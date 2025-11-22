@@ -40,10 +40,13 @@ class IosQRCodeGenerator : QRCodeGenerator {
         errorCorrection: String
     ): QRCodeData {
         try {
+            // Compress data if beneficial (similar to memvid)
+            val processedData = TextCompression.compress(data)
+
             val filter = CIFilter.filterWithName("CIQRCodeGenerator") ?:
                 throw IllegalStateException("CIQRCodeGenerator filter not available")
 
-            val inputData = data.encodeToByteArray()
+            val inputData = processedData.encodeToByteArray()
             val nsData = inputData.usePinned { pinned ->
                 NSData.create(bytes = pinned.addressOf(0), length = inputData.size.toULong())
             }

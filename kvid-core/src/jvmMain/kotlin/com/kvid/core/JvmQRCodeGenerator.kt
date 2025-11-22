@@ -19,12 +19,15 @@ class JvmQRCodeGenerator : QRCodeGenerator {
         version: Int,
         errorCorrection: String
     ): QRCodeData {
+        // Compress data if beneficial (similar to memvid)
+        val processedData = TextCompression.compress(data)
+
         // Check if data is too large for the requested version
         val maxCapacity = getMaxCapacityForVersion(version, errorCorrection)
-        if (data.toByteArray(Charsets.UTF_8).size > maxCapacity) {
+        if (processedData.toByteArray(Charsets.UTF_8).size > maxCapacity) {
             throw RuntimeException(
                 "Data too big for requested version. " +
-                "Data size: ${data.toByteArray(Charsets.UTF_8).size} bytes, " +
+                "Data size: ${processedData.toByteArray(Charsets.UTF_8).size} bytes, " +
                 "Max capacity for version $version with error correction $errorCorrection: $maxCapacity bytes. " +
                 "Consider using version 40 or chunking the data."
             )
@@ -37,7 +40,7 @@ class JvmQRCodeGenerator : QRCodeGenerator {
         )
 
         try {
-            val bitMatrix = writer.encode(data, BarcodeFormat.QR_CODE, 0, 0, hints)
+            val bitMatrix = writer.encode(processedData, BarcodeFormat.QR_CODE, 0, 0, hints)
             val width = bitMatrix.width
             val height = bitMatrix.height
 

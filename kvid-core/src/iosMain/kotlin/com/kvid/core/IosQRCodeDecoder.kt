@@ -84,7 +84,8 @@ class IosQRCodeDecoder : QRCodeDecoder {
         val payload = firstResult.payloadStringValue()
             ?: throw RuntimeException("Failed to extract QR code payload")
 
-        return payload
+        // Decompress if the data was compressed
+        return TextCompression.decompress(payload)
     }
 
     @OptIn(BetaInteropApi::class)

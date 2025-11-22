@@ -293,7 +293,10 @@ class JvmQRCodeDecoder : QRCodeDecoder {
                 ?: tryDecode(bitmap, pureHints)
                 ?: throw NotFoundException.getNotFoundInstance()
 
-            success(decodedText)
+            // Decompress if the data was compressed
+            val finalText = TextCompression.decompress(decodedText)
+
+            success(finalText)
         } catch (e: Exception) {
             failure(e)
         }
