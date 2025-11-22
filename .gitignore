@@ -1,0 +1,43 @@
+# Gradle
+.gradle/
+build/
+*.jar
+*.aar
+*.apk
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+
+# Kotlin
+.kotlin/
+*.kexe
+
+# Build artifacts
+out/
+bin/
+
+# Temp files
+*.tmp
+*.bak
+temp/
+
+# Python (for testing integration with memvid)
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+venv/
+
+# Local properties
+local.properties
+gradle.properties.local
+
+# Test outputs
+test-results/
+*.log
+kvid-examples/kvid-data/
