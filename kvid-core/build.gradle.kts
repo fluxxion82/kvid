@@ -1,3 +1,6 @@
+import org.gradle.api.tasks.testing.AbstractTestTask
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
@@ -60,5 +63,17 @@ kotlin {
             implementation(libs.androidx.test.core)
             implementation(libs.androidx.test.ext.junit)
         }
+    }
+}
+
+// Print failing tests with their messages and causes to the console so CI logs are diagnosable
+// without downloading the HTML/XML reports. Applies to JVM, Android host and Kotlin/Native test tasks.
+tasks.withType<AbstractTestTask>().configureEach {
+    testLogging {
+        events("failed", "skipped")
+        exceptionFormat = TestExceptionFormat.FULL
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
     }
 }
