@@ -68,6 +68,28 @@ jobs:
           arch: x86_64
           target: google_apis
           script: ./gradlew :kvid-core:connectedAndroidDeviceTest -Pandroid.testInstrumentationRunnerArguments.package=com.kvid.store --no-daemon --stacktrace
+      - name: Verify device tests ran
+        # The device-test task does not print counts and passes with zero tests, so count the JUnit results here.
+        run: |
+          python3 - <<'EOF'
+          import glob, sys, xml.etree.ElementTree as ET
+          run = failed = skipped = 0
+          for f in sorted(glob.glob("kvid-core/build/**/*.xml", recursive=True)):
+              try:
+                  root = ET.parse(f).getroot()
+              except ET.ParseError:
+                  continue
+              cases = list(root.iter("testcase"))
+              if not cases:
+                  continue
+              bad = sum(1 for c in cases if c.find("failure") is not None or c.find("error") is not None)
+              skip = sum(1 for c in cases if c.find("skipped") is not None)
+              print(f"{f}: {len(cases)} tests, {bad} failed, {skip} skipped")
+              run += len(cases); failed += bad; skipped += skip
+          print(f"Device tests: {run} run, {failed} failed, {skipped} skipped")
+          if run == 0:
+              sys.exit("No device test results found under kvid-core/build; the emulator job ran zero tests")
+          EOF
       - uses: actions/upload-artifact@v4
         if: always()
         with:
