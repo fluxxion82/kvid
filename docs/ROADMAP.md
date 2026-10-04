@@ -191,15 +191,16 @@ Defer stemming, advanced query syntax, phrase/prefix queries, and adaptive score
 
 ## Milestone 4: mobile proof and first release
 
-**Status: in progress on branch `phase-4-mobile-sample`** (five commits on `main` at `c299d31`; CI run 37228349307 green at `e3c017a`). Ready for review; packaging, snapshot UI and the open items below remain.
+**Status: implemented on branch `phase-4-mobile-sample`, ready for review** (eight commits on `main` at `c299d31`; CI run 37229989588 green at `c01c9da`, including the packaging check). An actual Maven Central release and the open items below remain.
 
 - [x] Notes sample (Compose Multiplatform 1.12.1, Material 3 1.9.0): `kvid-sample/shared` holds the UI, `NotesModel` and `StoreSession` for desktop, Android and iOS; `kvid-sample/androidApp` and the XcodeGen-generated `kvid-sample/iosApp` host it. Create, edit, delete, list, search while typing (whole words), tag chips, version history, close and reopen.
 - [x] Background/foreground transitions and recovery after process interruption, checked on running apps in CI. Android API 35 emulator: cold launch about 1.1 s creates and seeds the store; leaving the foreground closes it cleanly; a fresh process reopens it; killing the process with the store open, relaunching and leaving the foreground leaves a recovered, cleanly closed file with `quick_check` ok. iOS simulator: launch creates and seeds the store; moving another app to the front closes it cleanly. The checks read the store file from the device (`kvid-sample/check_store.py`).
 - [x] Serialized concurrent calls: `StoreSession` leases defer a background close until running work finishes, and a new use cancels a pending close (sample tests on the desktop JVM and iOS simulator).
 - [x] Documented resource lifecycle on the `Kvid` class: one writable handle per path per process, ownership at application scope on Android and iOS, transaction ownership, process death, and `close` semantics. `close()` can no longer be cancelled once called (a cancelled caller used to leave the handle open and its path reserved), and `use { }` closes after success, failure or cancellation; regression tests cover both.
 - [x] Basic document history is in the sample (versions oldest to newest, deletions kept).
-- [ ] Validate backup/export from a consistent committed snapshot in the sample (the store API and its tests exist; the sample has no export action yet).
-- [ ] Publish only targets that meet the acceptance criteria; document packaging for Kotlin and Swift consumers (Maven Central plus an XCFramework).
+- [x] Backup from a consistent committed snapshot in the sample: a Back up action writes a verified snapshot into a `backups` directory next to the store; a test opens it read-only, verifies it, and checks that the live store keeps accepting writes while the backup stays fixed.
+- [x] Packaging for Kotlin and Swift consumers, documented in the README and checked by the macOS CI job: `maven-publish` with POM metadata and javadoc jars stages the root module and its JVM, Android, iOS arm64 and iOS simulator arm64 publications; the release `KvidCore.xcframework` has device and simulator slices. All three platforms meet the CI acceptance checks.
+- [ ] Publish to Maven Central: needs a group ID in a verifiable namespace (`com.kvid` likely is not; `io.github.fluxxion82` would be), signing keys, and a Central Portal account. This is the owner's release decision.
 - [x] Migration statement for the experimental APIs and stored artifacts in the README: the QR/video classes are experimental and planned for `kvid-video`; their `.bin` indexes and MP4/QR artifacts are not compatible with `.kvid` stores and do not migrate automatically; data moves by re-adding text or importing JSON Lines. The README now leads with the store and the sample.
 
 Library changes in this phase:
