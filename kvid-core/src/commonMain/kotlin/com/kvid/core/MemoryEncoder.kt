@@ -57,23 +57,20 @@ class MemoryEncoder(
         outputPath: String,
         params: VideoEncodingParams = VideoEncodingParams()
     ): Result<EncodingStats> = withContext(Dispatchers.Default) {
+        if (chunks.isEmpty()) {
+            return@withContext Result.failure(IllegalStateException("No messages added"))
+        }
+        if (isEncoding) {
+            return@withContext Result.failure(IllegalStateException("Encoding already in progress"))
+        }
+
+        isEncoding = true
         try {
-            if (chunks.isEmpty()) {
-                return@withContext Result.failure(IllegalStateException("No messages added"))
-            }
-
-            if (isEncoding) {
-                return@withContext Result.failure(IllegalStateException("Encoding already in progress"))
-            }
-
-            isEncoding = true
-
             val capabilities = qrGenerator.getCapabilities()
             val startTime = Clock.System.now().toEpochMilliseconds()
 
             val errorCorrection = "M"
             if (!capabilities.supportedErrorCorrection.contains(errorCorrection)) {
-                isEncoding = false
                 return@withContext Result.failure(
                     IllegalArgumentException("Error correction level '$errorCorrection' not supported")
                 )
@@ -81,7 +78,6 @@ class MemoryEncoder(
 
             val oversizedChunks = chunks.filter { it.content.length > capabilities.maxDataCapacity }
             if (oversizedChunks.isNotEmpty()) {
-                isEncoding = false
                 return@withContext Result.failure(
                     IllegalArgumentException(
                         "Found ${oversizedChunks.size} chunk(s) exceeding max QR capacity of ${capabilities.maxDataCapacity} bytes. " +
@@ -90,7 +86,7 @@ class MemoryEncoder(
                 )
             }
 
-            videoEncoder.initialize(params).getOrElse { return@withContext Result.failure(it) }
+            videoEncoder.initialize(params).getOrThrow()
 
             for ((frameNum, chunk) in chunks.withIndex()) {
                 // Use version 30 which reliably handles 256-byte chunks
@@ -102,24 +98,27 @@ class MemoryEncoder(
 
                 val frameData = convertToRGB(qrData, params.width, params.height)
                 videoEncoder.addFrame(frameData, frameNum)
-                    .getOrElse { return@withContext Result.failure(it) }
+                    .getOrThrow()
             }
 
             val stats = videoEncoder.finalize(outputPath)
-                .getOrElse { return@withContext Result.failure(it) }
+                .getOrThrow()
 
-            isEncoding = false
             val encodingTime = Clock.System.now().toEpochMilliseconds() - startTime
 
             Result.success(
                 stats.copy(encodingTimeMs = encodingTime)
             )
-        } catch (e: CancellationException) {
-            throw e
         } catch (e: Exception) {
-            isEncoding = false
-            videoEncoder.cancel()
+            try {
+                videoEncoder.cancel()
+            } catch (cleanupFailure: Exception) {
+                if (cleanupFailure !== e) e.addSuppressed(cleanupFailure)
+            }
+            if (e is CancellationException) throw e
             Result.failure(e)
+        } finally {
+            isEncoding = false
         }
     }
 

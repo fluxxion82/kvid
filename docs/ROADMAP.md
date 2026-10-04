@@ -19,7 +19,7 @@ What is on the branch, and how each item was checked:
 | Gradle wrapper jar committed (was excluded by `*.jar`) | done | fresh `./gradlew` run in a clean container |
 | Kotlin 2.5.0-Beta1, Gradle 9.8.0, JDK 17 toolchain | done | JVM compile and tests executed |
 | AGP 9.4.0 via `com.android.kotlin.multiplatform.library`; Android target configured with `android {}` inside `kotlin {}`; device tests in `src/androidDeviceTest` | done | CI Ubuntu job (`./gradlew build`: Android compile, host tests, lint, JVM tests, examples) green on three consecutive runs |
-| iOS targets unchanged (iosX64, iosArm64, iosSimulatorArm64, static framework) | done | CI macOS job: Kotlin/Native 2.5.0-Beta1 compiles the iOS source sets and tests; 88 simulator tests run. Five `IosQRCodeGeneratorTest` cases fail on the runner with `Failed to create CGImage from QR code` (see Appendix A) and are skipped with that reason until reproduced locally |
+| iOS targets unchanged (iosX64, iosArm64, iosSimulatorArm64, static framework) | done | CI macOS job: Kotlin/Native 2.5.0-Beta1 compiles the iOS source sets and tests; 88 simulator tests run. Five `IosQRCodeGeneratorTest` rendering cases fail with `Failed to create CGImage from QR code` on CI and the local Xcode 26.2 simulator. CI explicitly excludes them with `KVID_SKIP_IOS_QR_RENDERING_TESTS=true`; they run by default locally (see Appendix A) |
 | kotlinx-coroutines 1.11.0, kotlinx-serialization 1.11.0 with the compiler plugin applied, androidx.test 1.7.0 / 1.3.0 | done | JVM compile |
 | Removed: Kotlin dev repo, `mavenLocal()`, four unrelated repos, `kotlinx-benchmark`, `maven-publish`, `appcompat`, forced Kotlin resolution strategy, no-op build-cache block | done | JVM configure |
 | `kvid-examples` compiles (three duplicate `main` functions removed) | done | compile executed |
@@ -54,7 +54,9 @@ The full per-platform defect list is in Appendix A as an investigation checklist
 - [x] Preserve coroutine cancellation through error handling. `Result` versus typed exceptions remains a separate API decision (open decision 5).
 - [x] Every test task prints failed and skipped events with full exception messages and causes, so CI logs are diagnosable without the report artifacts.
 - [x] First fully green CI run: commit `a997698`, run 37171137198 (https://github.com/fluxxion82/kvid/actions/runs/37171137198). Ubuntu green on all four runs; macOS green with the five Core Image rendering tests skipped and one decoder round-trip test ignored (82 passed, 6 skipped).
-- [ ] Reproduce the Core Image failure on a local Mac. If the generator works there, the skip reason becomes "GitHub runner limitation" and the tests can be gated on an environment variable; if it fails there too, Phase 1's pure-Kotlin QR encoder replaces it.
+- [x] Reproduce the Core Image failure locally: all five rendering tests fail on Xcode 26.2 with both default and software-renderer contexts. Remove unconditional `@Ignore` annotations; CI opts out using `KVID_SKIP_IOS_QR_RENDERING_TESTS=true`, excludes only these five tests, and prints the reason. A default local run exposes the defect.
+- [ ] Repair or replace the iOS renderer and remove the CI opt-out once the rendering tests pass. This remains a known platform defect, not a verified CI-only limitation.
+- [x] Fix `MemoryEncoder.buildVideo` lifecycle cleanup: cancellation and returned initialization/frame/finalization failures release resources and reset state; cleanup errors do not replace the original failure. Common regression tests exercise failure and successful retry.
 
 **Exit criterion:** reproducible build instructions and CI results for the actual branch, with platform limitations stated accurately.
 
@@ -237,7 +239,7 @@ Android (`AndroidVideoEncoder.kt`):
 
 iOS:
 
-- [x] confirmed by CI (three runs): `IosQRCodeGenerator.generateQRCode` throws `Failed to create CGImage from QR code` for every input on GitHub's macOS simulator runner, with both the default `CIContext` and `kCIContextUseSoftwareRenderer`. Not yet reproduced on a local Mac. Recommended Phase 1 fix regardless: a pure-Kotlin QR encoder in `commonMain` (a port of Nayuki's qrcodegen, or the `qrose` KMP library) so generation is byte-identical on every platform and depends on neither Core Image nor ZXing; decoding stays platform-specific (ZXing, Vision).
+- [x] confirmed by CI (three runs): `IosQRCodeGenerator.generateQRCode` throws `Failed to create CGImage from QR code` for every input on GitHub's macOS simulator runner, with both the default `CIContext` and `kCIContextUseSoftwareRenderer`. Also reproduced locally on Xcode 26.2 with both contexts. The five rendering tests run by default; CI explicitly opts out using `KVID_SKIP_IOS_QR_RENDERING_TESTS=true` and logs the exclusion reason. Recommended Phase 1 fix regardless: a pure-Kotlin QR encoder in `commonMain` (a port of Nayuki's qrcodegen, or the `qrose` KMP library) so generation is byte-identical on every platform and depends on neither Core Image nor ZXing; decoding stays platform-specific (ZXing, Vision).
 - [x] documented by an `@Ignore`d round-trip test: `IosQRCodeDecoder` passes raw pixels to `CIImage.imageWithData`, which expects an encoded image.
 - [ ] compiler warning, not yet confirmed at runtime: six `String as NSString` casts in `IosHnswVectorIndex.kt` are flagged "This cast can never succeed". Kotlin/Native often bridges these at runtime, so iOS index persistence needs an actual save/load test on the simulator before this is called a bug.
 - [ ] `IosTextCompression` uses Apple's raw-DEFLATE `zlib` algorithm under a `GZ:` prefix; JVM/Android gzip payloads cannot be read on iOS and vice versa.

@@ -251,8 +251,10 @@ Honest state as of October 2026:
 
 - **JVM**: QR generation/decoding, FFmpeg video encoding/decoding, chunking, embeddings and in-memory search work. The end-to-end encode → MP4 → decode path has no automated test yet.
 - **Android**: video encoding and QR decoding exist but have known defects (no QR generator, encoder does not drain output buffers, decoder ignores stride, decoded chunks are not decompressed). Not usable end to end yet.
-- **iOS**: QR generation works; the QR decoder, the video encoder (writes a custom container, not MP4) and compression (raw DEFLATE instead of gzip) are not compatible with the other platforms yet.
+- **iOS**: QR generation fails in the tested CI and local Xcode 26.2 simulators; the QR decoder, the video encoder (writes a custom container, not MP4) and compression (raw DEFLATE instead of gzip) are not compatible with the other platforms yet.
 - `SimpleEmbedding` is a hashing placeholder, not a semantic model.
+
+The five iOS QR rendering tests run by default. CI explicitly excludes them with `KVID_SKIP_IOS_QR_RENDERING_TESTS=true` while the simulator rendering defect is unresolved; the task logs this exclusion. The known decoder round-trip failure remains ignored.
 
 See `docs/ROADMAP.md` for the plan to fix these and where the project is heading.
 

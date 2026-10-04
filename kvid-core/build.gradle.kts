@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
@@ -75,5 +76,31 @@ tasks.withType<AbstractTestTask>().configureEach {
         showExceptions = true
         showCauses = true
         showStackTraces = true
+    }
+}
+
+// Keep rendering tests enabled by default. The CI simulator cannot currently render
+// Core Image QR images; opt out explicitly rather than ignoring tests on every host.
+val skipIosQrRendering = providers.environmentVariable("KVID_SKIP_IOS_QR_RENDERING_TESTS")
+    .map { it == "true" }.orElse(false)
+tasks.withType<KotlinNativeTest>().configureEach {
+    if (name.startsWith("ios") && skipIosQrRendering.get()) {
+        val renderingTests = listOf(
+            "testBasicQRCodeGeneration",
+            "testQRCodeWithDifferentErrorCorrection",
+            "testQRCodeLargeData",
+            "testPixelDataGrayscale",
+            "testQRCodeSquare"
+        )
+        renderingTests.forEach {
+            filter.excludeTestsMatching("com.kvid.core.IosQRCodeGeneratorTest.$it")
+        }
+        doFirst {
+            logger.warn(
+                "Excluding five iOS QR rendering tests: KVID_SKIP_IOS_QR_RENDERING_TESTS=true; " +
+                    "Core Image createCGImage returns nil on the tested simulators. " +
+                    "Unset the variable to run them (docs/ROADMAP.md Appendix A)."
+            )
+        }
     }
 }
