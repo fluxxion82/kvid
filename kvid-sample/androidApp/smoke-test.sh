@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Runs the installed debug app on a connected emulator and checks the store lifecycle on a device:
+#   1. a fresh launch creates and seeds the store and keeps it open in the foreground;
+#   2. leaving the foreground closes it cleanly (ProcessLifecycleOwner ON_STOP);
+#   3. a process killed with the store open relaunches, recovers and works.
+set -euo pipefail
+PKG=com.kvid.sample
+ACTIVITY="$PKG/com.kvid.sample.android.MainActivity"
+WORK=$(mktemp -d)
+CHECK="$(dirname "$0")/../check_store.py"
+
+pull_store() { adb exec-out run-as "$PKG" cat files/notes.kvid > "$WORK/notes.kvid"; }
+assert_alive() {
+  if ! adb shell pidof "$PKG" > /dev/null; then
+    adb logcat -d -b crash || true
+    echo "::error::$PKG is not running: $1"; exit 1
+  fi
+}
+assert_no_crash() {
+  if adb logcat -d -b crash | grep -q "$PKG"; then
+    adb logcat -d -b crash
+    echo "::error::$PKG crashed: $1"; exit 1
+  fi
+}
+
+adb logcat -c
+adb shell am start -W -n "$ACTIVITY"
+sleep 15
+assert_alive "after first launch"
+assert_no_crash "after first launch"
+pull_store
+python3 "$CHECK" "$WORK/notes.kvid" 0 6        # open in the foreground, seeded
+
+adb shell input keyevent KEYCODE_HOME
+sleep 5
+assert_no_crash "after leaving the foreground"
+pull_store
+python3 "$CHECK" "$WORK/notes.kvid" 1 6        # closed cleanly in the background
+
+adb shell am start -W -n "$ACTIVITY"
+sleep 10
+pull_store
+python3 "$CHECK" "$WORK/notes.kvid" 0 6        # reopened on return to the foreground
+adb shell am force-stop "$PKG"                 # kill with the store open
+sleep 2
+adb shell am start -W -n "$ACTIVITY"
+sleep 10
+assert_alive "after relaunching a killed process"
+assert_no_crash "after relaunching a killed process"
+adb shell input keyevent KEYCODE_HOME
+sleep 5
+pull_store
+python3 "$CHECK" "$WORK/notes.kvid" 1 6        # recovered, used and closed cleanly again
+echo "Android sample smoke test passed"

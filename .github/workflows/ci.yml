@@ -44,7 +44,9 @@ jobs:
         if: always()
         with:
           name: jvm-test-reports
-          path: kvid-core/build/reports/tests
+          path: |
+            kvid-core/build/reports/tests
+            kvid-sample/shared/build/reports/tests
 
   android-store:
     name: Android store (API 35 emulator)
@@ -68,10 +70,13 @@ jobs:
           arch: x86_64
           target: google_apis
           # The runner executes each script line separately. Device stdout goes to logcat, not Gradle,
-          # so the second line copies the search measurement line into the job log.
+          # so the second line copies the search measurement line into the job log. The last two lines
+          # install the notes sample and check the store lifecycle in the running app.
           script: |
             ./gradlew :kvid-core:connectedAndroidDeviceTest -Pandroid.testInstrumentationRunnerArguments.package=com.kvid.store --no-daemon --stacktrace
             adb logcat -d | grep -F "[kvid-measure]" || echo "no [kvid-measure] line in logcat"
+            ./gradlew :kvid-sample:androidApp:installDebug --no-daemon --stacktrace
+            bash kvid-sample/androidApp/smoke-test.sh
       - name: Verify device tests ran
         # The device-test task does not print counts or failing test names and passes with zero tests,
         # so count the JUnit results here and list failures. Runs after a failed test run as well.
@@ -127,8 +132,23 @@ jobs:
           # Local rendering tests remain enabled unless this opt-out is set.
           KVID_SKIP_IOS_QR_RENDERING_TESTS: 'true'
         run: ./gradlew :kvid-core:iosSimulatorArm64Test --no-daemon --stacktrace
+      - name: Sample model tests
+        run: ./gradlew :kvid-sample:shared:iosSimulatorArm64Test --no-daemon --stacktrace
+      - name: Build the iOS sample app
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          brew install xcodegen
+          cd kvid-sample/iosApp
+          xcodegen generate
+          xcodebuild -project KvidNotes.xcodeproj -target KvidNotes -configuration Debug -sdk iphonesimulator \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
+      - name: Run the iOS sample app
+        run: bash kvid-sample/iosApp/smoke-test.sh kvid-sample/iosApp/build/Debug-iphonesimulator/KvidNotes.app
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ios-test-reports
-          path: kvid-core/build/reports/tests
+          path: |
+            kvid-core/build/reports/tests
+            kvid-sample/shared/build/reports/tests
