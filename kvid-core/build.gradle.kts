@@ -16,7 +16,7 @@ kotlin {
     android {
         namespace = "com.kvid.core"
         compileSdk = libs.versions.androidCompileSdk.get().toInt()
-        minSdk = libs.versions.androidMinSdk.get().toInt()
+        minSdk = libs.versions.androidMinSdk.get().toInt()   // 23: required by androidx.sqlite 2.7 (ADR 0001)
 
         // Host-side (JVM) unit tests: runs commonTest on the host.
         withHostTestBuilder {}
@@ -25,8 +25,8 @@ kotlin {
         withDeviceTestBuilder {}
     }
 
+    // iosX64 (Intel simulator) is not published by androidx.sqlite 2.7.1 (ADR 0001).
     listOf(
-        iosX64(),
         iosArm64(),
         iosSimulatorArm64()
     ).forEach {
@@ -41,6 +41,9 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kotlinx.io.core)
+            api(libs.androidx.sqlite)
+            implementation(libs.androidx.sqlite.bundled)
         }
 
         commonTest.dependencies {

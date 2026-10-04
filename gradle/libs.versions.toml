@@ -2,7 +2,7 @@
 kotlin = "2.5.0-Beta1"
 agp = "9.4.0"
 androidCompileSdk = "36"
-androidMinSdk = "21"
+androidMinSdk = "23"
 coroutines = "1.11.0"
 serialization = "1.11.0"
 kotlinx-io = "0.9.1"

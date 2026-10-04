@@ -28,4 +28,3 @@ dependencyResolutionManagement {
 
 include(":kvid-core")
 include(":kvid-examples")
-include(":kvid-storage-spike")
