@@ -4,7 +4,7 @@ _Status: **Proposed**, version 0.1. Revised after Phase 1 review. This is the sp
 
 ## 1. Terms
 
-A store is a SQLite application database, conventionally `name.kvid`. A document has a stable `documentId`; immutable versions have store-wide `versionId` values. The current version is the newest version **including tombstones**: if it is a tombstone, the document is absent. Derived chunks and vectors are rebuildable, not authoritative.
+Creation must reserve a new file exclusively; opening writable must not recreate a missing file or modify an unsupported format before validation. A store is a SQLite application database, conventionally `name.kvid`. A document has a stable `documentId`; immutable versions have store-wide `versionId` values. The current version is the newest version **including tombstones**: if it is a tombstone, the document is absent. Derived chunks and vectors are rebuildable, not authoritative.
 
 A commit sequence (`seq`) increments once per committed write transaction. Versions in the same transaction share a sequence; order them by `(seq, versionId)`. Event time is supplied by the application, defaulting to put time. Commit time is informational and does not define visibility.
 
@@ -14,7 +14,7 @@ Default journal mode is `DELETE`. A write may create a `-journal` file. After su
 
 WAL is deferred from the public 0.1 API. A checkpoint and switch to `DELETE` cannot guarantee sidecar removal with an active reader or another process using the file. The spike tests both successful cleanup and a reader preventing the switch.
 
-A snapshot contains committed state only. Use a fresh read connection, rather than the writer connection with staged work, and bind the output pathname. `VACUUM INTO` creates a consistent database but does **not** atomically publish a destination: interruption can leave incomplete output. Export to an owned temporary path on the destination filesystem, validate the database and kvid invariants, sync it, atomically rename it, and sync the parent directory where supported. Reject an existing destination in 0.1. Return only after publication succeeds. Platform adapters must establish their rename and sync guarantees.
+A snapshot contains committed state only. Use a fresh read connection, rather than the writer connection with staged work, and bind the output pathname. `VACUUM INTO` creates a consistent database but does **not** atomically publish a destination: interruption can leave incomplete output. Export to an owned temporary path on the destination filesystem, validate the database and kvid invariants, sync it, atomically publish without replacement (a hard link followed by temporary-link removal is valid), and sync the parent directory where supported. Reject an existing destination in 0.1. Return only after publication succeeds. Platform adapters must establish their publication and sync guarantees. Android currently coordinates publishers with a per-destination directory reservation and atomic rename, because app SELinux rejects hard links; callers must own that destination directory against non-kvid writers. Stale reservations require inspection before manual removal. General Android no-replace publication without that ownership precondition requires a later native adapter.
 
 Reject snapshot and close calls from inside a managed transaction. Clean up only temporary files owned by this operation; never broadly delete matching files on open. A failure before rename must leave no published destination and must preserve the source. A sync failure after rename can leave a published file with uncertain durability; report that outcome and verify the owned destination before retrying.
 
@@ -24,7 +24,7 @@ Every writable connection explicitly configures and verifies `foreign_keys = ON`
 
 Outside `transaction { }`, each write commits before returning. Inside it, writes stage work; normal block completion commits, and an exception rolls back. There is no separately callable `commit()` that could prematurely commit a managed block. IDs returned inside the block are provisional until commit succeeds.
 
-The transaction receiver is an explicit scoped session. Hold the store's operation gate for the block and route session reads/writes directly to its connection; reacquiring a non-reentrant Mutex would deadlock. Reject reentry through the enclosing store, use after the session ends, and sharing the session with child coroutines. Nested session transactions use savepoints. Reads through the session see staged writes.
+The transaction receiver is an explicit scoped session. Hold the store's operation gate for the block and route session reads/writes directly to its connection; reacquiring a non-reentrant Mutex would deadlock. Reject reentry through the enclosing store or any active ancestor store, use after the session ends, and sharing the session with child coroutines. Nested session transactions use savepoints. Each write is individually savepoint-isolated so a caught write failure cannot leave partial changes; failed savepoint cleanup makes the outer session rollback-only. Reads through the session see staged writes.
 
 Check cancellation before commit. On cancellation or failure, perform rollback and connection cleanup in a non-cancellable context on the connection dispatcher, then propagate the original exception; retain cleanup failures as suppressed causes. Cancellation after commit cannot undo it. Blocking SQLite calls need not stop immediately on cancellation; this bundled build omits the progress callback.
 
@@ -32,7 +32,7 @@ Check cancellation before commit. On cancellation or failure, perform rollback a
 
 ## 4. Recovery, validation, and compatibility
 
-SQLite owns transaction journal recovery. kvid validates application identity and metadata, uses `quick_check` after a detected unclean shutdown, and exposes `verify()` with `integrity_check`, foreign-key checks, current-version/tombstone invariants, and FTS external-content consistency (`integrity-check` with `rank = 1`). A clean-close marker is advisory, particularly across processes.
+SQLite owns transaction journal recovery. kvid validates application identity and metadata, uses `quick_check` after a detected unclean shutdown, and exposes `verify()` with `integrity_check`, foreign-key checks, current-version/tombstone invariants, and FTS external-content consistency (`integrity-check` with `rank = 1`). Read-only verification explicitly reports FTS coverage in `VerifyReport.unchecked`; `ok` describes performed checks, not completeness. Public multi-statement reads and exports use one read transaction, including page payloads and cursor metadata. A clean-close marker is advisory, particularly across processes.
 
 SQLite does not inspect every page on every read. An invalid header is not evidence that arbitrary corruption can never return readable rows. Detected corruption must surface explicitly; unaccessed corruption requires verification. Refuse non-kvid databases as `NotAStore`, and damaged recognized stores as `Corrupt`; document ambiguous invalid-header classification.
 

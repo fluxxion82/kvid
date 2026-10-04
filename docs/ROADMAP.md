@@ -82,25 +82,26 @@ The spike targets minSdk 23 and omits iosX64 because the pinned artifact has no 
 
 ## Milestone 2: durable document store
 
-**Status: implemented, under review** on branch `phase-2-document-store` (CI run 37184291494 green on JVM, Android host and the iOS simulator at commit `9f38069`). `kvid-core` now carries the store in package `com.kvid.store`; the storage spike is deleted. The planning documents stay on this branch; the code branch has none.
+**Status: implemented, review corrections applied; release validation incomplete** on branch `phase-2-document-store` (CI run 37184291494 green on JVM and the iOS simulator; the Android host store suite was skipped at commit `9f38069`). `kvid-core` now carries the store in package `com.kvid.store`; the storage spike is deleted. The planning documents stay on this branch; the code branch has none.
 
 What is implemented, against the persistence contract:
 
 - [x] `kvid-core` minSdk 23 and `iosX64` removed (ADR 0001).
-- [x] `Kvid.create`, `open`, `openReadOnly`, `suspend close()`: `application_id`, `kvid_meta` format/schema versions, forward-only transactional migrations (none yet), `quick_check` after an unclean close, newer major or minor refused for every open; every writable connection sets and verifies `foreign_keys=ON`, `journal_mode=DELETE`, `synchronous=EXTRA` (contract 3, 4).
+- [x] `Kvid.create`, `open`, `openReadOnly`, `suspend close()`: `application_id`, `kvid_meta` format/schema versions, version checks that refuse older schemas until a real migration is provided, `quick_check` after an unclean close, newer major or minor refused for every open; every writable connection sets and verifies `foreign_keys=ON`, `journal_mode=DELETE`, `synchronous=EXTRA` (contract 3, 4).
 - [x] Scoped `transaction { }` with a `Transaction` receiver: no manual commit; savepoint nesting; reentry through the store, use after the block, and use from another coroutine are rejected; cancellation is checked before commit; rollback and cleanup run in a non-cancellable context on the connection dispatcher with cleanup failures suppressed (contract 3).
 - [x] Documents and versions: UUIDv7 or caller ids, `AUTOINCREMENT` version ids, `(seq, versionId)` visibility with tombstones, `get(asOfSeq)`, `history`, update creates a superseding version, delete creates a tombstone, several updates in one transaction (contract 6).
 - [x] Current-content projection (`current`) kept in the same transaction as the version write, external-content FTS5 maintained by triggers, `rebuildIndex()` from authoritative versions; `find` searches current live versions only, filters by tag and event-time range, returns higher-is-better scores and snippets (contract 7).
-- [x] `list` ordered by `(eventTime desc, versionId desc)` with keyset cursors; `find` with offset cursors; every cursor carries commit sequence, history floor and a query fingerprint and expires with `CursorExpired` after any committed write or compaction (contract 7).
-- [x] Bounds checked before writes (body, title, metadata, uri, tags) and stored lengths validated before materialising large text; hard library caps above configurable limits (contract 8).
+- [x] `list` ordered by `(eventTime desc, versionId desc)` with keyset cursors; `find` with offset cursors; every cursor carries commit sequence, history floor and an exact bounded query fingerprint and expires with `CursorExpired` after any committed write or compaction (contract 7).
+- [x] Bounds checked before writes (body, title, metadata, uri, tags) and stored body/metadata/title/URI/tag lengths validated before materialising large text; hard library caps above configurable limits (contract 8).
 - [x] `KvidException` subclasses with stable codes; driver errors translated by a version-pinned message parser with unknown codes mapped to `Io` (contract 5, see deviations).
-- [x] `snapshot()`: `VACUUM INTO` a temporary file next to the destination through a fresh read-only connection, validation of the copy, durability through a write transaction under `synchronous=EXTRA`, atomic rename, parent-directory fsync via a small `expect`/`actual` (JVM `FileChannel.force`, Android `Os.fsync`, iOS `fsync`); existing destinations refused; temp files removed on failure (contract 2).
+- [x] `snapshot()`: `VACUUM INTO` a temporary file next to the destination through a fresh read-only connection, validation of the copy, durability through a write transaction under `synchronous=EXTRA`, atomic publication, parent-directory fsync via a small `expect`/`actual` (JVM `FileChannel.force`, Android `Os.fsync`, iOS `fsync`); existing destinations refused; temp files removed on failure (contract 2).
 - [x] `verify()`: `integrity_check`, `foreign_key_check`, current-version and projection invariants, sequence bound, predecessor references, FTS `integrity-check` with `rank=1` on writable handles (contract 4).
 - [x] `vacuum(KEEP_ALL | KEEP_LATEST)`: retention applied transactionally with an explicit history floor (`asOf` below it raises `HistoryUnavailable`, deletion markers retained), then `VACUUM` (contract 6).
 - [x] JSON Lines export of every retained version; import of live current versions in one transaction, preserving ids, event times, titles, metadata, uris and tags.
 - [x] Tests (common, run on JVM and the iOS simulator; skipped on the Android host runtime where the bundled natives cannot load): reopen round trip, copying a closed file, foreign and newer files, unclean-close marker, commit/rollback/cancellation/savepoints/reentry/escape, versions and as-of visibility, same-transaction ordering, caller ids and unique uri, list ordering and cursor expiry, current-only search and find cursors, projection drift and rebuild, page damage, one writable handle per path plus read-only handles, snapshots, bounds, retention floor, JSON Lines, error translation, UUIDv7, float32 blob codec.
 - [x] JVM-only: a child JVM is SIGKILLed while holding an open write transaction; the parent reopens, sees exactly the committed documents, `verify()` passes, and the hot journal is gone.
-- [ ] Android device run of the common suite (the host runtime skips it). Needs an emulator job or a device.
+- [x] Android common store suite on a local Pixel 9 arm64 emulator, Android 15/API 35, with zero skips. Repeat on the corrected final tip; API 35 emulator CI is now configured.
+- [ ] Minimum-supported API 23 runtime validation and representative physical-device coverage.
 - [ ] A committed cross-platform fixture file read on all three targets (today each platform round-trips its own closed file).
 - [ ] Disk-full and failed-sync injection through the store API (the spike exercised `max_page_count` on a raw connection; the store has no test hook yet).
 - [ ] Process-kill recovery on iOS and Android (the JVM test cannot run in the simulator).
@@ -111,13 +112,33 @@ Deviations from, or decisions within, the contract for review:
 
 1. `update` creates a version with exactly the supplied fields; nothing is inherited from the previous version. Simple and explicit; an app that edits a body must resend title, tags, uri.
 2. Writable handles are coordinated per canonical path by refusing a second writable open in the same process with `Locked`, rather than sharing one connection owner between handles.
-3. `verify()` on a read-only handle cannot run FTS5's `integrity-check` (it is an `INSERT`) and skips it; the report says nothing about this today and should.
+3. Read-only `verify()` cannot run the FTS write command; `VerifyReport.unchecked` explicitly lists this missing coverage. `ok` applies only to performed checks. Snapshot validation uses writable full invariant verification.
 4. Error translation still parses the driver's message (pinned to 2.7.1 and tested); no supported adapter exists in androidx.sqlite. Unknown codes map to `Io`.
 5. `find` pagination is offset-based under a cursor that expires on any write; keyset paging on `(score, versionId)` was not worth it while ranking is still Milestone 3's subject.
 6. `importJsonLines` imports live current versions only; it does not reconstruct history.
 7. The connection dispatcher is `ioDispatcher.limitedParallelism(1)` per store (an `expect val` because `Dispatchers.IO` is not visible from common code).
 
-**Exit criterion:** committed documents and metadata survive close/reopen on every target; interrupted writes preserve the last committed state; detected corruption surfaces explicitly, and verify checks the full database and application invariants. Met on JVM and the iOS simulator; the Android device run is the open item.
+**Exit criterion:** committed documents and metadata survive close/reopen on every target; interrupted writes preserve the last committed state; detected corruption surfaces explicitly, and verify checks the full database and application invariants. Close/reopen and the common suite are verified on JVM/iOS; see the review evidence below for Android. Portable fixtures, store-level fault injection and mobile process interruption remain open validation items.
+
+### Phase 2 review corrections
+
+The review reproduced partial writes after a caught unique-URI failure, leaked transactions after cancellation during BEGIN, hidden outer-store reentry during nested transactions, projection-content drift missed by verify, title-length bounds missed during reads, and query cursor hash collisions. Corrected code isolates individual writes with savepoints, covers transaction/resource acquisition cancellation, retains ancestor transaction markers, groups multi-statement reads/exports in a read snapshot, compares projected content with authoritative versions, reports unchecked verification coverage, validates snapshot invariants, bounds stored title/URI/tag fields and compares exact query identities. Cleanup failures make a session rollback-only; ambiguous failed commits invalidate the connection and release its reservation. All vacuum/rebuild operations expire cursors. File creation reserves its path atomically; writable open cannot recreate a missing file, and unsupported format checks precede mutating connection configuration.
+
+Publication never replaces an existing destination on JVM/iOS (atomic hard-link creation followed by removal of the temporary link). Android app SELinux rejects hard links: an exclusive per-destination directory reservation coordinates kvid publishers across processes, followed by existence check and atomic rename. Android requires an app-owned destination directory without non-kvid writers; this is an explicit limitation, not a general filesystem no-replace primitive. A crash can leave `.NAME.kvid-publish-lock`; inspect destination and temporary output before manually removing that reservation. Unsupported publication/filesystem behavior must fail rather than silently weaken the guarantee. Failed directory sync after publication raises an uncertain-durability error and retains the published destination for inspection.
+
+**Reviewed code tip:** `8b47f77` on `phase-2-document-store`. Final local focused results: JVM 45 tests (including subprocess-kill recovery), iOS simulator 44, and Android Pixel 9 arm64/API 35 44; zero failures or skips in these store suites. Full CI at this corrected tip must pass before integration. The earlier CI run listed above belongs to the pre-review implementation.
+
+The Android device compilation now explicitly includes commonTest via `sourceSetTreeName = "test"`; the original configuration did not. A local Pixel 9 arm64 emulator running Android 15/API 35 passed the reviewed suite; final test totals and code tip are recorded below. Host tests returning without execution are not Android store runtime evidence.
+
+A trigger-induced SQLite automatic rollback regression verifies that caught failures cannot continue writing outside the intended transaction. The failed-commit regression uses a rollback trigger, not a failed-fsync injection: the latter remains a required gate. Schema 0 is refused rather than silently bumped to 1, since no historical migration has been implemented.
+
+### Milestone 3 order
+
+1. Establish the query API first: plain text by default, tokenize/quote literal terms with explicit AND/OR semantics; reserve raw FTS5 syntax for an opt-in advanced mode. Decide empty/punctuation-only and Unicode behavior, bound input and cursor lengths, and translate all invalid-query cases consistently. Existing `find` passes raw FTS5 expressions and remains an experimental API until this work lands.
+2. Validate tag/date/URI filters, their combinations, tie order and cursor expiry; add representative BM25 ranking cases and an independent small reference calculation.
+3. Measure realistic corpora and mobile resources before setting release budgets.
+
+Do not begin substantial Phase 3 implementation until the Phase 2 corrected branch's CI passes. Keep portable fixtures and disk-full/failed-sync injection visible as Phase 2 acceptance gates rather than treating green happy-path tests as complete durability validation.
 
 ## Milestone 3: useful offline full-text search
 
@@ -251,3 +272,8 @@ kvid began as a port of memvid v1 (Python; text chunks, gzip, QR codes, MP4 fram
 - [SQLite single-file portability](https://www.sqlite.org/onefile.html), [atomic commit](https://www.sqlite.org/atomiccommit.html), and [WAL behavior](https://www.sqlite.org/wal.html) inform the storage comparison; runtime journals differ from a closed portable artifact.
 - [kotlinx-io buffered I/O](https://kotlinlang.org/api/kotlinx-io/kotlinx-io-core/kotlinx.io/-sink/) informs common I/O usage if the custom-store path is chosen; platform durability requirements must be established separately.
 - [Android Gradle Library Plugin for KMP](https://developer.android.com/kotlin/multiplatform/plugin) documents the `android {}` block used in `kvid-core/build.gradle.kts`.
+
+## Phase 2 review implementation references
+
+- [Device-test source set configuration](https://developer.android.com/kotlin/multiplatform/plugin): `sourceSetTreeName = "test"` includes commonTest without breaking the default native hierarchy.
+- [Android emulator runner](https://github.com/ReactiveCircus/android-emulator-runner): the added CI job uses API 35/x86_64 and enables KVM. Local evidence above is API 35/arm64, not a result for the new CI job.
