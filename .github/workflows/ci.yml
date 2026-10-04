@@ -67,7 +67,11 @@ jobs:
           api-level: 35
           arch: x86_64
           target: google_apis
-          script: ./gradlew :kvid-core:connectedAndroidDeviceTest -Pandroid.testInstrumentationRunnerArguments.package=com.kvid.store --no-daemon --stacktrace
+          # The runner executes each script line separately. Device stdout goes to logcat, not Gradle,
+          # so the second line copies the search measurement line into the job log.
+          script: |
+            ./gradlew :kvid-core:connectedAndroidDeviceTest -Pandroid.testInstrumentationRunnerArguments.package=com.kvid.store --no-daemon --stacktrace
+            adb logcat -d | grep -F "[kvid-measure]" || echo "no [kvid-measure] line in logcat"
       - name: Verify device tests ran
         # The device-test task does not print counts and passes with zero tests, so count the JUnit results here.
         run: |

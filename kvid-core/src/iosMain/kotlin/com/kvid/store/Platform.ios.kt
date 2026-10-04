@@ -8,6 +8,8 @@ import platform.posix.O_RDONLY
 import platform.posix.close
 import platform.posix.fsync
 import platform.posix.open
+import platform.Foundation.NSString
+import platform.Foundation.precomposedStringWithCanonicalMapping
 
 internal actual object FileSync {
     @OptIn(ExperimentalForeignApi::class)
@@ -43,3 +45,6 @@ internal actual object PlatformInfo {
 }
 
 internal actual val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+
+internal actual fun normalizeNfc(text: String): String =
+    (text as NSString).precomposedStringWithCanonicalMapping

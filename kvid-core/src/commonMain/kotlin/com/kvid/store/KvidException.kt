@@ -25,6 +25,8 @@ sealed class KvidException(val code: String, message: String, cause: Throwable? 
     class HistoryUnavailable(message: String) : KvidException("KV_HISTORY_UNAVAILABLE", message)
     /** The cursor was issued before a write or compaction and is no longer valid. */
     class CursorExpired(message: String) : KvidException("KV_CURSOR_EXPIRED", message)
+    /** A [QuerySyntax.FTS5] expression the full-text engine rejected. [QuerySyntax.PLAIN] queries never raise this. */
+    class InvalidQuery(message: String, cause: Throwable? = null) : KvidException("KV_INVALID_QUERY", message, cause)
     /** The document does not exist (or is deleted, for operations that need a live document). */
     class NotFound(message: String) : KvidException("KV_NOT_FOUND", message)
     /** A file or document that must not exist already does. */

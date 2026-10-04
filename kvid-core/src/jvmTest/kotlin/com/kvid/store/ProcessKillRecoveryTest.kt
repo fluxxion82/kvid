@@ -41,6 +41,8 @@ class ProcessKillRecoveryTest {
             assertEquals(listOf("committed 2", "committed 1"), reopened.list().items.map { it.body })
             assertEquals(2L, reopened.stats().commitSeq)
             assertTrue(reopened.verify().ok, reopened.verify().problems.joinToString())
+            assertEquals(2, reopened.find("committed").items.size, "the full-text index matches the recovered documents")
+            assertTrue(reopened.find("vanish").items.isEmpty(), "rolled-back text is not searchable after recovery")
             reopened.close()
             assertEquals(listOf("kill.kvid", "marker"), dir.listNames(), "the hot journal was rolled back and removed")
         } finally {

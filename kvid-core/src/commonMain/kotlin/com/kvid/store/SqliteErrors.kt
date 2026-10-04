@@ -13,6 +13,7 @@ internal object SqliteErrors {
     private val codePattern = Regex("""Error code: (\d+)""")
 
     // Primary result codes, https://www.sqlite.org/rescode.html
+    const val SQLITE_ERROR = 1
     const val SQLITE_BUSY = 5
     const val SQLITE_LOCKED = 6
     const val SQLITE_READONLY = 8
@@ -24,6 +25,9 @@ internal object SqliteErrors {
 
     fun primaryCode(e: SQLiteException): Int? =
         codePattern.find(e.message.orEmpty())?.groupValues?.get(1)?.toIntOrNull()?.let { it and 0xFF }
+
+    /** The driver message without its `Error code: n, message: ` prefix. */
+    fun driverMessage(e: SQLiteException): String = e.message.orEmpty().let { it.substringAfter("message: ", it) }
 
     fun translate(e: SQLiteException, context: String): KvidException {
         val msg = "$context: ${e.message}"

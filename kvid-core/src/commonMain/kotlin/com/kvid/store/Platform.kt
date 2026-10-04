@@ -24,3 +24,10 @@ internal expect object PlatformInfo {
     /** False on the Android host-JVM unit-test runtime, where the bundled driver's native library is not loadable. */
     val storeSupported: Boolean
 }
+
+/**
+ * Unicode NFC normalization. kvid stores titles, bodies and tags in NFC and normalizes queries and tag
+ * filters the same way, so canonically equivalent text indexes, matches and filters identically
+ * (persistence contract, section 7). Uris and metadata are stored as given.
+ */
+internal expect fun normalizeNfc(text: String): String
