@@ -10,7 +10,7 @@ import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import androidx.core.graphics.createBitmap
+import android.graphics.Bitmap
 
 /**
  * Android implementation of video encoding using MediaCodec
@@ -574,7 +574,7 @@ class AndroidQRCodeDecoder : QRCodeDecoder {
 
     override suspend fun decodeQRCode(frameData: DecodedFrame): Result<String> = withContext(Dispatchers.Default) {
         try {
-            val bitmap = createBitmap(frameData.width, frameData.height, android.graphics.Bitmap.Config.RGB_565)
+            val bitmap = Bitmap.createBitmap(frameData.width, frameData.height, Bitmap.Config.RGB_565)
 
             var idx = 0
             for (y in 0 until frameData.height) {

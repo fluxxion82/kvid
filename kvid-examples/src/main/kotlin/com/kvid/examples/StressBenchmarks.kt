@@ -586,11 +586,3 @@ object StressBenchmarks {
         println("═".repeat(70))
     }
 }
-
-fun main(args: Array<String>) {
-    if (args.isNotEmpty() && args[0] == "benchmark-stress") {
-        StressBenchmarks.runAll()
-    } else {
-        println("Usage: ./gradlew :kvid-examples:run --args=\"benchmark-stress\"")
-    }
-}

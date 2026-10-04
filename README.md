@@ -13,7 +13,12 @@ KVID is a Kotlin Multiplatform port and evolution of [MemVid](https://github.com
 - High-level APIs: `MemoryStore`, `MemoryEncoder`, and `MemoryDecoder`
 
 ## Prerequisites
-- **FFmpeg** (optional, for JVM video encoding)
+- **JDK 17** (the build uses a Java 17 toolchain)
+- **Android SDK** (compileSdk 36) for the Android target
+- **Xcode** on macOS for the iOS targets
+- **FFmpeg** on the PATH for JVM video encoding/decoding and the JVM video tests
+
+Toolchain: Kotlin 2.5.0-Beta1, Gradle 9.8, Android Gradle Plugin 9.4 (KMP library plugin).
 
 ## Modules
 - `kvid-core/` – shared APIs and platform wiring under `src/commonMain`, `androidMain`, `jvmMain`, and `iosMain`
@@ -242,6 +247,13 @@ val qrDecoder = IosQRCodeDecoder()
 ```
 
 ## Status
-Core APIs, QR generation, chunking, embeddings, and in-memory search are implemented. Video encoding/decoding is production-ready on Android and iOS, with JVM support via FFmpeg. See the examples section above for the latest runnable flows.
+Honest state as of October 2026:
+
+- **JVM**: QR generation/decoding, FFmpeg video encoding/decoding, chunking, embeddings and in-memory search work. The end-to-end encode → MP4 → decode path has no automated test yet.
+- **Android**: video encoding and QR decoding exist but have known defects (no QR generator, encoder does not drain output buffers, decoder ignores stride, decoded chunks are not decompressed). Not usable end to end yet.
+- **iOS**: QR generation works; the QR decoder, the video encoder (writes a custom container, not MP4) and compression (raw DEFLATE instead of gzip) are not compatible with the other platforms yet.
+- `SimpleEmbedding` is a hashing placeholder, not a semantic model.
+
+See `docs/ROADMAP.md` for the plan to fix these and where the project is heading.
 
 MIT License

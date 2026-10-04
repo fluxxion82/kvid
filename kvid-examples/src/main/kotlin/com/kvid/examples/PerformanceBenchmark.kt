@@ -401,11 +401,3 @@ object PerformanceBenchmark {
         println("═".repeat(64))
     }
 }
-
-fun main(args: Array<String>) {
-    if (args.isNotEmpty() && args[0] == "benchmark") {
-        PerformanceBenchmark.runAll()
-    } else {
-        println("Usage: ./gradlew :kvid-examples:run --args=\"benchmark\"")
-    }
-}

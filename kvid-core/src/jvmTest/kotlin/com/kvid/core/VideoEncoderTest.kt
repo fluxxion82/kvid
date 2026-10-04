@@ -5,13 +5,23 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
- * Video encoder integration tests (requires FFmpeg installed)
- * These tests require actual FFmpeg binary and may be skipped in CI environments
+ * Video encoder integration tests (requires FFmpeg installed).
+ *
+ * Without ffmpeg the tests are skipped locally, but they FAIL when the CI environment
+ * variable is set so the suite can never go green with zero video coverage.
  */
 class VideoEncoderTest {
     private var ffmpegAvailable = false
+
+    private fun ffmpegOrSkip(): Boolean {
+        if (ffmpegAvailable) return true
+        if (System.getenv("CI") != null) fail("ffmpeg is required for video tests in CI")
+        println("Skipping: FFmpeg not available (install: brew install ffmpeg / apt install ffmpeg)")
+        return false
+    }
 
     @BeforeTest
     fun setUp() {
@@ -20,10 +30,7 @@ class VideoEncoderTest {
 
     @Test
     fun initializeCreatesValidEncoderState() {
-        if (!ffmpegAvailable) {
-            println("Skipping: FFmpeg not available")
-            return
-        }
+        if (!ffmpegOrSkip()) return
 
         val encoder = JvmVideoEncoder()
         val params = VideoEncodingParams(
@@ -55,10 +62,7 @@ class VideoEncoderTest {
 
     @Test
     fun rejectsNonRGBFrameFormat() {
-        if (!ffmpegAvailable) {
-            println("Skipping: FFmpeg not available")
-            return
-        }
+        if (!ffmpegOrSkip()) return
 
         val encoder = JvmVideoEncoder()
         val params = VideoEncodingParams(width = 256, height = 256)
@@ -94,10 +98,7 @@ class VideoEncoderTest {
      */
     @Test
     fun simpleEncodeTest() {
-        if (!ffmpegAvailable) {
-            println("Skipping: FFmpeg not available. Install: brew install ffmpeg")
-            return
-        }
+        if (!ffmpegOrSkip()) return
 
         val tempFile = File.createTempFile("kvid-test-", ".mp4")
         tempFile.deleteOnExit()
