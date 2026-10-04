@@ -2,6 +2,7 @@
 
 package com.kvid.core
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
@@ -38,6 +39,8 @@ class IosVideoEncoder : VideoEncoder {
             initialized = true
             canceled = false
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -102,6 +105,8 @@ class IosVideoEncoder : VideoEncoder {
 
             cleanup()
             Result.success(stats)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }

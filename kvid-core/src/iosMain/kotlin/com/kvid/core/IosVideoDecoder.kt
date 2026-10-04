@@ -2,6 +2,7 @@
 
 package com.kvid.core
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -115,6 +116,8 @@ class IosVideoDecoder : VideoDecoder {
             assetReader.cancelReading()
 
             Result.success(frames)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -155,6 +158,8 @@ class IosVideoDecoder : VideoDecoder {
                     codec = codec
                 )
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }

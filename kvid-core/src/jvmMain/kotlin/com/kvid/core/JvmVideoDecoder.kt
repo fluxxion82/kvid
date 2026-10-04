@@ -6,6 +6,7 @@ import com.google.zxing.MultiFormatReader
 import com.google.zxing.NotFoundException
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource
 import com.google.zxing.common.HybridBinarizer
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.awt.image.BufferedImage
@@ -68,9 +69,13 @@ class JvmVideoDecoder : VideoDecoder {
                 Files.walk(tempDir)
                     .sorted(Comparator.reverseOrder())
                     .forEach { Files.deleteIfExists(it) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) { }
 
             success(results)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             failure(e)
         }
@@ -145,6 +150,8 @@ class JvmVideoDecoder : VideoDecoder {
                 duration = duration,
                 codec = codec
             ))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             failure(e)
         }
@@ -178,6 +185,8 @@ class JvmVideoDecoder : VideoDecoder {
             } else {
                 failure(Exception("FFmpeg frame extraction failed with code $exitCode"))
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             failure(e)
         }
@@ -213,6 +222,8 @@ class JvmVideoDecoder : VideoDecoder {
                 height = height,
                 format = PixelFormat.RGB_888
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             null
         }
@@ -251,6 +262,8 @@ class JvmVideoDecoder : VideoDecoder {
                 height = image.height,
                 format = PixelFormat.RGB_888
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             null
         }
@@ -297,6 +310,8 @@ class JvmQRCodeDecoder : QRCodeDecoder {
             val finalText = TextCompression.decompress(decodedText)
 
             success(finalText)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             failure(e)
         }

@@ -7,6 +7,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.os.Build
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -50,6 +51,8 @@ class AndroidVideoEncoder : VideoEncoder {
             }
 
             initializeCodec(params, mimeType, params.width, params.height)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -104,6 +107,8 @@ class AndroidVideoEncoder : VideoEncoder {
             this.presentationTimeUs.clear()
 
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             mediaCodec?.release()
             mediaCodec = null
@@ -129,6 +134,8 @@ class AndroidVideoEncoder : VideoEncoder {
             } ?: return null
 
             MediaCodec.createByCodecName(codecInfo.name)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             null
         }
@@ -140,6 +147,8 @@ class AndroidVideoEncoder : VideoEncoder {
             codecs.any { info ->
                 info.isEncoder && info.supportedTypes.contains(mimeType)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             false
         }
@@ -182,6 +191,8 @@ class AndroidVideoEncoder : VideoEncoder {
             }
 
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -261,6 +272,8 @@ class AndroidVideoEncoder : VideoEncoder {
                     encodingTimeMs = encodingTimeMs
                 )
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         } finally {
@@ -282,6 +295,8 @@ class AndroidVideoEncoder : VideoEncoder {
             mediaMuxer?.release()
             mediaMuxer = null
             presentationTimeUs.clear()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             // Silently fail on cleanup
         }
@@ -438,6 +453,8 @@ class AndroidVideoDecoder : VideoDecoder {
             extractor.release()
 
             Result.success(results)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -503,6 +520,8 @@ class AndroidVideoDecoder : VideoDecoder {
                     codec = codec
                 )
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -561,6 +580,8 @@ fun getCodecNameForCodec(codec: VideoCodec): String {
 private fun MediaFormat.getIntegerIfAvailable(key: String, defaultValue: Int): Int {
     return try {
         getInteger(key)
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
         defaultValue
     }
@@ -614,6 +635,8 @@ class AndroidQRCodeDecoder : QRCodeDecoder {
             bitmap.recycle()
 
             Result.success(result.text)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }

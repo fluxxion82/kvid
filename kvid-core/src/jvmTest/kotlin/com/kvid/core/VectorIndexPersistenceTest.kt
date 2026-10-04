@@ -37,8 +37,13 @@ class JvmVectorIndexPersistenceTest {
         assertTrue(File(indexPath).exists(), "Index file should be created")
 
         val loadedIndex = JvmFlatVectorIndex(embedding)
-        loadedIndex.load(indexPath)
+        loadedIndex.load(indexPath).getOrThrow()
         assertEquals(4, loadedIndex.size(), "Loaded index should have 4 vectors")
+        for (id in vectors.indices) {
+            assertContentEquals(index.getVector(id), loadedIndex.getVector(id), "Vector $id must survive save/load")
+        }
+        val query = embedding.embed("banana")
+        assertEquals(index.search(query, topK = 4).map { it.id }, loadedIndex.search(query, topK = 4).map { it.id })
     }
 
     @Test
@@ -80,8 +85,13 @@ class JvmVectorIndexPersistenceTest {
         assertTrue(File(indexPath).exists(), "HNSW index file should be created")
 
         val loadedIndex = JvmHnswVectorIndex(embedding, maxM = 16, efConstruction = 200)
-        loadedIndex.load(indexPath)
+        loadedIndex.load(indexPath).getOrThrow()
         assertEquals(5, loadedIndex.size(), "Loaded HNSW index should have 5 vectors")
+        for (id in vectors.indices) {
+            assertContentEquals(index.getVector(id), loadedIndex.getVector(id), "Vector $id must survive save/load")
+        }
+        val query = embedding.embed("dog")
+        assertEquals(index.search(query, topK = 5).map { it.id }, loadedIndex.search(query, topK = 5).map { it.id })
     }
 
     @Test
@@ -262,8 +272,9 @@ class JvmVectorIndexPersistenceTest {
         val nonexistentPath = File(tempDir, "nonexistent.bin").absolutePath
         val index = JvmFlatVectorIndex(embedding)
 
-        index.load(nonexistentPath)
-        assertNotNull(index)
+        val result = index.load(nonexistentPath)
+        assertTrue(result.isFailure, "Loading a missing file must fail, not silently succeed")
+        assertEquals(0, index.size())
     }
 
     @Test

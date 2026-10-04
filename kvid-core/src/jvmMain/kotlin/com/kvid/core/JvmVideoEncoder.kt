@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * JVM implementation of video encoding using FFmpeg
@@ -37,6 +38,8 @@ class JvmVideoEncoder : VideoEncoder {
             tempDir = Files.createTempDirectory("kvid-video-")
 
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -70,6 +73,8 @@ class JvmVideoEncoder : VideoEncoder {
             frameFiles.add(frameFile)
             frameCount++
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -128,6 +133,8 @@ class JvmVideoEncoder : VideoEncoder {
                     encodingTimeMs = encodingTimeMs
                 )
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         } finally {
@@ -155,6 +162,8 @@ class JvmVideoEncoder : VideoEncoder {
                     .forEach { Files.deleteIfExists(it) }
             }
             tempDir = null
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
 
         }
@@ -243,6 +252,8 @@ class JvmVideoEncoder : VideoEncoder {
             } else {
                 Result.failure(Exception("FFmpeg failed with exit code $exitCode\nOutput: $output"))
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(Exception("Failed to execute FFmpeg: ${e.message}", e))
         }
@@ -258,6 +269,8 @@ fun isFFmpegAvailable(): Boolean {
             .redirectErrorStream(true)
             .start()
         process.waitFor() == 0
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
         false
     }
@@ -274,6 +287,8 @@ fun getFFmpegVersion(): String {
         val output = process.inputStream.bufferedReader().use { it.readLine() }
         process.waitFor()
         output ?: "Unknown"
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
         "Not available"
     }

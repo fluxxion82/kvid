@@ -1,5 +1,6 @@
 package com.kvid.core
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -32,6 +33,8 @@ object TextCompression {
             val compressed = compressBytes(data.encodeToByteArray())
             val encoded = Base64.encode(compressed)
             COMPRESSION_PREFIX + encoded
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             // If compression fails, return original
             data
@@ -53,6 +56,8 @@ object TextCompression {
             val compressed = Base64.decode(encoded)
             val decompressed = decompressBytes(compressed)
             decompressed.decodeToString()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw RuntimeException("Failed to decompress data: ${e.message}", e)
         }

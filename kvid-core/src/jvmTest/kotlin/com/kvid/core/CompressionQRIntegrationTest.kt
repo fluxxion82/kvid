@@ -206,15 +206,14 @@ class CompressionQRIntegrationTest {
     }
 
     @Test
-    fun testErrorHandlingWithCorruptedData() = runBlocking {
+    fun testCorruptedCompressedPayloadFailsInsteadOfReturningGarbage() = runBlocking {
+        val generator = JvmQRCodeGenerator()
         val decoder = JvmQRCodeDecoder()
 
-        // Create a frame with invalid compressed data
-        val generator = JvmQRCodeGenerator()
-
-        // This should handle decompression gracefully
-        val validText = "This is a valid message that will compress properly. ".repeat(5)
-        val qrData = generator.generateQRCode(validText, version = 30)
+        // Short enough to bypass compression, so the QR carries this literal "GZ:" payload
+        // that is not valid base64/gzip.
+        val corrupted = "GZ:this-is-not-base64!"
+        val qrData = generator.generateQRCode(corrupted, version = 10)
 
         val frame = DecodedFrame(
             frameNumber = 0,
@@ -225,8 +224,7 @@ class CompressionQRIntegrationTest {
         )
 
         val result = decoder.decodeQRCode(frame)
-        assertTrue(result.isSuccess)
-        assertEquals(validText, result.getOrNull())
+        assertTrue(result.isFailure, "A corrupted GZ: payload must surface as a failure, got ${result.getOrNull()}")
     }
 
     // Helper function to convert QR code data to RGB format for decoder

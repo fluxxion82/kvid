@@ -2,6 +2,7 @@
 
 package com.kvid.core
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.CoreImage.CIFilter
@@ -85,6 +86,8 @@ class IosQRCodeGenerator : QRCodeGenerator {
                 version = version,
                 dataCapacity = data.length
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw RuntimeException("Failed to generate QR code: ${e.message}", e)
         }

@@ -2,6 +2,7 @@ package com.kvid.core
 
 import android.content.Context
 import java.io.File
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Android-specific HNSW implementation with file persistence
@@ -22,6 +23,8 @@ class AndroidHnswVectorIndex(
             val file = File(path)
             file.parentFile?.mkdirs()
             file.writeText(content)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw RuntimeException("Failed to save vector index to $path: ${e.message}", e)
         }
@@ -31,6 +34,8 @@ class AndroidHnswVectorIndex(
         return try {
             val file = File(path)
             if (file.exists()) file.readText() else null
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw RuntimeException("Failed to load vector index from $path: ${e.message}", e)
         }
@@ -91,6 +96,8 @@ class AndroidFlatVectorIndex(
             val file = File(path)
             file.parentFile?.mkdirs()
             file.writeText(content)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw RuntimeException("Failed to save vector index to $path: ${e.message}", e)
         }
@@ -100,6 +107,8 @@ class AndroidFlatVectorIndex(
         return try {
             val file = File(path)
             if (file.exists()) file.readText() else null
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw RuntimeException("Failed to load vector index from $path: ${e.message}", e)
         }

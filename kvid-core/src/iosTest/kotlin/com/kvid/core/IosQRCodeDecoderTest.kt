@@ -1,70 +1,34 @@
 package com.kvid.core
 
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Ignore
 import kotlin.test.Test
-import kotlin.test.assertTrue
-import kotlin.test.assertNotNull
+import kotlin.test.assertEquals
 
 /**
- * Unit tests for IosQRCodeDecoder
- *
- * Tests QR code decoding functionality on iOS using the Vision framework
+ * Round-trip test for IosQRCodeDecoder: generate a QR with IosQRCodeGenerator,
+ * turn it into an RGB frame, decode it with the Vision-based decoder.
  */
 class IosQRCodeDecoderTest {
 
-    private val decoder = IosQRCodeDecoder()
-
     @Test
-    fun testQRCodeDecoderCreation() {
-        val testDecoder = IosQRCodeDecoder()
-        assertNotNull(testDecoder)
-    }
+    @Ignore // Known failure: the decoder feeds raw pixels to CIImage.imageWithData (expects PNG/JPEG). See docs/ROADMAP.md Phase 1.
+    fun testGenerateThenDecodeRoundTrip() = runTest {
+        val generator = IosQRCodeGenerator()
+        val decoder = IosQRCodeDecoder()
+        val text = "Round trip on iOS"
 
-    @Test
-    fun testDecodedFrameWithDifferentFormats() {
-        val formats = listOf(
-            PixelFormat.RGB_888,
-            PixelFormat.YUV_420P
-        )
-
-        for (format in formats) {
-            val pixelData = ByteArray(256 * 256 * 3)
-            val frame = DecodedFrame(
-                frameNumber = 0,
-                data = pixelData,
-                width = 256,
-                height = 256,
-                format = format
-            )
-
-            assertTrue(frame.format in formats)
+        val qr = generator.generateQRCode(text, version = 10)
+        val rgb = ByteArray(qr.width * qr.height * 3)
+        for (i in qr.pixels.indices) {
+            rgb[i * 3] = qr.pixels[i]
+            rgb[i * 3 + 1] = qr.pixels[i]
+            rgb[i * 3 + 2] = qr.pixels[i]
         }
-    }
+        val frame = DecodedFrame(frameNumber = 0, data = rgb, width = qr.width, height = qr.height)
 
-    @Test
-    fun testBatchFramesCreation() {
-        val frames = mutableListOf<DecodedFrame>()
+        val decoded = decoder.decodeQRCode(frame).getOrThrow()
 
-        for (i in 0 until 5) {
-            val pixelData = ByteArray(256 * 256 * 3)
-            frames.add(
-                DecodedFrame(
-                    frameNumber = i,
-                    data = pixelData,
-                    width = 256,
-                    height = 256,
-                    format = PixelFormat.RGB_888
-                )
-            )
-        }
-
-        assertTrue(frames.size == 5)
-        for (i in frames.indices) {
-            assertTrue(frames[i].frameNumber == i)
-        }
-    }
-
-    @Test
-    fun testDecoderInterfaceCompliance() {
-        assertTrue(decoder is QRCodeDecoder)
+        assertEquals(text, decoded)
     }
 }

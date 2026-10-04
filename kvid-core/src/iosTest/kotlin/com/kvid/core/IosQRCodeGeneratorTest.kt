@@ -47,7 +47,6 @@ class IosQRCodeGeneratorTest {
         assertNotNull(qrCode)
         assertTrue(qrCode.width > 0)
         assertTrue(qrCode.height > 0)
-        assertTrue(qrCode.dataCapacity >= largeData.length)
     }
 
     @Test
@@ -66,11 +65,10 @@ class IosQRCodeGeneratorTest {
     fun testPixelDataGrayscale() {
         val qrCode = generator.generateQRCode("Test")
 
-        // Verify pixels are grayscale (0-255 range)
-        for (pixel in qrCode.pixels) {
-            val value = pixel.toInt() and 0xFF
-            assertTrue(value in 0..255)
-        }
+        // A rendered QR code must contain both dark and light modules
+        val values = qrCode.pixels.map { it.toInt() and 0xFF }
+        assertTrue(values.any { it < 128 }, "QR code should contain dark modules")
+        assertTrue(values.any { it >= 128 }, "QR code should contain light modules")
     }
 
     @Test

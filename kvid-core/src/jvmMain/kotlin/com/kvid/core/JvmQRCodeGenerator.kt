@@ -7,6 +7,7 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.image.BufferedImage
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * JVM implementation of QR code generation using ZXing
@@ -59,6 +60,8 @@ class JvmQRCodeGenerator : QRCodeGenerator {
                 version = version,
                 dataCapacity = data.length
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw RuntimeException("Failed to generate QR code: ${e.message}", e)
         }

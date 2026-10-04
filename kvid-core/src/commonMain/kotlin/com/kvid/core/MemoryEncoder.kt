@@ -1,5 +1,6 @@
 package com.kvid.core
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
@@ -26,6 +27,8 @@ class MemoryEncoder(
                 addMessage(message)
             }
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -39,6 +42,8 @@ class MemoryEncoder(
             val textChunks = chunker.chunk(message)
             chunks.addAll(textChunks)
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -109,6 +114,8 @@ class MemoryEncoder(
             Result.success(
                 stats.copy(encodingTimeMs = encodingTime)
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             isEncoding = false
             videoEncoder.cancel()

@@ -256,26 +256,31 @@ class HnswVectorIndexTest {
     }
 
     @Test
-    fun testApproximateAccuracy() = runTest {
-        // Test that HNSW returns high-quality approximate results
-        val texts = listOf(
-            "apple fruit red",
-            "banana fruit yellow",
-            "carrot vegetable orange",
-            "dog animal pet",
-            "elephant animal large"
-        )
-        for ((id, text) in texts.withIndex()) {
-            val vector = embedding.embed(text)
-            index.add(id, vector)
+    fun testRecallAgainstExactSearch() = runTest(timeout = 5.minutes) {
+        // HNSW is approximate: measure recall@10 against the exact flat index on the same vectors.
+        val flat = FlatVectorIndex(embedding)
+        val rnd = kotlin.random.Random(42)
+        val alphabet = "abcdefghijklmnopqrstuvwxyz "
+        fun randomText() = (1..rnd.nextInt(8, 60)).map { alphabet[rnd.nextInt(alphabet.length)] }.joinToString("")
+
+        val count = 200
+        for (i in 0 until count) {
+            val vector = embedding.embed(randomText())
+            index.add(i, vector)
+            flat.add(i, vector)
         }
 
-        val queryVector = embedding.embed("fruit")
-        val results = index.search(queryVector, topK = 2)
-
-        assertEquals(2, results.size)
-        // Top results should be fruit-related (apple, banana)
-        assertTrue(results.isNotEmpty(), "Should find results")
+        var hits = 0
+        var total = 0
+        repeat(5) {
+            val q = embedding.embed(randomText())
+            val exact = flat.search(q, topK = 10).map { it.id }.toSet()
+            val approx = index.search(q, topK = 10).map { it.id }.toSet()
+            hits += (exact intersect approx).size
+            total += exact.size
+        }
+        val recall = hits.toFloat() / total
+        assertTrue(recall >= 0.9f, "HNSW recall@10 against exact search should be >= 0.9 but was $recall")
     }
 
     @Test
@@ -359,46 +364,6 @@ class HnswVectorIndexTest {
 }
 
 /**
- * Integration tests for persistence (save/load) functionality
- */
-class VectorIndexPersistenceTest {
-    private lateinit var embedding: SimpleEmbedding
-
-    @BeforeTest
-    fun setUp() {
-        embedding = SimpleEmbedding()
-    }
-
-    @Test
-    fun testFlatIndexPersistence() = runTest {
-        // Note: This test requires platform-specific implementation
-        // In common code, we can only test the structure
-        val index = FlatVectorIndex(embedding)
-
-        val texts = listOf("apple", "banana", "carrot")
-        for ((id, text) in texts.withIndex()) {
-            val vector = embedding.embed(text)
-            index.add(id, vector)
-        }
-
-        assertEquals(3, index.size(), "Index should contain 3 vectors before serialization")
-    }
-
-    @Test
-    fun testHnswIndexPersistence() = runTest {
-        val index = HnswVectorIndex(embedding)
-
-        val texts = listOf("apple", "banana", "carrot", "dog")
-        for ((id, text) in texts.withIndex()) {
-            val vector = embedding.embed(text)
-            index.add(id, vector)
-        }
-
-        assertEquals(4, index.size(), "Index should contain 4 vectors before serialization")
-    }
-}
-
-/**
  * Tests comparing Flat vs HNSW index characteristics
  */
 class VectorIndexComparisonTest {
@@ -450,28 +415,18 @@ class VectorIndexComparisonTest {
     }
 
     @Test
-    fun testHnswIndexApproximateQuality() = runTest {
+    fun testHnswMatchesExactSearchOnSmallSet() = runTest {
         val texts = listOf("apple", "apricot", "banana", "avocado", "carrot", "dill", "eggplant")
         for ((id, text) in texts.withIndex()) {
             val vector = embedding.embed(text)
+            flatIndex.add(id, vector)
             hnswIndex.add(id, vector)
         }
 
         val queryVector = embedding.embed("apple")
-        val results = hnswIndex.search(queryVector, topK = 3)
+        val exact = flatIndex.search(queryVector, topK = 3).map { it.id }
+        val approx = hnswIndex.search(queryVector, topK = 3).map { it.id }
 
-        assertEquals(3, results.size)
-        assertTrue(results.isNotEmpty(), "HNSW should find results")
-    }
-
-    @Test
-    fun testIndexSelectionGuidance() {
-        // Small dataset: Flat is better
-        val smallDatasetSize = 100
-        assertTrue(smallDatasetSize < 10000, "Small datasets should use Flat index")
-
-        // Large dataset: HNSW is better
-        val largeDatasetSize = 1000000
-        assertTrue(largeDatasetSize > 100000, "Large datasets should use HNSW index")
+        assertEquals(exact, approx, "With ef >= dataset size HNSW must return the exact top-3, in order")
     }
 }

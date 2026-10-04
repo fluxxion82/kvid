@@ -1,5 +1,6 @@
 package com.kvid.core
 
+import kotlin.coroutines.cancellation.CancellationException
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSCachesDirectory
@@ -65,6 +66,8 @@ class IosHnswVectorIndex(
                     throw RuntimeException("Failed to write vector index to $path")
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw RuntimeException("Failed to save vector index to $path: ${e.message}", e)
         }
@@ -84,6 +87,8 @@ class IosHnswVectorIndex(
             } else {
                 null
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw RuntimeException("Failed to load vector index from $path: ${e.message}", e)
         }
@@ -197,6 +202,8 @@ class IosFlatVectorIndex(embedding: SemanticEmbedding) : FlatVectorIndex(embeddi
                     throw RuntimeException("Failed to write vector index to $path")
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw RuntimeException("Failed to save vector index to $path: ${e.message}", e)
         }
@@ -216,6 +223,8 @@ class IosFlatVectorIndex(embedding: SemanticEmbedding) : FlatVectorIndex(embeddi
             } else {
                 null
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw RuntimeException("Failed to load vector index from $path: ${e.message}", e)
         }

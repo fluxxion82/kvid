@@ -1,5 +1,7 @@
 package com.kvid.core
 
+import kotlin.coroutines.cancellation.CancellationException
+
 /**
  * Interface for decoding messages from video files
  */
@@ -92,6 +94,8 @@ class MemoryDecoder(
                 .mapNotNull { it.getOrNull() }
 
             return Result.success(messages)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             return Result.failure(e)
         }
@@ -112,6 +116,8 @@ class MemoryDecoder(
                 .mapNotNull { it.getOrNull() }
 
             return Result.success(messages)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             return Result.failure(e)
         }

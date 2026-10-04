@@ -1,5 +1,7 @@
 package com.kvid.core
 
+import kotlin.coroutines.cancellation.CancellationException
+
 /**
  * Interface for semantic embeddings (vector representations of text)
  */
@@ -162,6 +164,8 @@ open class FlatVectorIndex(protected val embedding: SemanticEmbedding) : VectorI
                 vectors[id] = vector.copyOf()  // Store copy to prevent external modification
                 Result.success(Unit)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -173,6 +177,8 @@ open class FlatVectorIndex(protected val embedding: SemanticEmbedding) : VectorI
                 add(id, vector).getOrThrow()
             }
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -210,6 +216,8 @@ open class FlatVectorIndex(protected val embedding: SemanticEmbedding) : VectorI
 
             saveToDisk(path, data.joinToString("\n"))
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -249,6 +257,8 @@ open class FlatVectorIndex(protected val embedding: SemanticEmbedding) : VectorI
             }
 
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -307,6 +317,8 @@ open class HnswVectorIndex(
                 }
                 Result.success(Unit)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -319,6 +331,8 @@ open class HnswVectorIndex(
                 add(id, vector).getOrThrow()
             }
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -339,7 +353,10 @@ open class HnswVectorIndex(
 
         // layer 0: return topK results
         val candidates = searchLayer(queryVector, nearestNeighbors, ef, 0)
-        return candidates.take(topK).map { id ->
+        return candidates
+            .sortedBy { embedding.distance(queryVector, vectors[it]!!) }
+            .take(topK)
+            .map { id ->
             VectorSearchResult(
                 id = id,
                 similarity = embedding.similarity(queryVector, vectors[id]!!),
@@ -377,6 +394,8 @@ open class HnswVectorIndex(
 
             saveToDisk(path, data.joinToString("\n"))
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -463,6 +482,8 @@ open class HnswVectorIndex(
             }
 
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }

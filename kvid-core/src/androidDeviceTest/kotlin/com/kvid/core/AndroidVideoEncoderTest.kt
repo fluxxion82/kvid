@@ -231,7 +231,7 @@ class AndroidVideoEncoderTest {
 
         // Second initialization may reset or fail gracefully
         val result2 = encoder.initialize(params)
-        assertNotNull(result2, "Should handle re-initialization")
+        assertTrue(result2.isSuccess, "Re-initialization should succeed")
     }
 
     @Test

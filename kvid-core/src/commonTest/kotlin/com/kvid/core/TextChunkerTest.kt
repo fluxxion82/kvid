@@ -73,27 +73,29 @@ class TextChunkerTest {
 
     @Test
     fun testSentencePreservation() {
-        val chunker = TextChunker(
-            chunkSize = 200,
-            overlapSize = 10,
-            preserveSentences = true
-        )
-
+        // chunkSize 25 lands mid-sentence; with preserveSentences the chunk extends to the sentence end.
+        val chunker = TextChunker(chunkSize = 25, overlapSize = 0, preserveSentences = true)
         val text = "First sentence. Second sentence. Third sentence. Fourth sentence."
+
         val result = chunker.chunk(text)
 
-        // When preserving sentences, chunks should end with sentence punctuation
+        assertEquals(
+            listOf("First sentence. Second sentence.", "Third sentence. Fourth sentence."),
+            result.map { it.content }
+        )
         result.forEach { chunk ->
-            if (chunk.content.length > 1) {
-                val lastChar = chunk.content.last()
-                // Should end with punctuation or have more content
-                assertTrue(
-                    lastChar in listOf('.', '!', '?', ' ') ||
-                    chunk.content.contains(lastChar),
-                    "Chunk should preserve sentence boundaries: '${chunk.content.take(50)}...'"
-                )
-            }
+            assertTrue(chunk.content.last() in listOf('.', '!', '?'), "Chunk should end at a sentence boundary: '${chunk.content}'")
         }
+    }
+
+    @Test
+    fun testSentencePreservationDisabled() {
+        val chunker = TextChunker(chunkSize = 25, overlapSize = 0, preserveSentences = false)
+        val text = "First sentence. Second sentence. Third sentence. Fourth sentence."
+
+        val result = chunker.chunk(text)
+
+        assertEquals("First sentence. Second se", result[0].content)
     }
 
     @Test

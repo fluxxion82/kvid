@@ -34,7 +34,6 @@ class IosVideoEncoderTest {
 
         val result = encoder.initialize(params)
         assertTrue(result.isSuccess, "Initialization should succeed")
-        assertNotNull(result.getOrNull(), "Should return valid encoder state")
     }
 
     @Test
@@ -68,22 +67,6 @@ class IosVideoEncoderTest {
         val params = VideoEncodingParams(codec = VideoCodec.H265)
         val result = encoder.initialize(params)
         assertTrue(result.isSuccess, "H.265 should be supported on iOS")
-    }
-
-    @Test
-    fun testVP9Support() {
-        val params = VideoEncodingParams(codec = VideoCodec.VP9)
-        val result = encoder.initialize(params)
-        // VP9 may not be supported on all iOS versions
-        assertNotNull(result)
-    }
-
-    @Test
-    fun testAV1Support() {
-        val params = VideoEncodingParams(codec = VideoCodec.AV1)
-        val result = encoder.initialize(params)
-        // AV1 is newer, may not be supported on all iOS versions
-        assertNotNull(result)
     }
 
     @Test
@@ -200,10 +183,6 @@ class IosVideoEncoderTest {
         val params = VideoEncodingParams(width = 256, height = 256)
         val result1 = encoder.initialize(params)
         assertTrue(result1.isSuccess, "First initialization should succeed")
-
-        // Second initialization may fail or reset state
-        val result2 = encoder.initialize(params)
-        assertNotNull(result2, "Should handle re-initialization")
     }
 
     @Test
@@ -319,57 +298,10 @@ class IosVideoEncoderTest {
         for (i in 0 until 10) {
             val frameData = createTestFrame(256, 256, i)
             val result = encoder.addFrame(frameData, i)
-            // May succeed or fail depending on implementation
-            assertNotNull(result)
+            assertTrue(result.isSuccess, "Frame $i should be accepted")
         }
 
         encoder.cancel()
-    }
-
-    @Test
-    fun testFrameTimestampHandling() {
-        val params = VideoEncodingParams(width = 256, height = 256, fps = 30)
-        encoder.initialize(params)
-
-        val frameData = createTestFrame(256, 256, 0)
-        val timestamps = listOf(0L, 33L, 67L, 100L)  // ~30fps timestamps in ms
-
-        for (ts in timestamps) {
-            val result = encoder.addFrame(frameData, ts.toInt())
-            assertNotNull(result, "Should handle frame timestamp $ts")
-        }
-
-        encoder.cancel()
-    }
-
-    @Test
-    fun testRejectsInvalidDimensions() {
-        val invalidParams = listOf(
-            VideoEncodingParams(width = 0, height = 256),
-            VideoEncodingParams(width = 256, height = 0),
-            VideoEncodingParams(width = -1, height = 256),
-            VideoEncodingParams(width = 256, height = -1)
-        )
-
-        for (params in invalidParams) {
-            val result = encoder.initialize(params)
-            // Invalid dimensions may be rejected
-            assertNotNull(result, "Should handle invalid dimensions")
-        }
-    }
-
-    @Test
-    fun testRejectsInvalidFPS() {
-        val invalidParams = listOf(
-            VideoEncodingParams(fps = 0),
-            VideoEncodingParams(fps = -1),
-            VideoEncodingParams(fps = 1000)  // Unreasonable fps
-        )
-
-        for (params in invalidParams) {
-            val result = encoder.initialize(params)
-            assertNotNull(result, "Should handle invalid FPS")
-        }
     }
 
     /**

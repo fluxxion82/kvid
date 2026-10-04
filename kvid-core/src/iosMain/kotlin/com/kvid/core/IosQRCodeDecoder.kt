@@ -2,6 +2,7 @@
 
 package com.kvid.core
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCObjectVar
@@ -41,6 +42,8 @@ class IosQRCodeDecoder : QRCodeDecoder {
             val cgImage = convertFrameToCGImage(frameData)
             val result = decodeFromCGImage(cgImage)
             Result.success(result)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -52,6 +55,8 @@ class IosQRCodeDecoder : QRCodeDecoder {
                 val cgImage = convertFrameToCGImage(frame)
                 val result = decodeFromCGImage(cgImage)
                 Result.success(result)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Result.failure(e)
             }

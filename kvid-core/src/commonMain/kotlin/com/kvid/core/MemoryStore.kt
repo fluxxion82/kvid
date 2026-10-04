@@ -1,5 +1,6 @@
 package com.kvid.core
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -31,6 +32,8 @@ class MemoryStore(
                 addMessage(message)
             }
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -70,6 +73,8 @@ class MemoryStore(
             }
 
             Result.success(message.id)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -105,6 +110,8 @@ class MemoryStore(
             }
 
             Result.success(results.sortedByDescending { it.relevance })
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -123,20 +130,11 @@ class MemoryStore(
     }
 
     /**
-     * Export all chunks as JSON string
-     * Returns a simple JSON-like representation of the chunks
+     * Export all chunks (without embeddings) as a JSON string.
      */
     fun exportIndex(): String {
-        if (chunks.isEmpty()) {
-            return "{ \"chunks\": [] }"
-        }
-
-        // Manually build JSON since @Serializable on local classes has issues
-        val jsonChunks = chunks.map { chunk ->
-            """{"id":${chunk.id},"content":"${chunk.content.replace("\"", "\\\"")}","messageId":${chunk.messageId}}"""
-        }.joinToString(",")
-
-        return """{ "chunks": [$jsonChunks] }"""
+        val export = ExportedIndex(chunks.map { ExportedChunk(it.id, it.content, it.messageId) })
+        return Json.encodeToString(ExportedIndex.serializer(), export)
     }
 
     /**
@@ -148,6 +146,8 @@ class MemoryStore(
             metadata.clear()
             vectorIndex.clear().getOrThrow()
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -190,6 +190,12 @@ data class StoredChunk(
         return result
     }
 }
+
+@Serializable
+data class ExportedChunk(val id: Int, val content: String, val messageId: Int)
+
+@Serializable
+data class ExportedIndex(val chunks: List<ExportedChunk>)
 
 data class ChunkMetadata(
     val messageId: Int,
