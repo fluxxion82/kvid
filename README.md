@@ -71,7 +71,7 @@ Toolchain: Kotlin 2.5.0-Beta1, Gradle 9.8, Android Gradle Plugin 9.4, Compose Mu
 
 ## Packaging
 
-kvid is not on Maven Central yet. The build produces everything a release needs, and CI checks it on every run.
+kvid is not on Maven Central yet. The build stages unsigned Maven artifacts and an XCFramework. CI checks packaging and compiles a separate Kotlin consumer. A Central release still needs namespace verification and signing configuration.
 
 **Kotlin.** `kvid-core` publishes one Kotlin Multiplatform module with JVM, Android, iOS arm64 and iOS simulator arm64 variants:
 

@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** A note as shown in the list. [preview] is the search snippet for search results, else the body start. */
 data class NoteItem(
@@ -46,13 +48,14 @@ data class NotesState(
  * [NotesState.message]; nothing is retried silently.
  */
 class NotesModel(private val session: StoreSession) {
+    private val refreshMutex = Mutex()
     private val mutableState = MutableStateFlow(NotesState())
     val state: StateFlow<NotesState> = mutableState.asStateFlow()
 
     /** Reloads the list (or search results) and the tag chips for the current query and tag selection. */
-    suspend fun refresh() {
+    suspend fun refresh() = refreshMutex.withLock {
         val current = state.value
-        report {
+        report(accept = { it.query == current.query && it.selectedTags == current.selectedTags }) {
             val (notes, tags) = session.use { store ->
                 val selected = current.selectedTags.toList()
                 val notes = if (current.query.isBlank()) {
@@ -62,7 +65,11 @@ class NotesModel(private val session: StoreSession) {
                 }
                 notes to store.tagCounts(TAG_CHIPS)
             }
-            mutableState.update { it.copy(notes = notes, tags = tags, loading = false) }
+            mutableState.update {
+                if (it.query == current.query && it.selectedTags == current.selectedTags) {
+                    it.copy(notes = notes, tags = tags, loading = false)
+                } else it
+            }
         }
     }
 
@@ -127,11 +134,11 @@ class NotesModel(private val session: StoreSession) {
 
     fun clearMessage() = mutableState.update { it.copy(message = null, notice = null) }
 
-    private inline fun report(block: () -> Unit) {
+    private inline fun report(accept: (NotesState) -> Boolean = { true }, block: () -> Unit) {
         try {
             block()
         } catch (e: KvidException) {
-            mutableState.update { it.copy(message = "${e.code}: ${e.message}", loading = false) }
+            mutableState.update { if (accept(it)) it.copy(message = "${e.code}: ${e.message}", loading = false) else it }
         }
     }
 

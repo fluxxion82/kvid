@@ -2,6 +2,9 @@ package com.kvid.sample
 
 import com.kvid.store.Kvid
 import com.kvid.store.use
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -9,6 +12,57 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class NotesModelTest {
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test fun aRefreshDoesNotPublishResultsForAnObsoleteQuery() = sampleTest { path ->
+        val session = StoreSession(path)
+        session.use { it.put("stove"); it.put("tent") }
+        val model = NotesModel(session)
+        model.refresh()
+        val initial = model.state.value.notes
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val writer = launch {
+            session.use { store -> store.transaction { entered.complete(Unit); release.await() } }
+        }
+        entered.await()
+        model.setQuery("stove")
+        val search = launch { model.refresh() }
+        runCurrent() // the old refresh is now waiting behind the transaction
+        model.setQuery("tent")
+        release.complete(Unit)
+        writer.join()
+        search.join()
+        assertEquals(initial, model.state.value.notes, "the obsolete stove response must not replace the list")
+        model.refresh()
+        assertEquals(listOf("tent"), model.state.value.notes.map { it.title })
+        session.closeWhenIdle()
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test fun aRefreshDoesNotPublishErrorsForAnObsoleteQuery() = sampleTest { path ->
+        val session = StoreSession(path)
+        session.use { it.put("tent") }
+        val model = NotesModel(session)
+        model.refresh()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val writer = launch {
+            session.use { store -> store.transaction { entered.complete(Unit); release.await() } }
+        }
+        entered.await()
+        model.setQuery("x".repeat(4097))
+        val search = launch { model.refresh() }
+        runCurrent()
+        model.setQuery("tent")
+        release.complete(Unit)
+        writer.join()
+        search.join()
+        assertNull(model.state.value.message, "an obsolete request must not publish its size error")
+        model.refresh()
+        assertEquals(listOf("tent"), model.state.value.notes.map { it.title })
+        session.closeWhenIdle()
+    }
 
     @Test fun createSearchFilterEditHistoryAndDelete() = sampleTest { path ->
         val session = StoreSession(path)

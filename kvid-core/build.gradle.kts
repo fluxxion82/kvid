@@ -56,7 +56,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.kotlinx.serialization.json)
+            api(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.io.core)
             api(libs.androidx.sqlite)
             implementation(libs.androidx.sqlite.bundled)
@@ -126,9 +126,8 @@ tasks.withType<KotlinNativeTest>().configureEach {
 }
 
 // Publication: every Kotlin Multiplatform target (JVM, Android, iOS arm64 and simulator arm64) plus the
-// root module metadata. Maven Central needs the POM fields below, a javadoc jar and signatures; signing
-// applies only when signing keys are configured. Publishing stages into build/staging-repo, from which a
-// release bundle is uploaded through the Central Portal.
+// root module metadata. This stages unsigned artifacts into build/staging-repo. A Central release
+// additionally needs a verified namespace and signing configuration before bundle upload.
 val javadocJar by tasks.registering(Jar::class) {
     archiveClassifier.set("javadoc")
 }
