@@ -430,7 +430,7 @@ class KvidStoreTest {
         assertEquals(1, target.importJsonLines(out), "only live current versions are imported")
         val doc = assertNotNull(target.get(a))
         assertEquals("alpha 2", doc.body); assertEquals("A2", doc.title); assertEquals(listOf("t2"), doc.version.tags)
-        assertEquals(456L, doc.version.eventTimeMs); assertEquals("u://a", doc.version.uri)
+        assertEquals(456L, doc.version.eventTimeMs); assertNull(doc.version.uri, "an update carries only the fields it was given")
         assertNull(target.get(b))
         assertFailsWith<KvidException.AlreadyExists> { target.importJsonLines(out) }
         target.close()

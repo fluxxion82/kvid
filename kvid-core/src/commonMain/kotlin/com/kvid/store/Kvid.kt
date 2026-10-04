@@ -226,6 +226,7 @@ class Kvid private constructor(
     // ------------------------------------------------------------------ auto-commit operations
 
     suspend fun put(text: String, options: PutOptions = PutOptions()): DocumentId = transaction { put(text, options) }
+    /** Creates a new version with exactly the supplied fields; nothing is inherited from the previous version. */
     suspend fun update(id: DocumentId, text: String, options: PutOptions = PutOptions()): VersionId = transaction { update(id, text, options) }
     suspend fun delete(id: DocumentId): VersionId = transaction { delete(id) }
 
@@ -354,7 +355,7 @@ class Kvid private constructor(
     // ------------------------------------------------------------------ maintenance
 
     /** Full integrity and invariant check (contract, section 4). */
-    suspend fun verify(): VerifyReport = read { Ops.verify(conn) }
+    suspend fun verify(): VerifyReport = read { Ops.verify(conn, readOnly) }
 
     /** Rebuilds the current-version projection and its full-text index from the authoritative versions. */
     suspend fun rebuildIndex() {
@@ -791,7 +792,7 @@ internal object Ops {
         conn.exec("INSERT INTO current_fts(current_fts) VALUES ('rebuild')")
     }
 
-    fun verify(conn: SQLiteConnection): VerifyReport {
+    fun verify(conn: SQLiteConnection, readOnly: Boolean): VerifyReport {
         val problems = ArrayList<String>()
         val integrity = conn.query("PRAGMA integrity_check") { getText(0) }
         if (integrity != listOf("ok")) problems += integrity.map { "integrity_check: $it" }
@@ -819,10 +820,13 @@ internal object Ops {
                 "SELECT v.version_id FROM versions v WHERE v.supersedes_version_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM versions p WHERE p.version_id = v.supersedes_version_id)"
             ) { "version ${getLong(0)} supersedes a missing version although no history was pruned" }
         }
-        try {
-            conn.exec("INSERT INTO current_fts(current_fts, rank) VALUES ('integrity-check', 1)")
-        } catch (e: KvidException) {
-            problems += "fts integrity-check: ${e.message}"
+        // FTS5's integrity-check is issued as an INSERT and therefore needs a writable connection.
+        if (!readOnly) {
+            try {
+                conn.exec("INSERT INTO current_fts(current_fts, rank) VALUES ('integrity-check', 1)")
+            } catch (e: KvidException) {
+                problems += "fts integrity-check: ${e.message}"
+            }
         }
         return VerifyReport(problems.isEmpty(), problems)
     }
