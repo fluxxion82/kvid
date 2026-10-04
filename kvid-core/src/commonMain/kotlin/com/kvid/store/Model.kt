@@ -93,6 +93,9 @@ data class FindOptions(
 
 data class Page<T>(val items: List<T>, val nextCursor: String?)
 
+/** A tag and the number of live documents whose current version carries it. */
+data class TagCount(val tag: String, val documents: Long)
+
 /** A full-text hit over current live versions. [score] is higher-is-better (negated SQLite bm25). */
 data class Hit(val document: Document, val score: Double, val snippet: String?)
 

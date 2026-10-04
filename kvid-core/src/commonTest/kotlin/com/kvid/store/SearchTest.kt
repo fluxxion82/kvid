@@ -228,6 +228,20 @@ class SearchTest {
         store.close()
     }
 
+    @Test fun tagCountsCoverLiveCurrentVersionsOnly() = storeTest { dir ->
+        val store = Kvid.create(dir.file("a.kvid"))
+        val a = store.put("a", PutOptions(tags = listOf("work", "urgent")))
+        store.put("b", PutOptions(tags = listOf("work")))
+        val c = store.put("c", PutOptions(tags = listOf("home", "urgent")))
+        assertEquals(listOf(TagCount("urgent", 2), TagCount("work", 2), TagCount("home", 1)), store.tagCounts())
+        store.update(a, "a edited", PutOptions(tags = listOf("work")))
+        store.delete(c)
+        assertEquals(listOf(TagCount("work", 2)), store.tagCounts(), "superseded and deleted versions do not count")
+        assertEquals(listOf(TagCount("work", 2)), store.tagCounts(limit = 1))
+        assertEquals(store.tagCounts(), store.transaction { tagCounts() })
+        store.close()
+    }
+
     @Test fun queryBoundsApply() = storeTest { dir ->
         val store = Kvid.create(dir.file("a.kvid"))
         store.put("x")
