@@ -142,6 +142,8 @@ data class Limits(
         const val MAX_TAG_CODE_POINTS = 1024
         const val MAX_URI_BYTES = 64 * 1024
         const val MAX_QUERY_BYTES = 64 * 1024
+        /** UTF-8 budget for the serialized query and filters used by pagination. */
+        const val MAX_QUERY_IDENTITY_BYTES = 256 * 1024
         const val MAX_PAGE_SIZE = 5000
         /** Distinct pieces a [QuerySyntax.PLAIN] query may contain. */
         const val MAX_QUERY_TERMS = 128

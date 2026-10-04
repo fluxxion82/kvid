@@ -18,6 +18,57 @@ class SearchTest {
     private suspend fun Kvid.ids(query: String, options: FindOptions = FindOptions()): List<DocumentId> =
         find(query, options).items.map { it.document.id }
 
+    @Test fun uriPrefixesCompareEmbeddedNulLiterally() = storeTest { dir ->
+        val store = Kvid.create(dir.file("a.kvid"))
+        try {
+            store.put("note", PutOptions(uri = "a"))
+            store.put("note", PutOptions(uri = "a\u0000x"))
+            val expected = store.put("note", PutOptions(uri = "a\u0000b/child"))
+            assertEquals(listOf(expected), store.list(ListOptions(uriPrefix = "a\u0000b")).items.map { it.id })
+            assertEquals(listOf(expected), store.ids("note", FindOptions(uriPrefix = "a\u0000b")))
+        } finally { store.close() }
+    }
+
+    @Test fun tagFiltersHaveTheSameLengthBoundsAsWrites() = storeTest { dir ->
+        val store = Kvid.create(dir.file("a.kvid"))
+        try {
+            val tags = listOf("x".repeat(Limits().tagCodePoints + 1))
+            assertFailsWith<KvidException.LimitExceeded> { store.list(ListOptions(tags = tags)) }
+            assertFailsWith<KvidException.LimitExceeded> { store.find("x", FindOptions(tags = tags)) }
+        } finally { store.close() }
+    }
+
+    @Test fun configuredLargeTagSetsRemainSearchable() = storeTest { dir ->
+        val store = Kvid.create(dir.file("a.kvid"), StoreOptions(limits = Limits(tagsPerVersion = 1024)))
+        try {
+            val tags = (1..1001).map { "t$it" }
+            val id = store.put("searchable", PutOptions(tags = tags))
+            assertEquals(listOf(id), store.list(ListOptions(tags = tags)).items.map { it.id })
+            assertEquals(listOf(id), store.ids("searchable", FindOptions(tags = tags)))
+        } finally { store.close() }
+    }
+
+    @Test fun wideAcceptedFiltersProduceUsableCursors() = storeTest { dir ->
+        val store = Kvid.create(dir.file("a.kvid"), StoreOptions(limits = Limits(uriBytes = Limits.MAX_URI_BYTES)))
+        try {
+            val uri = "\"".repeat(Limits.MAX_URI_BYTES)
+            repeat(3) { store.put("note", PutOptions(uri = uri)) }
+            val options = ListOptions(limit = 1, uriPrefix = uri)
+            val page = store.list(options)
+            assertNotNull(page.nextCursor)
+            assertEquals(1, store.list(options.copy(cursor = page.nextCursor)).items.size)
+        } finally { store.close() }
+    }
+
+    @Test fun embeddedNulInPlainTextDoesNotProduceSyntaxErrors() = storeTest { dir ->
+        val store = Kvid.create(dir.file("a.kvid"))
+        try {
+            val id = store.put("rock roll")
+            assertEquals(listOf(id), store.ids("rock\u0000roll"))
+            assertEquals(listOf(id), store.ids("rock\u0000"))
+        } finally { store.close() }
+    }
+
     @Test fun plainQueriesTreatOperatorsQuotesAndPunctuationAsText() = storeTest { dir ->
         val store = Kvid.create(dir.file("a.kvid"))
         val both = store.put("rock and roll all night")

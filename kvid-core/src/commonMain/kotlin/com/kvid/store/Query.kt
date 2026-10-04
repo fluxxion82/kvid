@@ -14,7 +14,9 @@ internal object PlainQuery {
     /** The FTS5 expression, or null when the query has no searchable pieces. */
     fun compile(query: String, match: MatchMode): String? {
         val pieces = LinkedHashMap<String, String>()
-        for (piece in split(query)) {
+        for (rawPiece in split(query)) {
+            // FTS5 treats NUL as the end of its expression; preserve it as a token separator.
+            val piece = rawPiece.replace('\u0000', ' ')
             if (!hasTokenCharacter(piece)) continue
             val key = piece.lowercase()
             if (key !in pieces) pieces[key] = piece

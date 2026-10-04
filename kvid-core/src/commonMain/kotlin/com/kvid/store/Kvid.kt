@@ -722,14 +722,21 @@ internal object Ops {
         init {
             if (this.tags.size > limits.tagsPerVersion) throw KvidException.LimitExceeded("more than ${limits.tagsPerVersion} tag filters")
             if (this.tags.any { it.isEmpty() }) throw KvidException.Usage("tag filters must not be empty")
+            if (this.tags.any { tag -> tag.count { !it.isLowSurrogate() } > limits.tagCodePoints }) {
+                throw KvidException.LimitExceeded("tag filter exceeds ${limits.tagCodePoints} code points")
+            }
             uriPrefix?.let { if (it.encodeToByteArray().size > limits.uriBytes) throw KvidException.LimitExceeded("uriPrefix exceeds ${limits.uriBytes} bytes") }
         }
 
         fun appendSql(sb: StringBuilder) {
             if (since != null) sb.append(" AND c.event_time_ms >= ?")
             if (until != null) sb.append(" AND c.event_time_ms < ?")
-            repeat(tags.size) { sb.append(" AND EXISTS (SELECT 1 FROM version_tags t WHERE t.version_id = c.version_id AND t.tag = ?)") }
-            if (uriPrefix != null) sb.append(" AND c.uri GLOB ?")
+            if (tags.isNotEmpty()) {
+                sb.append(" AND (SELECT count(*) FROM version_tags t WHERE t.version_id = c.version_id AND t.tag IN (")
+                sb.append(tags.joinToString(",") { "?" })
+                sb.append(")) = ?")
+            }
+            if (uriPrefix != null) sb.append(" AND substr(CAST(c.uri AS BLOB), 1, length(CAST(? AS BLOB))) = CAST(? AS BLOB)")
         }
 
         /** Binds the filter parameters starting at index [first]; returns the next free index. */
@@ -738,23 +745,21 @@ internal object Ops {
             since?.let { st.bindLong(i++, it) }
             until?.let { st.bindLong(i++, it) }
             tags.forEach { st.bindText(i++, it) }
-            uriPrefix?.let { st.bindText(i++, globPrefix(it)) }
+            if (tags.isNotEmpty()) st.bindLong(i++, tags.size.toLong())
+            uriPrefix?.let { st.bindText(i++, it); st.bindText(i++, it) }
             return i
         }
 
         fun fingerprint(): List<String?> = listOf(since?.toString(), until?.toString(), Json.encodeToString(tags), uriPrefix)
 
-        /** A GLOB pattern matching [prefix] literally: `*`, `?` and `[` are bracketed. */
-        private fun globPrefix(prefix: String): String = buildString {
-            for (ch in prefix) if (ch == '*' || ch == '?' || ch == '[') append('[').append(ch).append(']') else append(ch)
-            append('*')
-        }
+
     }
 
     fun list(conn: SQLiteConnection, limits: Limits, options: ListOptions): Page<Document> {
         val limit = options.limit.coerceIn(1, limits.pageSize)
         val filters = Filters(limits, options.sinceEventTimeMs, options.untilEventTimeMs, options.tags, options.uriPrefix)
         val fingerprint = Json.encodeToString(listOf("list", limit.toString()) + filters.fingerprint())
+        Cursor.validateFingerprint(fingerprint)
         val cursor = options.cursor?.let { Cursor.parse(conn, it, fingerprint) }
         val sql = buildString {
             append("SELECT c.version_id, c.doc_id FROM current c WHERE 1=1")
@@ -790,6 +795,7 @@ internal object Ops {
         val fingerprint = Json.encodeToString(
             listOf("find", options.syntax.name, options.match.name, expression, limit.toString()) + filters.fingerprint()
         )
+        Cursor.validateFingerprint(fingerprint)
         val cursor = options.cursor?.let { Cursor.parse(conn, it, fingerprint) }
         val offset = cursor?.key1 ?: 0L
         val sql = buildString {
@@ -942,13 +948,22 @@ internal class Cursor(private val seq: Long, private val floor: Long, private va
     fun encode(): String = "v2:$seq:$floor:$fp:$key1:$key2"
 
     companion object {
+        fun validateFingerprint(value: String) {
+            if (value.encodeToByteArray().size > Limits.MAX_QUERY_IDENTITY_BYTES) {
+                throw KvidException.LimitExceeded("combined query and filters exceed ${Limits.MAX_QUERY_IDENTITY_BYTES} bytes")
+            }
+        }
+
         // Exact bounded query identity avoids collisions in String.hashCode().
-        private fun fingerprintKey(value: String): String = value.encodeToByteArray().joinToString("") {
-            (it.toInt() and 255).toString(16).padStart(2, '0')
+        private fun fingerprintKey(value: String): String {
+            validateFingerprint(value)
+            return value.encodeToByteArray().joinToString("") {
+                (it.toInt() and 255).toString(16).padStart(2, '0')
+            }
         }
 
         fun parse(conn: SQLiteConnection, encoded: String, fingerprint: String): Cursor {
-            if (encoded.length > 4 * Limits.MAX_QUERY_BYTES) throw KvidException.Usage("cursor exceeds hard cap")
+            if (encoded.length > 2 * Limits.MAX_QUERY_IDENTITY_BYTES + 256) throw KvidException.Usage("cursor exceeds hard cap")
             val parts = encoded.split(':')
             if (parts.size != 6 || parts[0] != "v2") throw KvidException.Usage("malformed cursor")
             fun number(index: Int) = parts[index].toLongOrNull() ?: throw KvidException.Usage("malformed cursor")
