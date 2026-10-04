@@ -44,9 +44,59 @@ jobs:
         if: always()
         with:
           name: jvm-test-reports
+          path: kvid-core/build/reports/tests
+
+  android-store:
+    name: Android store (API 35 emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          script: ./gradlew :kvid-core:connectedAndroidDeviceTest -Pandroid.testInstrumentationRunnerArguments.package=com.kvid.store --no-daemon --stacktrace
+      - name: Verify device tests ran
+        # The device-test task does not print counts and passes with zero tests, so count the JUnit results here.
+        run: |
+          python3 - <<'EOF'
+          import glob, sys, xml.etree.ElementTree as ET
+          run = failed = skipped = 0
+          for f in sorted(glob.glob("kvid-core/build/**/*.xml", recursive=True)):
+              try:
+                  root = ET.parse(f).getroot()
+              except ET.ParseError:
+                  continue
+              cases = list(root.iter("testcase"))
+              if not cases:
+                  continue
+              bad = sum(1 for c in cases if c.find("failure") is not None or c.find("error") is not None)
+              skip = sum(1 for c in cases if c.find("skipped") is not None)
+              print(f"{f}: {len(cases)} tests, {bad} failed, {skip} skipped")
+              run += len(cases); failed += bad; skipped += skip
+          print(f"Device tests: {run} run, {failed} failed, {skipped} skipped")
+          if run == 0:
+              sys.exit("No device test results found under kvid-core/build; the emulator job ran zero tests")
+          EOF
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-store-test-reports
           path: |
-            kvid-core/build/reports/tests
-            kvid-storage-spike/build/reports/tests
+            kvid-core/build/reports/androidTests
+            kvid-core/build/outputs/androidTest-results
 
   ios:
     name: iOS simulator tests
@@ -63,11 +113,9 @@ jobs:
           # Explicit quarantine of the known Core Image simulator defect.
           # Local rendering tests remain enabled unless this opt-out is set.
           KVID_SKIP_IOS_QR_RENDERING_TESTS: 'true'
-        run: ./gradlew :kvid-core:iosSimulatorArm64Test :kvid-storage-spike:iosSimulatorArm64Test --no-daemon --stacktrace
+        run: ./gradlew :kvid-core:iosSimulatorArm64Test --no-daemon --stacktrace
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ios-test-reports
-          path: |
-            kvid-core/build/reports/tests
-            kvid-storage-spike/build/reports/tests
+          path: kvid-core/build/reports/tests

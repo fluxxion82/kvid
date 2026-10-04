@@ -14,7 +14,7 @@ KVID is a Kotlin Multiplatform port and evolution of [MemVid](https://github.com
 
 ## Prerequisites
 - **JDK 17** (the build uses a Java 17 toolchain)
-- **Android SDK** (compileSdk 36) for the Android target
+- **Android SDK** (compileSdk 36, minSdk 23) for the Android target
 - **Xcode** on macOS for the iOS targets
 - **FFmpeg** on the PATH for JVM video encoding/decoding and the JVM video tests
 
@@ -23,7 +23,6 @@ Toolchain: Kotlin 2.5.0-Beta1, Gradle 9.8, Android Gradle Plugin 9.4 (KMP librar
 ## Modules
 - `kvid-core/` – shared APIs and platform wiring under `src/commonMain`, `androidMain`, `jvmMain`, and `iosMain`
 - `kvid-examples/` – runnable samples and benchmarks invoked via `./gradlew :kvid-examples:run`
-- `kvid-storage-spike/` – throwaway verification tests for SQLite via the androidx.sqlite bundled driver; not a published module
 
 ## Build and Test
 ```bash
