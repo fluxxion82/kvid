@@ -1,235 +1,256 @@
 # kvid roadmap
 
-_Written October 2026 after reviewing kvid (this repo) and memvid (github.com/memvid/memvid at commit e6bd9f7, 2026-07-14, plus the v0.1.3 Python tag). Direction confirmed by the owner: build general-purpose pieces first, AI-agent integrations last; adopt current tooling including Kotlin 2.5.0-Beta1._
+_Revised October 4, 2026. This merges the owner's Codex-reviewed revision of the roadmap with the state of the `phase-0-baseline` branch. Unchecked items are planned work, not implementation claims. Where something was verified by running it, the text says so; everything else comes from source inspection._
 
-## 0. Direction in one paragraph
+## Direction
 
-kvid becomes a **general-purpose, embedded, single-file searchable store for Kotlin Multiplatform apps**: one file holds documents, metadata, full-text and (optionally) vector indexes, with crash-safe appends, document history and encryption at rest. It is useful for a notes or journal app, offline documentation, message and chat history, logs, receipts, clippings, voice-memo transcripts, photo captions, and, as one use case among those, memory for AI assistants. memvid v2 is the architectural model (it solved the same problems well), but kvid keeps memvid's ideas, not its bytes, and keeps every building block usable on its own. The QR-in-video pipeline kvid started from survives as an optional archive/export format, not as the storage engine.
+kvid becomes a general-purpose, embedded, portable searchable document store for Kotlin Multiplatform applications on JVM, Android, and iOS. Documents, metadata, and eventually optional vector indexes travel together in a portable file. Notes, journals, offline documentation, transcripts, and message history are the initial use cases. AI integrations come last and remain optional.
 
-## 1. Where things stand
+The first release has one concrete goal: **save documents, reopen safely, and search offline on all three platforms.**
 
-### 1.1 memvid has moved on from the design kvid copied
+QR codes in video become an optional archive/export feature. Repairing every existing video implementation is not a prerequisite for the new store. memvid informs the design (it solved the same problems and then abandoned the QR approach), but neither its API nor its internal format determines kvid's architecture.
 
-kvid is a port of **memvid v1**: text chunks, gzip, QR codes, MP4 frames, a FAISS-style vector index on the side. memvid deprecated that design in January 2026 and rewrote the project in Rust as **v2**. The README now says, verbatim: "Memvid v1 (QR-based memory) is deprecated. If you are referencing QR codes, you are using outdated information."
+## Current baseline (branch `phase-0-baseline`)
 
-The v2 design is a **single-file `.mv2` store** (header, embedded write-ahead log, append-only "Smart Frames", BM25 index, HNSW index, time index, TOC footer). The stated reasons for abandoning v1 bite harder on a phone than on a server:
+What is on the branch, and how each item was checked:
 
-| Reason memvid gave for dropping v1 | How it applies to kvid |
+| Item | State | How verified |
+|---|---|---|
+| Gradle wrapper jar committed (was excluded by `*.jar`) | done | fresh `./gradlew` run in a clean container |
+| Kotlin 2.5.0-Beta1, Gradle 9.8.0, JDK 17 toolchain | done | JVM compile and tests executed |
+| AGP 9.4.0 via `com.android.kotlin.multiplatform.library`; Android target configured with `android {}` inside `kotlin {}`; device tests in `src/androidDeviceTest` | done | **not executed**: the cloud sandbox cannot reach `dl.google.com`, so neither AGP nor the Android SDK could be downloaded. Verification happens in CI. |
+| iOS targets unchanged (iosX64, iosArm64, iosSimulatorArm64, static framework) | done | **not executed** on a Linux host; CI's macOS job compiles and runs simulator tests |
+| kotlinx-coroutines 1.11.0, kotlinx-serialization 1.11.0 with the compiler plugin applied, androidx.test 1.7.0 / 1.3.0 | done | JVM compile |
+| Removed: Kotlin dev repo, `mavenLocal()`, four unrelated repos, `kotlinx-benchmark`, `maven-publish`, `appcompat`, forced Kotlin resolution strategy, no-op build-cache block | done | JVM configure |
+| `kvid-examples` compiles (three duplicate `main` functions removed) | done | compile executed |
+| ffmpeg-dependent JVM tests fail instead of skip when `CI` is set | done | ran with ffmpeg present |
+| Tautological tests removed or replaced with behavioral ones (see Milestone 0) | done | JVM suite executed: 106 tests, 0 failures, 0 skipped |
+| `CancellationException` is rethrown ahead of every `catch (e: Exception)` in main source sets | done | JVM compile; Android and iOS source sets compile only in CI |
+| `MemoryStore.exportIndex` uses kotlinx.serialization instead of hand-built JSON | done | round-trip test with quotes, backslashes, tabs and newlines |
+| `HnswVectorIndex.search` sorts candidates by distance before taking top-k (results were returned in visit order) | done | new recall@10 test against the exact index |
+| GitHub Actions: Ubuntu job (ffmpeg, `./gradlew build`, examples compile) and macOS job (iOS simulator tests) | done | runs on pushes to `main` and `phase-*` branches, on pull requests, and manually |
+| README prerequisites and status describe the real per-platform state | done | review |
+
+Still true, from source inspection, and unchanged by Phase 0:
+
+- `MemoryStore` retains chunks and metadata in memory; saving a vector index alone does not persist a searchable document store.
+- `SimpleEmbedding` is a positional character-code demonstration, not a semantic model.
+- The iOS encoder writes a custom container rather than MP4; iOS compression is raw DEFLATE while JVM and Android use gzip; the iOS QR decoder cannot build an image from raw pixels (an `@Ignore`d round-trip test now documents this in `iosTest`).
+- The Android encoder does not drain output buffers during encoding, and there is no Android QR generator.
+
+The full per-platform defect list is in Appendix A as an investigation checklist. The Android and iOS items are from reading the code, not from device execution.
+
+## Milestone 0: establish a reproducible baseline
+
+- [x] Make a fresh checkout build using a committed Gradle wrapper, including its JAR.
+- [x] Choose the Kotlin/Gradle/AGP combination (2.5.0-Beta1 / 9.8.0 / 9.4.0). JVM verified; Android and iOS verification is the first CI run on this branch. The Kotlin Gradle plugin compatibility table is not yet published for 2.5.0-Beta1 (2.4.20 lists AGP 9.3.1 and Gradle 9.7.0 as the newest fully supported). If CI rejects the combination, pin `kotlin = "2.4.20"` in `gradle/libs.versions.toml` until 2.5.0 ships.
+- [x] Apply the serialization compiler plugin where generated serializers are needed.
+- [x] Remove unused repositories, plugins, and dependencies after confirming usage.
+- [x] Add CI for JVM tests, Android host tests, examples compilation, and iOS simulator tests.
+- [ ] Add an Android emulator job for device tests once there is platform-specific storage behavior to test (Milestone 2). Host tests alone do not establish mobile support.
+- [x] Make missing prerequisites visible in test reports; required CI coverage fails when its prerequisites are absent.
+- [x] Correct README capabilities and prerequisites to match verified behavior.
+- [x] Replace tautological tests with behavioral tests where coverage is needed; remove assertions that establish no behavior. Removed: data-class construction and enum-count "integration" tests, `100 < 10000`, byte-in-0..255, `assertNotNull` on non-null `Result`, a print-only benchmark that ran as a unit test, the whole iOS video decoder test file (16 tests that never called the decoder). Added: HNSW recall against exact search, HNSW top-k equals exact top-k on a small set, exact sentence-boundary chunking, corrupted compressed payload fails, vectors and search results survive save/load, export JSON round trip, an ignored iOS QR round trip that documents the known decoder failure.
+- [x] Preserve coroutine cancellation through error handling. `Result` versus typed exceptions remains a separate API decision (open decision 5).
+- [ ] Confirm the first green CI run on all three jobs and record the commit here.
+
+**Exit criterion:** reproducible build instructions and CI results for the actual branch, with platform limitations stated accurately.
+
+## Milestone 1: choose storage architecture and define its contract
+
+Compare three approaches in a short architecture decision record before implementing a database engine:
+
+| Approach | Benefit | Cost or constraint |
+|---|---|---|
+| SQLite-backed document store | Existing transaction and recovery machinery; a portable database file; FTS5 gives BM25 ranking without writing an index | Native integration and deployment; WAL mode creates `-wal`/`-shm` sidecars while open; vectors need an extension or application-side scanning |
+| Append-only document log with rebuildable indexes | Smaller custom format; authoritative documents survive index loss | kvid owns recovery, durable writes, compaction, and indexing |
+| Custom file with embedded WAL and persisted index segments (memvid v2's shape) | Direct control over a strict single-file runtime format | Largest correctness and maintenance burden |
+
+**Provisional preference:** evaluate SQLite first. The Kotlin Multiplatform `androidx.sqlite` bundled driver ships one SQLite build for Android, iOS and JVM, which removes the per-platform variance that sank memvid v1 and gives transactions, crash recovery and full-text search on day one. kvid's own value then lives above it: the document model, history, portable snapshot export, optional vectors, and the archive formats. Fall back to the append-only log only if owning the format proves essential to the product or SQLite's constraints (sidecars while open, extension loading on iOS, binary size) fail the criteria below.
+
+Evaluation criteria, measured on a phone with a representative notes corpus (thousands of documents, tens of MB):
+
+- [ ] FTS5 is compiled into the chosen driver on every target (verify, do not assume).
+- [ ] "Single file" is defined precisely: one portable artifact after a clean close is the target; no sidecars even during writes is a stretch goal. Decide whether temporary files during compaction or snapshot export are permitted.
+- [ ] Open time, ingest time, query latency, peak memory, and file size for each candidate.
+- [ ] Binary size added to an Android APK and an iOS app.
+- [ ] Behavior when copied while open, when the process is killed mid-transaction, and on disk-full.
+
+### Durability and concurrency
+
+- [ ] Specify whether `put` merely stages a change and whether only `commit` promises durability.
+- [ ] Specify transaction atomicity, read-your-writes behavior, rollback, and the result of closing with uncommitted work.
+- [ ] Define how incomplete records, torn writes, and incomplete transactions are recognized.
+- [ ] Specify write and durable-sync ordering and recovery after each step.
+- [ ] If using a WAL, specify checkpoint publication and safe WAL reuse, including a full-WAL policy.
+- [ ] Start with one writer. Define same-process coroutine synchronization, cross-process locking, and reader visibility during commits.
+- [ ] Define behavior on disk-full errors, cancellation, failed sync, unsupported format versions, and corruption.
+- [ ] Define a narrow platform I/O interface for positioned reads/writes, durable synchronization, locking, and file replacement. Keep encoding and recovery logic common. Buffered I/O alone does not establish durability.
+
+### Documents, versions, and history
+
+- [ ] Use stable `documentId` values, immutable `versionId` values, and separate chunk identifiers. A URI is metadata or an explicitly defined key, not an implicit identity rule.
+- [ ] Separate commit order from application event time. Define which timestamp each date filter uses and how timestamp ties are resolved.
+- [ ] Define update/delete behavior and which version is visible at a commit sequence.
+- [ ] Define retention and compaction policies. Keeping history and physically removing deleted versions are different modes with different guarantees.
+- [ ] Define whether historical search requires historical ranking statistics or only historical document visibility. Defer historical ranked search if necessary.
+- [ ] Define pagination ordering and whether cursors remain valid across commits.
+
+### Format evolution and bounds
+
+- [ ] Document versioning, feature flags, unknown-field behavior, and migration policy.
+- [ ] Bound record lengths, metadata sizes, decompression output, and allocation sizes before reading user-supplied files.
+- [ ] Choose one portable compression envelope and prove it with shared fixtures. Gzip, zlib-wrapped DEFLATE, and raw DEFLATE are distinct formats; today iOS and JVM/Android disagree.
+- [ ] Make authoritative documents recoverable independently of derived indexes; define index rebuild behavior.
+- [ ] Reserve a format path for encrypted records and authenticated metadata before freezing the format. Define nonce uniqueness, key identification, and what remains visible without a key.
+
+The header/WAL/data/index/footer layout from the earlier draft is a candidate sketch for the custom-format option only, not a committed specification.
+
+**Exit criterion:** an architecture decision record, a written persistence contract, and small platform I/O prototypes that establish the required primitives on JVM, Android, and iOS.
+
+## Milestone 2: durable document store
+
+- [ ] Implement `create`, `open`, `close`, `put`, `get`, `update`, `delete`, and atomic `commit` according to the contract.
+- [ ] Persist document text and metadata, not just vectors.
+- [ ] Add portable format fixtures written and read across all three platforms.
+- [ ] Add integrity verification and explicit corruption errors.
+- [ ] Implement recovery and rebuildable derived state.
+- [ ] Test interruption at transaction boundaries, truncated records, damaged checksums, disk-full/short-write failures, and cancellation.
+- [ ] Distinguish deterministic I/O fault injection from actual platform durability testing; neither proves every power-loss scenario.
+- [ ] Add minimal JSON Lines import/export for inspection and recovery.
+
+Keep large attachments, historical ranked search, and a full CLI outside this milestone unless they are necessary for the selected use case.
+
+**Exit criterion:** committed documents and metadata survive close/reopen on every target; interrupted writes preserve the last committed state; corruption cannot silently produce successful reads.
+
+## Milestone 3: useful offline full-text search
+
+- [ ] Provide lexical search with BM25 ranking, deterministic tie-breaking, and documented Unicode normalization/tokenization. With SQLite this is FTS5 configuration plus a tokenizer decision; with a custom store it is a standalone inverted index.
+- [ ] Start with basic text queries and tag, date, and URI filters. Specify AND/OR filter behavior.
+- [ ] Search the visible document versions; prevent deleted or superseded versions from leaking into current results.
+- [ ] Define chunk-to-document result aggregation before exposing chunked search.
+- [ ] Verify ranking against a representative notes/document corpus and an independent reference calculation for small cases.
+- [ ] Ensure indexes rebuild from authoritative documents and remain consistent after recovery.
+- [ ] Measure ingest time, open time, query latency, peak memory, and file size at representative corpus sizes. Record devices and workloads before setting release budgets.
+
+Defer stemming, advanced query syntax, phrase/prefix queries, and adaptive score cutoffs until demonstrated needs justify their complexity.
+
+**Exit criterion:** persisted documents are searchable offline with reliable filtering and measured performance on target platforms.
+
+## Milestone 4: mobile proof and first release
+
+- [ ] Build a small Android/iOS notes sample (Compose Multiplatform): create, edit, delete, close/reopen, search, and filter.
+- [ ] Exercise background/foreground transitions, serialized concurrent calls, and recovery after process interruption.
+- [ ] Expose a documented resource lifecycle, including `close` and transaction ownership.
+- [ ] Provide basic document history if supported by the retention contract.
+- [ ] Validate backup/export from a consistent committed snapshot. Copying a live writable file must not be an undocumented backup strategy.
+- [ ] Publish only targets that meet the acceptance criteria; document packaging for Kotlin and Swift consumers (Maven Central plus an XCFramework).
+- [ ] Provide a clear migration statement for the existing experimental APIs (`MemoryStore`, `MemoryEncoder`, `MemoryDecoder`) and stored artifacts.
+
+**First-release boundary:** durable documents, metadata, BM25, basic filters, portable files, and a working mobile sample. No embedding download is required.
+
+## Milestone 5: optional semantic and hybrid search
+
+- [ ] Support one real embedding implementation first; verify tokenizer, pooling, normalization, and output parity across supported platforms.
+- [ ] Record the full embedding configuration in the file: model/revision or hash, tokenizer revision, dimensions, pooling, normalization, and distance metric. Refuse to mix models.
+- [ ] Treat embeddings as derived data; define missing-model behavior and explicit re-embedding/index migration.
+- [ ] Keep exact vector search as the correctness baseline and initial implementation.
+- [ ] Introduce HNSW only after measurements establish a benefit. Evaluate recall@k versus latency and memory across parameters and multiple seeded datasets. The current implementation is a reference, not a release candidate: it recomputes the farthest result inside its inner loop and persists as CSV text.
+- [ ] Benchmark graph construction and query behavior; avoid fragile wall-clock assertions in ordinary unit tests.
+- [ ] Add hybrid search with document-level deduplication and measured reciprocal-rank-fusion settings.
+- [ ] Add token-aware chunking when the real tokenizer is available.
+
+ONNX Runtime with a shared model (for example `bge-small-en-v1.5`, 384 dimensions) is the candidate for portable vectors across platforms, not a required default. Platform-native (Apple `NLContextualEmbedding`) and remote models may be separate providers with distinct identities. Do not impose a model download on lexical-only users.
+
+**Exit criterion:** semantic retrieval improves a representative evaluation corpus and has explicit model compatibility and resource costs.
+
+## Later capabilities
+
+### Encryption
+
+Implement encryption after the format has reserved its required structure and before promoting kvid for sensitive-data use. Select a maintained cross-platform cryptographic implementation; specify key provisioning, password derivation if supported, authenticated coverage of documents and indexes, nonce lifecycle, and key rotation. Checksums detect accidental corruption; they do not provide authentication. If SQLite is chosen, evaluate whole-file encryption of the exported snapshot versus an encrypted-database build.
+
+### Video archive/export
+
+Move the existing QR/MP4 pipeline into optional `kvid-video`. Repair portable compression, Android codec buffering/plane handling, iOS pixel conversion/resource lifetimes, and genuine MP4 encoding as part of this work (Appendix A).
+
+Require exact byte recovery, payload checksums, explicit missing-frame errors, and cross-platform fixtures. Include chunk sequencing and reconstruction; decoding QR strings alone is not a complete document import. Derive frame size from QR version (the current 256 px frames hold under two pixels per module at version 30). Test codec/quality configurations before describing export as a backup. Video export is codec-dependent.
+
+### Backup and synchronization
+
+Document consistent snapshot export and interrupted-compaction recovery early. Treat multi-device sync as a separate design with stable identifiers, conflict resolution, merge behavior, and deletion propagation. An append-only file is not by itself a synchronization protocol.
+
+### Developer tools and additional media
+
+Expand a JVM CLI when the API stabilizes: `create`, `put`, `get`, `find`, `stats`, `verify`, `export`, and `import`; add history/compaction commands with those features. Add Markdown import/export, blobs, image embeddings (MobileCLIP-class models are designed for phones), and natural-language date parsing based on actual demand.
+
+### AI integrations, last
+
+Optional context assembly with citations and a token budget can build on search. MCP, Koog, LangChain4j, and structured memory cards follow demonstrated integration needs. The core store must remain useful without an LLM or network connection.
+
+## Module boundaries
+
+Begin with logical boundaries and split published artifacts when dependencies or consumers require it:
+
+| Module | Responsibility |
 |---|---|
-| Decoding QR codes from video frames is slow compared to reading bytes | kvid shells out to ffmpeg, writes PPM files to disk, then runs ZXing per frame |
-| The format depended on video codec behaviour, which varies by platform | kvid has three different encoders (ffmpeg, MediaCodec, a custom iOS container) that cannot read each other's output today |
-| No crash recovery; a crash mid-write corrupts the file | kvid has no durable store at all; text lives only in the MP4, vectors in a CSV |
-| Search was vector-only, no full-text | Same in kvid, and the default embedding is not semantic (see 1.3) |
-| Python could not be embedded in other languages | Kotlin Multiplatform solves this one, which is kvid's real opportunity |
+| `kvid-core` | Documents, persistence contract, storage, lifecycle, recovery |
+| `kvid-search` | Standalone lexical/vector indexes and ranking (only if the custom-store path is chosen; with SQLite most of this is FTS5) |
+| `kvid-text` | Shared text normalization, tokenization, chunking; extract when useful |
+| `kvid-sample` | Android/iOS proof of the library |
+| Optional providers | Embedding runtimes and remote APIs |
+| Later tools | Video export, CLI, and AI adapters |
 
-memvid v2 has **no mobile story**: it targets macOS, Linux and Windows only, depends on Tantivy, ONNX Runtime and mmap, and has an open issue asking for a C FFI. An embedded single-file store with search for Android, iOS and JVM is an empty niche, and it is useful far beyond agents.
+Keep store-specific version visibility and transaction rules out of standalone search components. Avoid creating all proposed modules before they have implementations or a clear dependency-isolation benefit.
 
-### 1.2 kvid platform parity today
+## Decisions still open
 
-Only the JVM can do the full encode, MP4, decode, text round trip, and even that path is untested end to end. The README has been corrected to say so.
+1. Storage engine (SQLite versus custom) and the exact meaning of single-file operation.
+2. Durability boundary, transaction API, and reader model.
+3. Document identity, history retention, and historical-search guarantees.
+4. Format versioning, compression, encryption structure, and compaction strategy.
+5. Error API: typed exceptions or `Result`, with cancellation preserved in either case (cancellation is now preserved in the existing `Result` style).
+6. Verified toolchain versions and supported platform minimums (minSdk 21 today; AGP 9.4 imposes no higher floor).
+7. Representative workloads and performance budgets.
+8. Whether `.kvid` names a custom format or an application container over another engine.
 
-| Capability | JVM | Android | iOS |
-|---|---|---|---|
-| QR generate | ZXing, works | **Missing** (no `AndroidQRCodeGenerator`, so `MemoryEncoder` cannot be built) | CIFilter, works, ignores the requested version |
-| QR decode | ZXing, works | ZXing, but never decompresses `GZ:` payloads | **Broken**: raw pixels fed to `CIImage.imageWithData`, which expects PNG/JPEG (`IosQRCodeDecoder.kt:99`) |
-| Video encode | ffmpeg subprocess via PPM temp files | MediaCodec, **hangs** past a few frames (see 1.3) | **Stub**: writes a custom raw-RGB "KVID" container, not MP4 (`IosVideoEncoder.kt:145`) |
-| Video decode | ffmpeg extracts every frame to disk even when a subset is requested | MediaCodec, assumes packed I420 with no stride | AVAssetReader, emits BGRA labelled as RGB_888 |
-| Compression | gzip | gzip (byte-for-byte copy of JVM) | **raw DEFLATE** (`IosTextCompression.kt:20`); JVM/Android files cannot be read on iOS |
-| Vector index persistence | CSV text file | CSV (copy of JVM) | CSV via NSString |
+## Appendix A: investigation checklist from the code review
 
-### 1.3 Concrete defects in the current code
+Findings from reading the code. Items marked "confirmed" were reproduced by a test on this branch; the rest are unconfirmed on devices.
 
 Core (commonMain):
 
-- `SimpleEmbedding` is not semantic. It sums character codes into 384 positional buckets (`SemanticEmbedding.kt:95-111`). `MemoryStoreTest` sidesteps it with a keyword embedding.
-- `HnswVectorIndex` recomputes the farthest element of the result set with `maxByOrNull` inside the inner loop and re-sorts the candidate list on every insert (`SemanticEmbedding.kt:519-551`). The iOS test needs a five-minute timeout for 500 vectors. It persists as CSV text.
-- `MemoryStore` keeps chunks and metadata only in memory; "persistence" saves the vector index but not the text or metadata, so a reloaded index has nothing to return.
-- `exportIndex` builds JSON by hand with escaping that misses backslashes and newlines (`MemoryStore.kt:134-140`). The serialization compiler plugin is now applied, so this can be replaced with `Json.encodeToString`.
-- Every suspend function wraps its body in `try { } catch (e: Exception) { Result.failure(e) }`, which swallows `CancellationException` and breaks structured concurrency.
-- `MemoryEncoder` hard-codes QR version 30 (137 modules) into 256 px frames (`MemoryEncoder.kt:91-96`, `VideoEncoder.kt:31-36`), under two pixels per module before chroma subsampling and CRF 28 compression. No test proves this decodes. Frame size should be derived from the QR version.
+- [x] confirmed and fixed: `HnswVectorIndex.search` returned candidates in visit order, not by distance.
+- [ ] `HnswVectorIndex` recomputes the farthest element of the result set with `maxByOrNull` inside the inner loop and re-sorts the candidate list on every insert (`SemanticEmbedding.kt`); 500 inserts need a five-minute timeout on the iOS simulator.
+- [ ] `MemoryEncoder` hard-codes QR version 30 into 256 px frames; no test proves this decodes after H.264 compression.
+- [ ] `JvmVideoDecoder` extracts every frame to disk even when a subset is requested.
 
 Android (`AndroidVideoEncoder.kt`):
 
-- `addFrame` never drains output buffers; once the codec's input pool fills, frames are silently dropped while returning success (lines 165-184), and `finalize` then spins forever waiting for an end-of-stream flag it never queued (lines 214-237).
-- RGB is converted to planar I420 while the codec is configured for semi-planar NV12.
-- The decoder ignores stride, slice height and the real output colour format.
-- The QR decoder never calls `TextCompression.decompress`.
+- [ ] `addFrame` never drains output buffers; once the codec's input pool fills, frames are dropped while returning success, and `finalize` loops waiting for an end-of-stream it never queued.
+- [ ] RGB is converted to planar I420 while the codec is configured for semi-planar NV12.
+- [ ] The decoder ignores stride, slice height and the real output colour format; it also re-queues end-of-stream every iteration and accumulates every frame in memory.
+- [ ] The QR decoder never calls `TextCompression.decompress`; there is no Android QR generator at all.
+- [ ] Re-`initialize` leaks the previous `MediaCodec`; `encodingTimeMs` is measured from construction, not initialization.
 
 iOS:
 
-- CoreFoundation objects (`CGImage`, colour spaces, every `copyNextSampleBuffer`) are never released.
-- `IosVideoDecoder` skips frame-number increments on `continue`, shifting indices.
-- `IosQRCodeDecoder` and `IosVideoEncoder` cannot round-trip with anything.
+- [x] confirmed by an `@Ignore`d round-trip test: `IosQRCodeDecoder` passes raw pixels to `CIImage.imageWithData`, which expects an encoded image.
+- [ ] `IosTextCompression` uses Apple's raw-DEFLATE `zlib` algorithm under a `GZ:` prefix; JVM/Android gzip payloads cannot be read on iOS and vice versa.
+- [ ] `IosVideoEncoder` writes a custom raw-RGB container, not MP4; `IosVideoDecoder` cannot read it, emits BGRA labelled RGB_888, skips frame-number increments on `continue`, and hard-codes H.264 in `getVideoInfo`.
+- [ ] CoreFoundation objects (`CGImage`, colour spaces, every `copyNextSampleBuffer`) are never released.
+- [ ] `IosQRCodeGenerator` ignores the requested version and reports it as honoured.
 
-Tests and examples:
+Build and examples:
 
-- ffmpeg-dependent JVM tests `println` and return, so a machine without ffmpeg is green with zero video coverage. CI now installs ffmpeg, and the guards fail rather than skip when `CI` is set.
-- Many tests are tautological (assert `100 < 10000`, assert a masked byte is in 0..255, `assertNotNull` on a non-null `Result`). Nothing anywhere tests `MemoryDecoder` or a video round trip.
-- `PersistenceExample` looks for an index filename the writer never produces; `PerformanceBenchmark.benchmarkEndToEnd` reuses one encoder across sizes without clearing it.
+- [ ] `PersistenceExample` looks for an index filename the writer never produces; `PerformanceBenchmark.benchmarkEndToEnd` reuses one encoder across sizes without clearing it; the advanced benchmarks run parameter sweeps that are impractical with the current HNSW.
 
-## 2. Plan by phase
+## Appendix B: memvid background
 
-### Phase 0: build, CI, honesty (done in this session except where marked)
+kvid began as a port of memvid v1 (Python; text chunks, gzip, QR codes, MP4 frames, FAISS index). memvid deprecated that design in January 2026 and rewrote the project in Rust as v2: a single-file `.mv2` store with an embedded write-ahead log, append-only checksummed frames, a Tantivy BM25 index, an HNSW index, a time index, and a TOC footer; hybrid search fused with reciprocal rank fusion; as-of queries; optional encryption. The stated reasons for abandoning v1 were slow QR decoding, codec behaviour that varied by platform, no crash recovery, vector-only search, and a Python implementation that could not be embedded. These facts come from the memvid repository at commit e6bd9f7 (2026-07-14), its `MV2_SPEC.md`, and package-registry metadata; they are background for the architecture decision, not requirements. Byte compatibility with `.mv2` is not a goal: its index segments are Rust-library layouts and its spec and code disagree in several places. An importer that reads `.mv2` frames and rebuilds kvid indexes can be considered later if users need it.
 
-- [x] Commit `gradle/wrapper/gradle-wrapper.jar` (it was gitignored by `*.jar`; a fresh clone could not run Gradle).
-- [x] Kotlin **2.5.0-Beta1** (owner's choice), Gradle **9.8.0**, Android Gradle Plugin **9.4.0** using the **`com.android.kotlin.multiplatform.library`** plugin (AGP 9 does not allow `com.android.library` next to the KMP plugin in one subproject; the Android target is configured with `android {}` inside `kotlin {}`, and instrumented tests live in `src/androidDeviceTest`).
-- [x] kotlinx-coroutines 1.11.0, kotlinx-serialization 1.11.0 with the compiler plugin applied, androidx.test 1.7.0 / 1.3.0, foojay resolver 1.0.0, JDK 17 toolchain.
-- [x] Removed: Kotlin dev repo, `mavenLocal()`, jogamp/compose/ktor/wasm repos, `kotlinx-benchmark` (zero benchmarks), `maven-publish` (nothing publishable yet), `appcompat` (one extension import, replaced with `Bitmap.createBitmap`), the forced Kotlin version resolution strategy, the no-op `buildCache` block (replaced by `org.gradle.caching=true`).
-- [x] Deleted the three duplicate `main` functions that made `kvid-examples` fail to compile.
-- [x] GitHub Actions: Ubuntu job with ffmpeg running `build` (JVM tests + Android host tests + examples compile), macOS job running iOS simulator tests.
-- [x] README prerequisites and status rewritten to match reality.
-- [ ] **Unverified**: the Android plugin configuration and the iOS compile. This sandbox's proxy blocks `dl.google.com`, so neither AGP nor the Android SDK could be downloaded, and the Kotlin/Native toolchain is Apple-host only. JVM tests and the examples compile were verified on Kotlin 2.5.0-Beta1 with the Android plugin temporarily stripped. The first CI run on GitHub, or one local `./gradlew build`, settles it.
-- [ ] Note on the Beta: the Kotlin Gradle plugin compatibility table is not yet published for 2.5.0-Beta1 (2.4.20 lists Gradle up to 9.7.0 and AGP up to 9.3.1 as fully supported). Expect warnings; if the Android plugin rejects the Beta, pin `kotlin = "2.4.20"` in `gradle/libs.versions.toml` until 2.5.0 ships.
-- [x] ffmpeg-dependent JVM tests now fail instead of skip when `CI` is set.
-- [ ] Delete the tautological tests listed in 1.3.
+## Reference notes
 
-### Phase 1: make the existing pipeline actually work everywhere
-
-This proves the platform layers and produces golden fixtures. It is also what makes the "archive to video" export in Phase 5 real.
-
-- **Portable compression.** Make iOS produce real gzip using `platform.zlib` (`deflateInit2` with windowBits 31). Add a fixture test: a `GZ:` string committed to the repo must decompress on all three targets.
-- **Shared JVM/Android code.** Add a `jvmAndAndroid` intermediate source set. Move ZXing QR generation, the QR decoder, gzip and file persistence there, and keep only the AWT `BufferedImage` helper in `jvmMain`. This gives Android a QR generator and removes three duplicated files.
-- **Android encoder.** Drain output buffers after each input, fail loudly on dropped frames, exit `finalize` on timeout, feed NV12 or use `COLOR_FormatYUV420Flexible` with `getInputImage()`. Decoder: read planes and strides via `getOutputImage()`.
-- **iOS.** Build the `CGImage` for QR decoding from raw pixels with `CGImageCreate` and a data provider. Release every CF object. Convert BGRA to RGB in the decoder. Replace the custom container with `AVAssetWriter` writing H.264 MP4.
-- **One real end-to-end test on JVM**: `MemoryEncoder` to MP4 to `MemoryDecoder` to `MemoryStore.search`. Commit the resulting MP4 as a fixture and decode it in `androidDeviceTest` and `iosTest`.
-- Derive frame size from QR version (at least three or four pixels per module plus quiet zone), and encode with `-tune stillimage -g 1` as memvid v1 did.
-
-### Phase 2: the `.kvid` single-file store
-
-The heart of the project, and the piece every other use case rests on. Mirror memvid v2's architecture, not its bytes (see 4 on why byte compatibility is not worth chasing).
-
-Layout, all little-endian, one file, no sidecars:
-
-```
-Header (4 KB): magic "KVID", format version, flags, embedding model id + dimension,
-               WAL offset/size/checkpoint sequence, footer offset, header checksum
-WAL (fixed region, 1 to 16 MB): [seq u64][type u8][len u32][payload][checksum]
-Data segments: frames, each compressed payload + frame record
-Index segments: lexical (BM25), vector (HNSW), time index
-TOC footer: segment descriptors with offsets, lengths, checksums; footer checksum
-```
-
-Frame record (memvid's "Smart Frame", but think of it as "a document version"): monotonic `frameId`, `timestamp`, `uri`, `title`, `tags`, `labels`, `metadata` map, `checksum` of the payload, `encoding` (plain or deflate), `role` (document, chunk, or blob), `parentId`, `chunkIndex`/`chunkCount`, `status` (active or tombstone), `supersedes`.
-
-Operations: `put` appends a WAL record; `commit` writes pending frames into a data segment, updates indexes, rewrites the TOC footer; `open` scans for the last valid footer and replays WAL records after the checkpoint; `delete` writes a tombstone; `update` writes a new frame with `supersedes` (this is document history, usable by any app); `vacuum` rewrites without tombstones; `verify` recomputes checksums; `timeline` and as-of reads give "what did this file contain on Tuesday" to any app, not just agents.
-
-Implementation notes:
-
-- Use `kotlinx-io` for file access in common code so there is a single implementation of the format. Only paths differ per platform.
-- Checksums: CRC32 for integrity; SHA-256 for payload hashes via `expect`/`actual` (JCA on JVM/Android, CommonCrypto on iOS).
-- Compression: the existing `compressBytes`/`decompressBytes` pair once Phase 1 makes it portable. zstd later via `zstd-jni` and a CocoaPod if size matters.
-- Replace `Result`-everywhere with a `KvidException` hierarchy carrying error codes, and stop catching `Exception` in suspend functions.
-- Single writer: advisory lock (file lock on JVM/Android, `flock` on iOS) with a clear error, as memvid does.
-- Blobs: allow frames whose payload is binary (attachments, thumbnails) so apps can keep small files next to their text.
-
-### Phase 3: search that holds up, full-text first
-
-Full-text search needs no model download and serves every use case, so it comes first; vectors are optional.
-
-- **BM25 lexical index** in common code: inverted index with positions, Unicode tokenizer, optional stemmer, phrase and prefix queries, persisted as a segment. memvid uses Tantivy for this; Kotlin needs a small hand-written one, which is fine at the scale of one device.
-- **Filters** on every query: `since`/`until`, tag and label match, uri prefix scope, `asOfFrame` and `asOfTs` (time travel), pagination cursor.
-- **Rewrite HNSW**: contiguous `FloatArray` storage, binary heaps for candidates and results, heuristic neighbour selection, binary persistence. Add a recall test against the flat index (recall@10 at or above 0.95 on a few thousand vectors) and a timing test that would catch the current quadratic behaviour.
-- **Real embeddings, as optional modules.** The embedding interface carries a model id and dimension that are written into the file header so two files or two platforms cannot silently mix models (memvid's `ModelMismatch`).
-  - `kvid-embeddings-onnx` for JVM and Android using ONNX Runtime with `bge-small-en-v1.5` (384 dimensions, memvid's default). Implement the BERT WordPiece tokenizer in common Kotlin rather than depending on a native tokenizer library.
-  - iOS via ONNX Runtime's Objective-C pod with the same model, or Core ML conversion of the same model. Apple's `NLContextualEmbedding` is a zero-dependency option but is a different model, so it gets its own model id.
-  - `kvid-embeddings-remote` using Ktor for hosted embedding APIs.
-- **Hybrid search with Reciprocal Rank Fusion**, k = 60, merged by frame id, exactly as memvid's `fuse_hits_rrf`. Modes `lex`, `sem`, `hybrid`, plus an adaptive cut-off (score cliff or elbow) as in memvid's `search_adaptive`.
-- Token-aware chunking once the tokenizer exists; keep the character-based chunker as fallback.
-
-### Phase 4: developer surface
-
-- **API shaped like memvid's so its docs transfer**, but named for documents, not agents: `Kvid.create(path)`, `open`, `put`, `putMany`, `update`, `delete`, `get`, `find`, `timeline`, `stats`, `commit`, `seal`, `verify`, `vacuum`.
-- **Standalone modules.** Keep the indexes independent of the store so an app can use just the full-text index over its own data: `kvid-text` (chunking, tokenizing), `kvid-search` (BM25, HNSW, fusion), `kvid-core` (store and format).
-- **CLI** (`kvid-cli`, JVM, clikt 5): `create`, `put`, `find`, `get`, `timeline`, `stats`, `verify`, `vacuum`, `export`, `import`. Cheap, and makes every feature testable from a shell.
-- **Import/export** in plain formats: JSON Lines and a folder of Markdown files with front matter, so data is never locked in.
-- **Sample app**: a Compose Multiplatform notes app (Android and iOS) that writes, searches, filters by tag and date, and shows document history. This is the proof that the mobile story is real.
-- Publish `kvid-core` to Maven Central with an XCFramework for iOS.
-
-### Phase 5: broader features
-
-- **Encrypted files** (password or key): memvid uses Argon2id plus AES-256-GCM. A KMP crypto library such as cryptography-kotlin gives AES-GCM and PBKDF2 on all targets; Argon2 would need native bindings. Encryption at rest matters more on a phone than on a server.
-- **Video archive export** (`kvid export --video`, `kvid import --video`): the Phase 1 QR/MP4 pipeline, repackaged as an optional `kvid-video` module. A fun, codec-independent "print your data to a video" backup, and the project's origin story.
-- **Sync-friendliness**: document how a single append-mostly file behaves under iCloud Drive and Android backup; consider a compaction mode that keeps the file small for sync.
-- **Images**: memvid uses MobileCLIP-S2, which was designed for phones. A `kvid-embeddings-clip` module for photo search is a natural mobile feature.
-- **Natural-language dates** ("last Tuesday") as a query filter, useful for any timeline UI.
-
-### Phase 6: AI integrations (last, and optional)
-
-- `ask(question, contextOnly = true)` returning fused hits plus a token-budgeted context string and citations, leaving the LLM call to the app.
-- MCP server (`kvid-mcp`, JVM, the official Kotlin MCP SDK) so Claude Desktop, Claude Code and Cursor can use a `.kvid` file. memvid has only community MCP servers.
-- Koog and LangChain4j adapters on JVM.
-- Memory cards (entity, slot, value, validity time) as a structured layer on top of frames, if there is demand.
-
-## 3. memvid features ranked for kvid
-
-| Feature | Mimic? | Notes |
-|---|---|---|
-| Single-file store with WAL and crash recovery | Yes, first | The core of v2; solves kvid's biggest gap; general-purpose |
-| Immutable, checksummed, append-only frames with tombstones and supersedes | Yes | Document history for any app |
-| BM25 full-text search | Yes | No model needed; serves every use case |
-| Time travel (`asOfFrame`, `asOfTs`, `timeline`) | Yes | Nearly free on an append-only log |
-| Metadata, tag, label and date filters with cursors | Yes | Every list screen needs these |
-| `verify` and `doctor` (integrity check, rebuild index) | Yes | Pairs with the WAL work |
-| CLI with `create/put/find/timeline/stats` | Yes | Cheap, makes the library usable |
-| Hybrid search with RRF | Yes, optional module | Only when an embedding model is configured |
-| Model id pinned in the file (`ModelMismatch`) | Yes | Prevents silent cross-platform vector mismatch |
-| Adaptive cut-off (score cliff, elbow) | Yes | Small, improves result quality |
-| Password-encrypted files | Yes, Phase 5 | High value on mobile |
-| `ask` with context assembly and citations | Later, Phase 6 | AI-specific |
-| Official MCP server | Later, Phase 6 | AI-specific |
-| Memory cards / enrichment | Later, Phase 6 | AI-specific |
-| Natural-language date parsing | Later | Useful for timelines generally |
-| Product quantization of vectors | Later | Only matters past ~100k vectors |
-| CLIP images, Whisper audio, PDF extraction | Later | Images first (MobileCLIP is mobile-native) |
-| Replay sessions | No | Niche |
-| Capacity tickets, API-key tiers, telemetry | No | Commercial plumbing |
-| Byte-compatible `.mv2` | No | Tantivy segments are Rust-only; spec and code diverge; an importer is possible later |
-
-## 4. Why not just read `.mv2` files
-
-memvid's data segments (zstd payloads with BLAKE3 checksums and a documented TOC) are readable, but its lexical index is a Tantivy directory and its vector index is a Rust crate's layout, both opaque. The spec also disagrees with the code in several places (CRC32/SHA-256 in the spec, BLAKE3 in code; LZ4 listed, only zstd implemented; different HNSW parameters), and releases ship weekly. An importer that reads frames and rebuilds kvid's own indexes is feasible later; byte compatibility is not a goal.
-
-## 5. Decisions already made, and ones still open
-
-Made:
-
-- General-purpose first; AI integrations last.
-- Kotlin 2.5.0-Beta1, Gradle 9.8, AGP 9.4, JDK 17 toolchain.
-- The QR/video path is an export format, not the storage engine.
-
-Open:
-
-1. **File extension and name**: `.kvid` is suggested.
-2. **Embedding default**: bge-small via ONNX on every platform (consistent vectors, 120 MB download) or platform-native models (no download, incompatible vectors across platforms). Suggested: ONNX by default, platform-native as opt-in with its own model id.
-3. **Error handling style**: typed exceptions (suggested) or keep `Result`. Decide before Phase 2.
-4. **Compression**: DEFLATE everywhere (zero dependencies) or add zstd.
-5. **Second opinion**: a Codex review of this plan was requested but could not run from the cloud sandbox (no CLI, no credentials, `api.openai.com` blocked by the environment's network policy). See the session notes for how to enable it.
-
-## 6. Proposed module layout
-
-```
-kvid-core                 common: file format, WAL, frames, store API
-kvid-search               common: BM25, HNSW, fusion, filters (no dependency on the store)
-kvid-text                 common: chunking, tokenizers
-kvid-embeddings-onnx      jvm + android: ONNX Runtime, bge-small, WordPiece tokenizer
-kvid-embeddings-apple     ios: ONNX pod or Core ML; NLContextualEmbedding as alternative
-kvid-embeddings-remote    common: Ktor client for hosted embedding APIs
-kvid-video                existing QR/MP4 code, fixed in Phase 1, exposed as export/import
-kvid-cli                  jvm: clikt commands
-kvid-sample               Compose Multiplatform notes app
-kvid-mcp                  jvm: MCP server (Phase 6)
-```
-
-API sketch:
-
-```kotlin
-val db = Kvid.create("notes.kvid")
-val id = db.put("Met Sam about the Q4 plan", PutOptions(title = "standup", tags = listOf("work")))
-db.update(id, "Met Sam and Priya about the Q4 plan")      // new frame, supersedes the old one
-db.commit()
-
-val hits    = db.find("Q4 plan", k = 5, since = lastWeek, tags = listOf("work"))
-val history = db.timeline(uri = hits.first().uri)
-val before  = db.find("Q4 plan", asOfTs = yesterday)
-db.verify()
-```
+- [SQLite single-file portability](https://www.sqlite.org/onefile.html), [atomic commit](https://www.sqlite.org/atomiccommit.html), and [WAL behavior](https://www.sqlite.org/wal.html) inform the storage comparison; runtime journals differ from a closed portable artifact.
+- [kotlinx-io buffered I/O](https://kotlinlang.org/api/kotlinx-io/kotlinx-io-core/kotlinx.io/-sink/) informs common I/O usage if the custom-store path is chosen; platform durability requirements must be established separately.
+- [Android Gradle Library Plugin for KMP](https://developer.android.com/kotlin/multiplatform/plugin) documents the `android {}` block used in `kvid-core/build.gradle.kts`.
