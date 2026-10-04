@@ -47,7 +47,7 @@ The full per-platform defect list is in Appendix A as an investigation checklist
 - [x] Apply the serialization compiler plugin where generated serializers are needed.
 - [x] Remove unused repositories, plugins, and dependencies after confirming usage.
 - [x] Add CI for JVM tests, Android host tests, examples compilation, and iOS simulator tests.
-- [ ] Add an Android emulator job for device tests once there is platform-specific storage behavior to test (Milestone 2). Host tests alone do not establish mobile support.
+- [x] Android emulator job (`android-store`: API 35, x86_64, KVM) runs the common store suite on a device and fails when the instrumentation run executes zero tests, because the device-test task prints no counts and passes on an empty run. First green run 37216476571 at `8b47f77`; counted run 37217532833 at `f678eb1` (44 tests). Host tests alone do not establish mobile support.
 - [x] Make missing prerequisites visible in test reports; required CI coverage fails when its prerequisites are absent.
 - [x] Correct README capabilities and prerequisites to match verified behavior.
 - [x] Replace tautological tests with behavioral tests where coverage is needed; remove assertions that establish no behavior. Removed: data-class construction and enum-count "integration" tests, `100 < 10000`, byte-in-0..255, `assertNotNull` on non-null `Result`, a print-only benchmark that ran as a unit test, the whole iOS video decoder test file (16 tests that never called the decoder). Added: HNSW recall against exact search, HNSW top-k equals exact top-k on a small set, exact sentence-boundary chunking, corrupted compressed payload fails, vectors and search results survive save/load, export JSON round trip, an ignored iOS QR round trip that documents the known decoder failure.
@@ -82,7 +82,7 @@ The spike targets minSdk 23 and omits iosX64 because the pinned artifact has no 
 
 ## Milestone 2: durable document store
 
-**Status: implemented, review corrections applied; release validation incomplete** on branch `phase-2-document-store` (CI run 37184291494 green on JVM and the iOS simulator; the Android host store suite was skipped at commit `9f38069`). `kvid-core` now carries the store in package `com.kvid.store`; the storage spike is deleted. The planning documents stay on this branch; the code branch has none.
+**Status: implemented, review corrections applied, full CI green at `f678eb1`; release validation incomplete** on branch `phase-2-document-store` (CI run 37217532833: JVM and Android host tests, the API 35 emulator job with 44 store tests, and the iOS simulator all green; the Android host store suite is skipped by design because the bundled natives cannot load there). `kvid-core` now carries the store in package `com.kvid.store`; the storage spike is deleted. The planning documents stay on this branch; the code branch has none.
 
 What is implemented, against the persistence contract:
 
@@ -100,7 +100,7 @@ What is implemented, against the persistence contract:
 - [x] JSON Lines export of every retained version; import of live current versions in one transaction, preserving ids, event times, titles, metadata, uris and tags.
 - [x] Tests (common, run on JVM and the iOS simulator; skipped on the Android host runtime where the bundled natives cannot load): reopen round trip, copying a closed file, foreign and newer files, unclean-close marker, commit/rollback/cancellation/savepoints/reentry/escape, versions and as-of visibility, same-transaction ordering, caller ids and unique uri, list ordering and cursor expiry, current-only search and find cursors, projection drift and rebuild, page damage, one writable handle per path plus read-only handles, snapshots, bounds, retention floor, JSON Lines, error translation, UUIDv7, float32 blob codec.
 - [x] JVM-only: a child JVM is SIGKILLed while holding an open write transaction; the parent reopens, sees exactly the committed documents, `verify()` passes, and the hot journal is gone.
-- [x] Android common store suite on a local Pixel 9 arm64 emulator, Android 15/API 35, with zero skips. Repeat on the corrected final tip; API 35 emulator CI is now configured.
+- [x] Android common store suite: local Pixel 9 arm64 emulator (Android 15/API 35) at `8b47f77` with zero skips, and the CI API 35 x86_64 emulator job at `f678eb1` (run 37217532833: 44 run, 0 failed, 0 skipped).
 - [ ] Minimum-supported API 23 runtime validation and representative physical-device coverage.
 - [ ] A committed cross-platform fixture file read on all three targets (today each platform round-trips its own closed file).
 - [ ] Disk-full and failed-sync injection through the store API (the spike exercised `max_page_count` on a raw connection; the store has no test hook yet).
@@ -126,7 +126,9 @@ The review reproduced partial writes after a caught unique-URI failure, leaked t
 
 Publication never replaces an existing destination on JVM/iOS (atomic hard-link creation followed by removal of the temporary link). Android app SELinux rejects hard links: an exclusive per-destination directory reservation coordinates kvid publishers across processes, followed by existence check and atomic rename. Android requires an app-owned destination directory without non-kvid writers; this is an explicit limitation, not a general filesystem no-replace primitive. A crash can leave `.NAME.kvid-publish-lock`; inspect destination and temporary output before manually removing that reservation. Unsupported publication/filesystem behavior must fail rather than silently weaken the guarantee. Failed directory sync after publication raises an uncertain-durability error and retains the published destination for inspection.
 
-**Reviewed code tip:** `8b47f77` on `phase-2-document-store`. Final local focused results: JVM 45 tests (including subprocess-kill recovery), iOS simulator 44, and Android Pixel 9 arm64/API 35 44; zero failures or skips in these store suites. Full CI at this corrected tip must pass before integration. The earlier CI run listed above belongs to the pre-review implementation.
+**Reviewed code tip:** `8b47f77` on `phase-2-document-store`. Final local focused results: JVM 45 tests (including subprocess-kill recovery), iOS simulator 44, and Android Pixel 9 arm64/API 35 44; zero failures or skips in these store suites. Full CI at this corrected tip passed (run 37216476571).
+
+**Second review (Claude, October 4):** no objections to `8b47f77`; the corrections match the contract, and the snapshot temporary file is created beside its destination so hard-link publication stays on one filesystem. One evidence gap: the emulator job's log printed no test counts, the device-test task passes when the instrumentation run finds no tests, and the report artifact lives on blob storage that the cloud session cannot fetch. `f678eb1` adds a CI step that counts the JUnit results after the emulator run and fails on zero. CI run 37217532833 at `f678eb1` is green: Android emulator 44 run, 0 failed, 0 skipped; JVM/Android host and iOS simulator green. Merge candidate: `f678eb1`.
 
 The Android device compilation now explicitly includes commonTest via `sourceSetTreeName = "test"`; the original configuration did not. A local Pixel 9 arm64 emulator running Android 15/API 35 passed the reviewed suite; final test totals and code tip are recorded below. Host tests returning without execution are not Android store runtime evidence.
 
@@ -138,7 +140,7 @@ A trigger-induced SQLite automatic rollback regression verifies that caught fail
 2. Validate tag/date/URI filters, their combinations, tie order and cursor expiry; add representative BM25 ranking cases and an independent small reference calculation.
 3. Measure realistic corpora and mobile resources before setting release budgets.
 
-Do not begin substantial Phase 3 implementation until the Phase 2 corrected branch's CI passes. Keep portable fixtures and disk-full/failed-sync injection visible as Phase 2 acceptance gates rather than treating green happy-path tests as complete durability validation.
+The Phase 2 corrected branch's CI passed at `f678eb1`; substantial Phase 3 implementation starts once it is merged. Keep portable fixtures and disk-full/failed-sync injection visible as Phase 2 acceptance gates rather than treating green happy-path tests as complete durability validation.
 
 ## Milestone 3: useful offline full-text search
 
@@ -276,4 +278,4 @@ kvid began as a port of memvid v1 (Python; text chunks, gzip, QR codes, MP4 fram
 ## Phase 2 review implementation references
 
 - [Device-test source set configuration](https://developer.android.com/kotlin/multiplatform/plugin): `sourceSetTreeName = "test"` includes commonTest without breaking the default native hierarchy.
-- [Android emulator runner](https://github.com/ReactiveCircus/android-emulator-runner): the added CI job uses API 35/x86_64 and enables KVM. Local evidence above is API 35/arm64, not a result for the new CI job.
+- [Android emulator runner](https://github.com/ReactiveCircus/android-emulator-runner): the added CI job uses API 35/x86_64 and enables KVM. Local evidence above is API 35/arm64; the CI job's own result is run 37217532833 at `f678eb1` (44 tests, counted by the job's verification step).
