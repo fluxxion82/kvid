@@ -1,5 +1,10 @@
 package com.kvid.store
 
+import kotlinx.coroutines.CoroutineDispatcher
+
+/** Blocking-I/O dispatcher; `Dispatchers.IO` is not visible from common code. */
+internal expect val ioDispatcher: CoroutineDispatcher
+
 /**
  * The only platform-specific pieces of the store (persistence contract, section 7).
  * Everything else, including journaling, locking and recovery, is SQLite's.

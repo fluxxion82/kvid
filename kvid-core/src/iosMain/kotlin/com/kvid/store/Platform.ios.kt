@@ -1,5 +1,8 @@
 package com.kvid.store
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.posix.O_RDONLY
 import platform.posix.close
@@ -21,3 +24,5 @@ internal actual object PlatformInfo {
     actual val name: String = "ios"
     actual val storeSupported: Boolean = true
 }
+
+internal actual val ioDispatcher: CoroutineDispatcher = Dispatchers.IO

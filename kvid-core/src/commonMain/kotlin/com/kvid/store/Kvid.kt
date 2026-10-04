@@ -17,7 +17,6 @@ import com.kvid.store.Sql.queryText
 import com.kvid.store.Sql.textOrNull
 import com.kvid.store.Sql.update
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -56,7 +55,7 @@ class Kvid private constructor(
     private val options: StoreOptions,
     private val meta: Meta
 ) {
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val dispatcher: CoroutineDispatcher = ioDispatcher.limitedParallelism(1)
     private val gate = Mutex()
     private var closed = false
     private var savepointCounter = 0
@@ -69,7 +68,7 @@ class Kvid private constructor(
         private val driver = BundledSQLiteDriver()
 
         /** Creates a new store. Fails with [KvidException.AlreadyExists] if the path exists. */
-        suspend fun create(path: String, options: StoreOptions = StoreOptions()): Kvid = withContext(Dispatchers.IO) {
+        suspend fun create(path: String, options: StoreOptions = StoreOptions()): Kvid = withContext(ioDispatcher) {
             val canonical = canonicalize(path, mustExist = false)
             if (SystemFileSystem.exists(Path(canonical))) throw KvidException.AlreadyExists("store already exists: $canonical")
             OpenRegistry.acquire(canonical)
@@ -99,7 +98,7 @@ class Kvid private constructor(
         }
 
         /** Opens an existing store for reading and writing. One writable handle per path per process. */
-        suspend fun open(path: String, options: StoreOptions = StoreOptions()): Kvid = withContext(Dispatchers.IO) {
+        suspend fun open(path: String, options: StoreOptions = StoreOptions()): Kvid = withContext(ioDispatcher) {
             val canonical = canonicalize(path, mustExist = true)
             OpenRegistry.acquire(canonical)
             try {
@@ -118,7 +117,7 @@ class Kvid private constructor(
         }
 
         /** Opens a store read-only. Sees committed state only; writes raise [KvidException.ReadOnly]. */
-        suspend fun openReadOnly(path: String, options: StoreOptions = StoreOptions()): Kvid = withContext(Dispatchers.IO) {
+        suspend fun openReadOnly(path: String, options: StoreOptions = StoreOptions()): Kvid = withContext(ioDispatcher) {
             val canonical = canonicalize(path, mustExist = true)
             val conn = SqliteErrors.guard("open $canonical") { driver.open(canonical, SQLITE_OPEN_READONLY) }
             try {
@@ -468,7 +467,7 @@ class Kvid private constructor(
      * Returns the number of documents created. Everything is imported in one transaction.
      */
     suspend fun importJsonLines(source: String): Int {
-        val records = withContext(Dispatchers.IO) {
+        val records = withContext(ioDispatcher) {
             val src = Path(source)
             if (!SystemFileSystem.exists(src)) throw KvidException.NotFound("no such file: $source")
             val latest = LinkedHashMap<String, JsonlRecord>()

@@ -1,5 +1,7 @@
 package com.kvid.store
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import android.system.Os
 import android.system.OsConstants
 
@@ -18,3 +20,5 @@ internal actual object PlatformInfo {
     // Host-JVM unit tests (androidHostTest) run on a desktop VM without the bundled driver's Android natives.
     actual val storeSupported: Boolean = System.getProperty("java.vm.name")?.contains("Dalvik") == true
 }
+
+internal actual val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
