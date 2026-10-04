@@ -132,6 +132,8 @@ jobs:
           # Local rendering tests remain enabled unless this opt-out is set.
           KVID_SKIP_IOS_QR_RENDERING_TESTS: 'true'
         run: ./gradlew :kvid-core:iosSimulatorArm64Test --no-daemon --stacktrace
+      - name: Search measurement with an optimized binary
+        run: ./gradlew :kvid-core:iosSimulatorArm64ReleaseTest --tests "com.kvid.store.SearchMeasurementTest" --no-daemon --stacktrace
       - name: Sample model tests
         run: ./gradlew :kvid-sample:shared:iosSimulatorArm64Test --no-daemon --stacktrace
       - name: Build the iOS sample app

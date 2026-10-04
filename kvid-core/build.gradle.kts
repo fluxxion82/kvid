@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
@@ -35,6 +36,15 @@ kotlin {
             baseName = "kvidcore"
             binaryOption("bundleId", "kvidcore")
             isStatic = true
+        }
+    }
+
+    // Debug Kotlin/Native test binaries are unoptimized, so their timings overstate app costs. This
+    // adds an optimized test binary and the task iosSimulatorArm64ReleaseTest, used for measurements.
+    iosSimulatorArm64 {
+        binaries.test(listOf(NativeBuildType.RELEASE))
+        testRuns.create("release") {
+            setExecutionSourceFrom(binaries.getTest(NativeBuildType.RELEASE))
         }
     }
 
