@@ -1,253 +1,82 @@
-# KVID
+# kvid
 
-KVID is a Kotlin Multiplatform library that stores text as QR codes inside MP4 video frames and keeps the data searchable through semantic embeddings and vector indexes.
+kvid is an embedded, searchable document store for Kotlin Multiplatform apps on Android, iOS and the JVM. A store is one portable SQLite file holding your documents, their metadata and tags, every retained version, and an offline full-text index.
 
-## Relation to MemVid
+It started as a Kotlin port of [memvid](https://github.com/memvid/memvid). memvid has since moved from QR codes in video to a single-file memory format; kvid follows that direction for general-purpose use (notes, journals, offline documentation, transcripts, message history), with AI integrations optional and last.
 
-KVID is a Kotlin Multiplatform port and evolution of [MemVid](https://github.com/yourusername/memvid), originally written in Python. While MemVid focused on server-side LLM memory systems, KVID extends the concept to mobile and cross-platform environments with native support for Android, iOS, and JVM. Both projects share the core innovation of using video compression for efficient text storage with QR codes, but KVID adds multiplatform capabilities, hardware-accelerated encoding, and enhanced semantic search features.
+## What the store provides
 
-## What KVID Provides
-- QR code generation and decoding across JVM/Android/iOS
-- Video encoding/decoding adapters (FFmpeg/MediaCodec/VideoToolbox)
-- Text chunking, embeddings, and in-memory vector indexes
-- High-level APIs: `MemoryStore`, `MemoryEncoder`, and `MemoryDecoder`
+- Durable writes: every write commits atomically and survives process death; scoped `transaction { }` blocks group writes.
+- Versioned documents: updates and deletes keep history; `get(id, asOfSeq)` reads a document as it was.
+- Offline full-text search with BM25 ranking, snippets, Unicode case and accent folding, and plain-text queries by default.
+- Filters shared by listing and search: event-time range, tags (all required) and uri prefix; tag counts for filter UIs.
+- Portable files: `snapshot()` publishes a consistent, verified copy; `verify()` checks the whole store; JSON Lines export and import.
+- Typed failures (`KvidException` with stable codes) and enforced size bounds.
 
-## Prerequisites
-- **JDK 17** (the build uses a Java 17 toolchain)
-- **Android SDK** (compileSdk 36, minSdk 23) for the Android target
-- **Xcode** on macOS for the iOS targets
-- **FFmpeg** on the PATH for JVM video encoding/decoding and the JVM video tests
+## Quick start
 
-Toolchain: Kotlin 2.5.0-Beta1, Gradle 9.8, Android Gradle Plugin 9.4 (KMP library plugin).
-
-## Modules
-- `kvid-core/` – shared APIs and platform wiring under `src/commonMain`, `androidMain`, `jvmMain`, and `iosMain`
-- `kvid-examples/` – runnable samples and benchmarks invoked via `./gradlew :kvid-examples:run`
-
-## Build and Test
-```bash
-./gradlew build            # Build everything and run tests
-./gradlew :kvid-core:test  # Core tests only
-```
-
-## Quick Usage (MemoryStore)
 ```kotlin
-import com.kvid.core.*
-import kotlinx.coroutines.runBlocking
+import com.kvid.store.*
 
-fun main() = runBlocking {
-    val store = MemoryStore(chunkSize = 256)
-    store.addMessages(
-        listOf(
-            Message(id = 1, content = "Hello, world"),
-            Message(id = 2, content = "Semantic search is handy")
-        )
-    ).getOrThrow()
+suspend fun notes(path: String) = Kvid.create(path).use { store ->
+    val id = store.put(
+        "Budget review on Thursday; draft the plan for next quarter.",
+        PutOptions(title = "Q4 planning", tags = listOf("work"))
+    )
+    store.update(id, "Budget review moved to Friday.", PutOptions(title = "Q4 planning", tags = listOf("work")))
 
-    val results = store.search("greeting", topK = 3).getOrThrow()
-    results.forEach { println("${(it.relevance * 100).toInt()}% → ${it.content}") }
+    val hits = store.find("budget friday", FindOptions(tags = listOf("work")))
+    hits.items.forEach { println("${it.document.title}: ${it.snippet}") }
+
+    println(store.history(id).size)          // 2 versions
+    store.snapshot("$path.backup")           // consistent copy for backup or sharing
 }
 ```
 
-## Examples
-Run examples from the repo root:
+Open an existing file with `Kvid.open(path)`, or `Kvid.openReadOnly(path)` alongside a writer. A process holds one writable handle per file; own it at application scope and close it when that owner goes away. The `Kvid` class documentation describes the lifecycle on Android and iOS.
+
+## Notes sample
+
+`kvid-sample` is a Compose Multiplatform notes app built on the store: list, search while typing (whole words), tag chips, edit, delete and version history. It closes the store whenever the app leaves the foreground.
+
 ```bash
-./gradlew :kvid-examples:run --args="<example>"
+./gradlew :kvid-sample:shared:run                  # desktop
+./gradlew :kvid-sample:androidApp:installDebug     # Android device or emulator
+cd kvid-sample/iosApp && xcodegen generate         # then open KvidNotes.xcodeproj in Xcode
 ```
 
-### Available Examples
-- **Default** (no args): Basic memory-store demo with semantic search and stats
-- **`persistence`**: Create → search → save (.bin) → load → update flow; files land in `kvid-examples/kvid-data/`
-- **`persistence-load`**: Load an existing index (run `persistence` first) and perform searches
-- **`advanced`**: Batch insert and search timing over synthetic data
-- **`chunking`**: Inspect how `TextChunker` splits and annotates text
-- **`vector-index`**: Work directly with `InMemoryVectorIndex`
-- **`embedding`**: Compare semantic similarity scores between texts
-- **`benchmark`**: Standard benchmarks (~3 minutes) - text chunking, QR generation, embeddings, vector search, video encoding/decoding
-- **`benchmark-advanced`**: Advanced benchmarks (~15 minutes) - memory profiling, scalability testing, parameter tuning
-- **`benchmark-stress`**: Stress benchmarks (~20 minutes) - large dataset handling, long-running operations, memory leak detection
-- **`qrtest`**: Basic QR-code sanity check
+## Platform support and evidence
 
-## Persistence
+CI runs the store tests on the JVM, on an Android API 35 emulator and on the iOS simulator, plus a JVM test that kills a child process mid-transaction. It also builds and launches the sample on the emulator and the simulator, and checks that the store file is created, closed cleanly in the background and, on Android, recovered after the process is killed.
 
-KVID allows you to save and load vector indexes for persistent storage:
+| Target | Minimum | Notes |
+|---|---|---|
+| JVM | Java 17 | |
+| Android | API 23 | Runtime checked on API 35 only |
+| iOS | arm64 device and arm64 simulator | Intel simulators are not supported by the bundled SQLite |
 
-### Save and Load Workflow
+The store format (0.1, schema 2) is pre-release: files from unreleased schema 1 builds are refused, and the format may still change before the first release.
+
+## Build and test
+
+Requires JDK 17, the Android SDK, and Xcode on macOS for iOS.
+
 ```bash
-# Step 1: Create and save data
-./gradlew :kvid-examples:run --args="persistence"
-
-# Step 2: Load and search saved data
-./gradlew :kvid-examples:run --args="persistence-load"
+./gradlew build                                    # JVM and Android host build and tests, sample included
+./gradlew :kvid-core:iosSimulatorArm64Test         # iOS simulator tests (macOS)
+./gradlew :kvid-core:connectedAndroidDeviceTest    # store tests on a connected device or emulator
 ```
 
-### Code Example
-```kotlin
-// Create and save
-val store = MemoryStore(chunkSize = 256)
-store.addMessages(messages).getOrThrow()
+Toolchain: Kotlin 2.5.0-Beta1, Gradle 9.8, Android Gradle Plugin 9.4, Compose Multiplatform 1.12.1.
 
-val embedding = SimpleEmbedding()
-val index = JvmHnswVectorIndex(embedding)
-// Add vectors...
-index.save("/path/to/index.bin").getOrThrow()
+## Experimental APIs and migration
 
-// Load and search
-val index = JvmHnswVectorIndex(embedding)
-index.load("/path/to/index.bin").getOrThrow()
-val results = index.search(queryVector, topK = 5)
-```
+The original QR-code video pipeline in package `com.kvid.core` (`MemoryStore`, `MemoryEncoder`, `MemoryDecoder`, the QR generators and decoders, the video encoders and decoders, `TextChunker`, `SimpleEmbedding` and the in-memory vector indexes) is experimental. It is planned to move into an optional `kvid-video` module and may change or be removed.
 
-**File Locations**: Saved indexes are stored in `kvid-examples/kvid-data/` with `.bin` extension (e.g., `messages-index.bin`).
+- Its artifacts are not compatible with `.kvid` stores. There is no automatic migration of `.bin` vector indexes or of MP4 or QR videos.
+- To move data, collect the original text and `put` it into a store, or write JSON Lines records and use `importJsonLines`.
 
-## Architecture
-
-### Data Flow
-
-**Encoding Pipeline:**
-```
-Text Messages → TextChunker → QR Codes → Video Frames → MP4 File
-                     ↓
-               Embeddings → Vector Index
-```
-
-**Search Pipeline:**
-```
-User Query → Embedding → Vector Search → Frame IDs → QR Decode → Messages
-```
-
-### Platform Abstraction
-KVID uses Kotlin Multiplatform with platform-specific implementations:
-
-- **commonMain/**: Interfaces and core logic (TextChunker, SemanticEmbedding, etc.)
-- **androidMain/**: MediaCodec for hardware-accelerated video encoding
-- **jvmMain/**: FFmpeg wrapper for video encoding
-- **iosMain/**: VideoToolbox and AVFoundation for video encoding
-
-### Key Components
-- **QRCodeGenerator**: Converts text to QR code images (ZXing on JVM/Android, Core Image on iOS)
-- **VideoEncoder/Decoder**: Handles MP4 video creation and frame extraction
-- **SemanticEmbedding**: Generates vector representations of text
-- **VectorIndex**: Stores and searches embedding vectors (InMemoryVectorIndex, HNSW)
-- **TextChunker**: Splits text into semantic chunks with configurable size and overlap
-
-## API Quick Reference
-
-### Create a Store
-```kotlin
-val store = MemoryStore(chunkSize = 512)
-```
-
-### Add and Search Messages
-```kotlin
-// Add messages
-store.addMessages(listOf(
-    Message(id = 1, content = "Your message here", source = "user_1")
-)).getOrThrow()
-
-// Search
-val results = store.search("query", topK = 5).getOrThrow()
-results.forEach { println("${it.relevance}: ${it.content}") }
-```
-
-### Text Chunking
-```kotlin
-val chunker = TextChunker(
-    chunkSize = 512,
-    overlapSize = 32,
-    preserveSentences = true
-)
-val chunks = chunker.chunk("Your long text...")
-```
-
-### Embeddings
-```kotlin
-val embedding = SimpleEmbedding()
-val vector = embedding.embed("Hello world")
-val similarity = embedding.similarity(vec1, vec2)
-```
-
-### Video Encoding (when available)
-```kotlin
-val encoder = MemoryEncoder(
-    qrGenerator = JvmQRCodeGenerator(),
-    videoEncoder = JvmVideoEncoder(),
-    chunkSize = 512
-)
-encoder.addMessage("Message 1").getOrThrow()
-encoder.buildVideo("output.mp4", params).getOrThrow()
-```
-
-## Performance Benchmarks
-
-KVID includes comprehensive benchmarking:
-
-### Typical Performance (modern hardware)
-- **Text Chunking**: 20,000+ chunks/sec
-- **QR Generation**: 100+ QR codes/sec
-- **Embedding (Single)**: 100+ embeddings/sec
-- **Vector Search (HNSW)**: 20-67 queries/sec
-- **Video Compression**: 50:1 to 150:1 ratio
-- **Memory per Vector**: 1,800-2,500 bytes
-
-### Benchmark Commands
-```bash
-./gradlew :kvid-examples:run --args="benchmark"           # Quick test (~3 min)
-./gradlew :kvid-examples:run --args="benchmark-advanced"  # Deep analysis (~15 min)
-./gradlew :kvid-examples:run --args="benchmark-stress"    # Stress test (~20 min)
-```
-
-## Android Support
-
-### MediaCodec Integration
-KVID uses MediaCodec for hardware-accelerated video encoding on Android (API 21+):
-
-**Features:**
-- Hardware-accelerated encoding when available
-- Automatic fallback to software encoding
-- Support for H.264, H.265, VP9, and AV1 codecs
-- RGB to YUV420 color space conversion
-- Frame-by-frame encoding with proper timestamps
-
-**Usage:**
-```kotlin
-val encoder = AndroidVideoEncoder()
-encoder.initialize(VideoEncodingParams(256, 256, 30, VideoCodec.H264))
-encoder.addFrame(frameData, frameNumber).getOrThrow()
-val stats = encoder.finalize("/path/to/output.mp4").getOrThrow()
-```
-
-**Codec Detection:**
-```kotlin
-val codecs = getAvailableVideoCodecs()  // ["H.264", "H.265", "VP9"]
-```
-
-## iOS Support
-
-### Native Framework Integration
-KVID uses native Apple frameworks for iOS (iOS 11.0+):
-
-**Components:**
-- **QR Generation**: Core Image's CIFilter
-- **Video Encoding**: AVFoundation + VideoToolbox (H.264/H.265)
-- **Video Decoding**: AVFoundation's frame extraction
-- **QR Decoding**: Vision Framework's barcode detection
-
-**Features:**
-- Hardware-accelerated video encoding/decoding
-- No external dependencies (native frameworks only)
-- Full async/coroutine support
-
-**Usage:**
-```kotlin
-val generator = IosQRCodeGenerator()
-val encoder = IosVideoEncoder()
-val decoder = IosVideoDecoder()
-val qrDecoder = IosQRCodeDecoder()
-```
-
-## Status
-Honest state as of October 2026:
+Current state of the experimental pipeline:
 
 - **JVM**: QR generation/decoding, FFmpeg video encoding/decoding, chunking, embeddings and in-memory search work. The end-to-end encode → MP4 → decode path has no automated test yet.
 - **Android**: video encoding and QR decoding exist but have known defects (no QR generator, encoder does not drain output buffers, decoder ignores stride, decoded chunks are not decompressed). Not usable end to end yet.
@@ -255,5 +84,7 @@ Honest state as of October 2026:
 - `SimpleEmbedding` is a hashing placeholder, not a semantic model.
 
 The five iOS QR rendering tests run by default. CI explicitly excludes them with `KVID_SKIP_IOS_QR_RENDERING_TESTS=true` while the simulator rendering defect is unresolved; the task logs this exclusion. The known decoder round-trip failure remains ignored.
+
+The examples in `kvid-examples` exercise the experimental pipeline: `./gradlew :kvid-examples:run --args="<example>"` with `persistence`, `persistence-load`, `advanced`, `chunking`, `vector-index`, `embedding`, `benchmark` or `qrtest`.
 
 MIT License
