@@ -23,6 +23,7 @@ Toolchain: Kotlin 2.5.0-Beta1, Gradle 9.8, Android Gradle Plugin 9.4 (KMP librar
 ## Modules
 - `kvid-core/` – shared APIs and platform wiring under `src/commonMain`, `androidMain`, `jvmMain`, and `iosMain`
 - `kvid-examples/` – runnable samples and benchmarks invoked via `./gradlew :kvid-examples:run`
+- `kvid-storage-spike/` – throwaway verification tests for the storage decision in `docs/adr/0001-storage-engine.md` (SQLite via the androidx.sqlite bundled driver); not a published module
 
 ## Build and Test
 ```bash
