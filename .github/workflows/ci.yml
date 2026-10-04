@@ -73,7 +73,9 @@ jobs:
             ./gradlew :kvid-core:connectedAndroidDeviceTest -Pandroid.testInstrumentationRunnerArguments.package=com.kvid.store --no-daemon --stacktrace
             adb logcat -d | grep -F "[kvid-measure]" || echo "no [kvid-measure] line in logcat"
       - name: Verify device tests ran
-        # The device-test task does not print counts and passes with zero tests, so count the JUnit results here.
+        # The device-test task does not print counts or failing test names and passes with zero tests,
+        # so count the JUnit results here and list failures. Runs after a failed test run as well.
+        if: always()
         run: |
           python3 - <<'EOF'
           import glob, sys, xml.etree.ElementTree as ET
@@ -89,10 +91,17 @@ jobs:
               bad = sum(1 for c in cases if c.find("failure") is not None or c.find("error") is not None)
               skip = sum(1 for c in cases if c.find("skipped") is not None)
               print(f"{f}: {len(cases)} tests, {bad} failed, {skip} skipped")
+              for c in cases:
+                  problem = c.find("failure") if c.find("failure") is not None else c.find("error")
+                  if problem is not None:
+                      detail = (problem.get("message") or problem.text or "").strip().splitlines()
+                      print(f"FAILED {c.get('classname')}.{c.get('name')}: {detail[0][:300] if detail else ''}")
               run += len(cases); failed += bad; skipped += skip
           print(f"Device tests: {run} run, {failed} failed, {skipped} skipped")
           if run == 0:
               sys.exit("No device test results found under kvid-core/build; the emulator job ran zero tests")
+          if failed:
+              sys.exit(f"{failed} device test(s) failed")
           EOF
       - uses: actions/upload-artifact@v4
         if: always()

@@ -528,9 +528,18 @@ class KvidStoreTest {
         val store = Kvid.create(path)
         repeat(50) { store.put("row $it with enough text to occupy space ".repeat(20)) }
         store.close()
+        // Damage live b-tree structure: the root page of `versions`. A fixed file offset is not enough,
+        // because the bundled SQLite uses auto-vacuum, so page 2 is a pointer map whose unused tail is
+        // legitimately ignored, and the used part depends on the file size.
+        val (root, pageSize) = BundledSQLiteDriver().open(path).use { raw ->
+            val root = raw.prepare("SELECT rootpage FROM sqlite_schema WHERE name = 'versions'").use { st -> st.step(); st.getLong(0).toInt() }
+            val pageSize = raw.prepare("PRAGMA page_size").use { st -> st.step(); st.getLong(0).toInt() }
+            root to pageSize
+        }
         val bytes = readFile(path)
-        assertTrue(bytes.size > 3 * 4096)
-        for (i in 4096 + 200 until 4096 + 1200) bytes[i] = 0x5A.toByte()   // damage inside page 2
+        assertTrue(bytes.size >= root * pageSize)
+        val start = (root - 1) * pageSize
+        for (i in start until start + 1000) bytes[i] = 0x5A.toByte()
         overwriteFile(path, bytes)
         val outcome = runCatching {
             val reopened = Kvid.open(path)
