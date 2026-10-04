@@ -10,6 +10,11 @@ internal expect val ioDispatcher: CoroutineDispatcher
  * Everything else, including journaling, locking and recovery, is SQLite's.
  */
 internal expect object FileSync {
+    /** Reserve a new database path atomically; never truncate an existing file. */
+    fun createExclusive(path: String)
+    /** Atomically publish without replacing an existing destination. Both paths are on one filesystem. Android requires an app-owned directory with no non-kvid writers. */
+    fun publishNoReplace(source: String, destination: String)
+
     /** Flushes a directory's metadata so a completed rename is durable. Returns false where unsupported. */
     fun syncDirectory(path: String): Boolean
 }

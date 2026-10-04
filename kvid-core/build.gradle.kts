@@ -22,7 +22,7 @@ kotlin {
         withHostTestBuilder {}
 
         // Device-side (instrumented) tests: kvid-core/src/androidDeviceTest.
-        withDeviceTestBuilder {}
+        withDeviceTestBuilder { sourceSetTreeName = "test" }
     }
 
     // iosX64 (Intel simulator) is not published by androidx.sqlite 2.7.1 (ADR 0001).

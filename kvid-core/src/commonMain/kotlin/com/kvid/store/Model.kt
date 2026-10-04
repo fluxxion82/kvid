@@ -65,7 +65,8 @@ data class Hit(val document: Document, val score: Double, val snippet: String?)
 
 enum class Retention { KEEP_ALL, KEEP_LATEST }
 
-data class VerifyReport(val ok: Boolean, val problems: List<String>)
+/** [ok] covers performed checks only; inspect [unchecked] before treating verification as complete. */
+data class VerifyReport(val ok: Boolean, val problems: List<String>, val unchecked: List<String> = emptyList())
 
 data class StoreStats(
     val documents: Long,

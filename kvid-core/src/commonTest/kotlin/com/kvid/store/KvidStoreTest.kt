@@ -2,6 +2,10 @@ package com.kvid.store
 
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
@@ -20,6 +24,213 @@ import kotlin.test.assertTrue
 
 /** Persistence contract test matrix (section 11) for the parts Milestone 2 implements. */
 class KvidStoreTest {
+
+    @Test fun caughtWriteFailureDoesNotCommitPartialDocumentChanges() = storeTest { dir ->
+        val store = Kvid.create(dir.file("notes.kvid"), StoreOptions(uniqueUri = true))
+        try {
+            val existing = store.put("original", PutOptions(uri = "same"))
+            store.transaction {
+                assertFailsWith<KvidException.AlreadyExists> {
+                    put("failed", PutOptions(documentId = "failed", uri = "same"))
+                }
+                assertNull(get("failed"))
+                assertFailsWith<KvidException.AlreadyExists> {
+                    update(existing, "failed update", PutOptions(uri = "same-other"))
+                    put("second failure", PutOptions(uri = "same-other"))
+                }
+                put("survives")
+            }
+            assertNull(store.get("failed"))
+            assertTrue(store.verify().ok)
+        } finally { store.close() }
+    }
+
+    @Test fun verifyChecksProjectionContentNotJustVersionPointers() = storeTest { dir ->
+        val path = dir.file("notes.kvid")
+        val store = Kvid.create(path)
+        try {
+            store.put("authoritative")
+            BundledSQLiteDriver().open(path).use { it.execSQL("UPDATE current SET body = 'wrong' ") }
+            assertFalse(store.verify().ok)
+        } finally { store.close() }
+    }
+
+    @Test fun readOnlyVerifyReportsMissingFtsCoverage() = storeTest { dir ->
+        val path = dir.file("notes.kvid")
+        val store = Kvid.create(path)
+        try {
+            store.put("test")
+            val ro = Kvid.openReadOnly(path)
+            try { assertTrue(ro.verify().unchecked.isNotEmpty()) } finally { ro.close() }
+        } finally { store.close() }
+    }
+
+    @Test fun cancellationWhileBeginningDoesNotLeakTransaction() = storeTest { dir ->
+        val path = dir.file("notes.kvid")
+        val store = Kvid.create(path)
+        val lock = BundledSQLiteDriver().open(path)
+        try {
+            lock.execSQL("BEGIN IMMEDIATE")
+            val job = launch { store.transaction { put("cancelled") } }
+            withContext(Dispatchers.Default) { delay(100) }
+            job.cancel()
+            lock.execSQL("ROLLBACK")
+            job.join()
+            store.put("later")
+            assertEquals(1, store.stats().liveDocuments)
+        } finally { lock.close(); store.close() }
+    }
+
+    @Test fun nestedDifferentStoreCannotHideOuterTransactionReentry() = storeTest { dir ->
+        val a = Kvid.create(dir.file("a.kvid"))
+        val b = Kvid.create(dir.file("b.kvid"))
+        try {
+            withContext(Dispatchers.Default) { withTimeout(2000) {
+                a.transaction {
+                    b.transaction { assertFailsWith<KvidException.Usage> { a.get("missing") } }
+                }
+            } }
+        } finally { a.close(); b.close() }
+    }
+
+    @Test fun snapshotRefusesLogicallyInvalidSource() = storeTest { dir ->
+        val path = dir.file("notes.kvid")
+        val store = Kvid.create(path)
+        try {
+            store.put("authoritative")
+            BundledSQLiteDriver().open(path).use { it.execSQL("UPDATE current SET body = 'wrong'") }
+            assertFailsWith<KvidException.Corrupt> { store.snapshot(dir.file("copy.kvid")) }
+            assertFalse(dir.exists("copy.kvid"))
+        } finally { store.close() }
+    }
+
+    @Test fun storedTitleLengthsAreCheckedBeforeMaterializingText() = storeTest { dir ->
+        val path = dir.file("notes.kvid")
+        val store = Kvid.create(path)
+        try {
+            val id = store.put("body")
+            BundledSQLiteDriver().open(path).use { raw ->
+                raw.prepare("UPDATE versions SET title = ?").use { st ->
+                    st.bindText(1, "x".repeat(Limits.MAX_TITLE_BYTES + 1)); st.step()
+                }
+            }
+            assertFailsWith<KvidException.Corrupt> { store.get(id) }
+        } finally { store.close() }
+    }
+
+    @Test fun cursorRejectsDifferentQueriesEvenWithHashCollisions() = storeTest { dir ->
+        val store = Kvid.create(dir.file("notes.kvid"))
+        try {
+            repeat(3) { store.put("Aa BB") }
+            val page = store.find("Aa", FindOptions(limit = 1))
+            assertNotNull(page.nextCursor)
+            assertFailsWith<KvidException.Usage> { store.find("BB", FindOptions(limit = 1, cursor = page.nextCursor)) }
+        } finally { store.close() }
+    }
+
+    @Test fun snapshotPublicationNeverReplacesAnExistingFile() = storeTest { dir ->
+        val src = dir.file("source")
+        val dest = dir.file("destination")
+        overwriteFile(src, byteArrayOf(1))
+        overwriteFile(dest, byteArrayOf(2))
+        assertFailsWith<KvidException.AlreadyExists> { FileSync.publishNoReplace(src, dest) }
+        assertContentEquals(byteArrayOf(2), readFile(dest))
+        assertContentEquals(byteArrayOf(1), readFile(src))
+    }
+
+    @Test fun cancelledOpenReleasesTheConnectionAndWriterReservation() = storeTest { dir ->
+        val path = dir.file("notes.kvid")
+        Kvid.create(path).close()
+        val lock = BundledSQLiteDriver().open(path)
+        try {
+            lock.execSQL("BEGIN IMMEDIATE")
+            val job = launch { Kvid.open(path).close() }
+            withContext(Dispatchers.Default) { delay(100) }
+            job.cancel()
+            lock.execSQL("ROLLBACK")
+            job.join()
+            val reopened = Kvid.open(path)
+            try { reopened.put("works") } finally { reopened.close() }
+        } finally { lock.close() }
+    }
+
+    @Test fun automaticSqliteRollbackMakesTheSessionUnusable() = storeTest { dir ->
+        val path = dir.file("notes.kvid")
+        val store = Kvid.create(path)
+        try {
+            BundledSQLiteDriver().open(path).use {
+                it.execSQL("CREATE TRIGGER fail_write BEFORE INSERT ON versions WHEN new.body = 'fail' BEGIN SELECT RAISE(ROLLBACK, 'injected rollback'); END")
+            }
+            assertFailsWith<KvidException.Io> {
+                store.transaction {
+                    put("before")
+                    assertFailsWith<KvidException.Io> { put("fail") }
+                    put("after")
+                }
+            }
+            assertEquals(0, store.stats().liveDocuments)
+        } finally { store.close() }
+    }
+
+    @Test fun allMaintenanceThatCanChangeResultsExpiresCursors() = storeTest { dir ->
+        val store = Kvid.create(dir.file("notes.kvid"))
+        try {
+            repeat(3) { store.put("match $it") }
+            val beforeVacuum = store.find("match", FindOptions(limit = 1)).nextCursor
+            store.vacuum()
+            assertFailsWith<KvidException.CursorExpired> { store.find("match", FindOptions(limit = 1, cursor = beforeVacuum)) }
+            val beforeRebuild = store.find("match", FindOptions(limit = 1)).nextCursor
+            store.rebuildIndex()
+            assertFailsWith<KvidException.CursorExpired> { store.find("match", FindOptions(limit = 1, cursor = beforeRebuild)) }
+        } finally { store.close() }
+    }
+
+    @Test fun oversizedStoredTagsAreRejected() = storeTest { dir ->
+        val path = dir.file("notes.kvid")
+        val store = Kvid.create(path)
+        try {
+            val id = store.put("body", PutOptions(tags = listOf("small")))
+            for (tag in listOf("x".repeat(Limits.MAX_TAG_CODE_POINTS + 1), "\u0000" + "x".repeat(4 * Limits.MAX_TAG_CODE_POINTS + 1))) {
+                BundledSQLiteDriver().open(path).use { raw ->
+                    raw.prepare("UPDATE version_tags SET tag = ?").use { st -> st.bindText(1, tag); st.step() }
+                }
+                assertFailsWith<KvidException.Corrupt> { store.get(id) }
+            }
+        } finally { store.close() }
+    }
+
+    @Test fun olderSchemaWithoutAMigrationIsRefused() = storeTest { dir ->
+        val path = dir.file("notes.kvid")
+        Kvid.create(path).close()
+        BundledSQLiteDriver().open(path).use { it.execSQL("PRAGMA user_version = 0") }
+        assertFailsWith<KvidException.UnsupportedFormat> { Kvid.open(path).close() }
+        BundledSQLiteDriver().open(path).use { raw ->
+            raw.prepare("PRAGMA user_version").use { st -> st.step(); assertEquals(0, st.getLong(0)) }
+        }
+    }
+
+    @Test fun failedCommitInvalidatesTheConnectionAndReleasesItsReservation() = storeTest { dir ->
+        val path = dir.file("notes.kvid")
+        val store = Kvid.create(path)
+        try {
+            BundledSQLiteDriver().open(path).use {
+                it.execSQL("CREATE TRIGGER fail_commit BEFORE UPDATE OF commit_seq ON kvid_meta BEGIN SELECT RAISE(ROLLBACK, 'injected commit failure'); END")
+            }
+            assertFailsWith<KvidException.Io> { store.put("not committed") }
+            assertFailsWith<KvidException.Closed> { store.get("missing") }
+            val reopened = Kvid.open(path)
+            try { assertEquals(0, reopened.stats().liveDocuments) } finally { reopened.close() }
+        } finally { store.close() }
+    }
+
+    @Test fun exclusiveCreationNeverTruncatesAnExistingFile() = storeTest { dir ->
+        val path = dir.file("reserved")
+        FileSync.createExclusive(path)
+        assertTrue(dir.exists("reserved"))
+        overwriteFile(path, byteArrayOf(7))
+        assertFailsWith<KvidException.AlreadyExists> { FileSync.createExclusive(path) }
+        assertContentEquals(byteArrayOf(7), readFile(path))
+    }
 
     // ---------------------------------------------------------------- lifecycle and portability
 

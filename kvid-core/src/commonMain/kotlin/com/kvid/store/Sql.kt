@@ -6,6 +6,20 @@ import androidx.sqlite.execSQL
 
 /** Thin, exception-translating helpers over the driver API. Bind indices are 1-based, columns 0-based. */
 internal object Sql {
+    fun <T> SQLiteConnection.readSnapshot(block: () -> T): T {
+        exec("BEGIN")
+        try {
+            val result = block()
+            exec("COMMIT")
+            return result
+        } catch (failure: Throwable) {
+            try { if (inTransaction()) exec("ROLLBACK") } catch (cleanup: Throwable) {
+                if (cleanup !== failure) failure.addSuppressed(cleanup)
+            }
+            throw failure
+        }
+    }
+
     fun SQLiteConnection.exec(sql: String) = SqliteErrors.guard(sql.take(60)) { execSQL(sql) }
 
     inline fun <T> SQLiteConnection.query(

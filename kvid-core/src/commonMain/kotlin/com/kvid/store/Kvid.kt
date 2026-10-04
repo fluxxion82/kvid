@@ -6,6 +6,7 @@ import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.SQLiteException
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.driver.bundled.SQLITE_OPEN_READONLY
+import androidx.sqlite.driver.bundled.SQLITE_OPEN_READWRITE
 import com.kvid.store.Sql.bindLongOrNull
 import com.kvid.store.Sql.bindTextOrNull
 import com.kvid.store.Sql.exec
@@ -16,6 +17,7 @@ import com.kvid.store.Sql.queryOne
 import com.kvid.store.Sql.queryText
 import com.kvid.store.Sql.textOrNull
 import com.kvid.store.Sql.update
+import com.kvid.store.Sql.readSnapshot
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -68,12 +70,13 @@ class Kvid private constructor(
         private val driver = BundledSQLiteDriver()
 
         /** Creates a new store. Fails with [KvidException.AlreadyExists] if the path exists. */
-        suspend fun create(path: String, options: StoreOptions = StoreOptions()): Kvid = withContext(ioDispatcher) {
+        suspend fun create(path: String, options: StoreOptions = StoreOptions()): Kvid = acquireHandle {
             val canonical = canonicalize(path, mustExist = false)
             if (SystemFileSystem.exists(Path(canonical))) throw KvidException.AlreadyExists("store already exists: $canonical")
             OpenRegistry.acquire(canonical)
             try {
-                val conn = SqliteErrors.guard("open $canonical") { driver.open(canonical) }
+                FileSync.createExclusive(canonical)
+                val conn = SqliteErrors.guard("open $canonical") { driver.open(canonical, SQLITE_OPEN_READWRITE) }
                 try {
                     configureWritable(conn, options)
                     conn.exec("PRAGMA application_id = ${Schema.APPLICATION_ID}")
@@ -93,31 +96,32 @@ class Kvid private constructor(
                     closeQuietly(conn, t); throw t
                 }
             } catch (t: Throwable) {
-                OpenRegistry.release(canonical); throw t
+                withContext(NonCancellable) { OpenRegistry.release(canonical) }; throw t
             }
         }
 
         /** Opens an existing store for reading and writing. One writable handle per path per process. */
-        suspend fun open(path: String, options: StoreOptions = StoreOptions()): Kvid = withContext(ioDispatcher) {
+        suspend fun open(path: String, options: StoreOptions = StoreOptions()): Kvid = acquireHandle {
             val canonical = canonicalize(path, mustExist = true)
             OpenRegistry.acquire(canonical)
             try {
-                val conn = SqliteErrors.guard("open $canonical") { driver.open(canonical) }
+                val conn = SqliteErrors.guard("open $canonical") { driver.open(canonical, SQLITE_OPEN_READWRITE) }
                 try {
-                    configureWritable(conn, options)
+                    conn.exec("PRAGMA busy_timeout = ${options.busyTimeoutMs}")
                     val meta = validate(conn, readOnly = false)
+                    configureWritable(conn, options)
                     conn.exec("UPDATE kvid_meta SET clean_close = 0")
                     Kvid(canonical, conn, readOnly = false, options, meta)
                 } catch (t: Throwable) {
                     closeQuietly(conn, t); throw t
                 }
             } catch (t: Throwable) {
-                OpenRegistry.release(canonical); throw t
+                withContext(NonCancellable) { OpenRegistry.release(canonical) }; throw t
             }
         }
 
         /** Opens a store read-only. Sees committed state only; writes raise [KvidException.ReadOnly]. */
-        suspend fun openReadOnly(path: String, options: StoreOptions = StoreOptions()): Kvid = withContext(ioDispatcher) {
+        suspend fun openReadOnly(path: String, options: StoreOptions = StoreOptions()): Kvid = acquireHandle {
             val canonical = canonicalize(path, mustExist = true)
             val conn = SqliteErrors.guard("open $canonical") { driver.open(canonical, SQLITE_OPEN_READONLY) }
             try {
@@ -126,6 +130,20 @@ class Kvid private constructor(
                 Kvid(canonical, conn, readOnly = true, options, meta)
             } catch (t: Throwable) {
                 closeQuietly(conn, t); throw t
+            }
+        }
+
+        private suspend fun acquireHandle(block: suspend () -> Kvid): Kvid {
+            var acquired: Kvid? = null
+            try {
+                return withContext(ioDispatcher) { block().also { acquired = it } }
+            } catch (failure: Throwable) {
+                withContext(NonCancellable) {
+                    try { acquired?.close() } catch (cleanup: Throwable) {
+                        if (cleanup !== failure) failure.addSuppressed(cleanup)
+                    }
+                }
+                throw failure
             }
         }
 
@@ -176,19 +194,8 @@ class Kvid private constructor(
 
         private fun migrate(conn: SQLiteConnection, from: Int) {
             // Forward-only migrations, each in its own transaction with the version bump (contract, section 4).
-            var v = from
-            while (v < Schema.SCHEMA_VERSION) {
-                conn.exec("BEGIN IMMEDIATE")
-                try {
-                    // No migrations exist yet; a future step goes here as `when (v) { 1 -> ... }`.
-                    conn.exec("PRAGMA user_version = ${v + 1}")
-                    conn.exec("COMMIT")
-                } catch (t: Throwable) {
-                    runCatching { conn.exec("ROLLBACK") }
-                    throw t
-                }
-                v++
-            }
+            // There is no supported older schema yet. Never relabel unknown structures as v1.
+            throw KvidException.UnsupportedFormat("no migration exists from schema $from to ${Schema.SCHEMA_VERSION}", Schema.FORMAT_MAJOR, Schema.FORMAT_MINOR)
         }
 
         private fun canonicalize(path: String, mustExist: Boolean): String {
@@ -242,7 +249,7 @@ class Kvid private constructor(
         rejectInsideTransaction("store operation")
         return gate.withLock {
             ensureOpen()
-            withContext(dispatcher) { block() }
+            withContext(dispatcher) { conn.readSnapshot(block) }
         }
     }
 
@@ -258,45 +265,55 @@ class Kvid private constructor(
         if (readOnly) throw KvidException.ReadOnly("store opened read-only: $path")
         return gate.withLock {
             ensureOpen()
-            val txSeq = withContext(dispatcher) {
-                conn.exec("BEGIN IMMEDIATE")
-                try {
-                    conn.queryLong("SELECT commit_seq FROM kvid_meta WHERE id = 1") + 1
-                } catch (t: Throwable) {
-                    runCatching { conn.exec("ROLLBACK") }; throw t
-                }
-            }
-            val session = Session(this, txSeq)
+            var session: Session? = null
+            var commitAttempted = false
             try {
-                val result = withContext(TxMarker(this)) {
-                    session.ownerJob = currentCoroutineContext()[Job]
-                    block(session)
+                val txSeq = withContext(NonCancellable + dispatcher) {
+                    conn.exec("BEGIN IMMEDIATE")
+                    conn.queryLong("SELECT commit_seq FROM kvid_meta WHERE id = 1") + 1
                 }
                 currentCoroutineContext().ensureActive()
+                val activeSession = Session(this, txSeq)
+                session = activeSession
+                val result = withContext(TxMarker(this, currentCoroutineContext()[TxMarker])) {
+                    activeSession.ownerJob = currentCoroutineContext()[Job]
+                    block(activeSession)
+                }
+                currentCoroutineContext().ensureActive()
+                activeSession.rollbackFailure?.let { throw KvidException.Io("transaction is rollback-only after savepoint cleanup failure", it) }
                 withContext(NonCancellable + dispatcher) {
+                    commitAttempted = true
                     conn.update("UPDATE kvid_meta SET commit_seq = ? WHERE id = 1") { bindLong(1, txSeq) }
                     conn.exec("COMMIT")
                 }
                 result
             } catch (t: Throwable) {
                 withContext(NonCancellable + dispatcher) {
-                    if (conn.inTransaction()) {
-                        try { conn.exec("ROLLBACK") } catch (cleanup: Throwable) { if (cleanup !== t) t.addSuppressed(cleanup) }
+                    var rollbackFailed = false
+                    try { if (conn.inTransaction()) conn.exec("ROLLBACK") }
+                    catch (cleanup: Throwable) {
+                        rollbackFailed = true
+                        if (cleanup !== t) t.addSuppressed(cleanup)
+                    }
+                    if (rollbackFailed || (commitAttempted && t is KvidException.Io)) {
+                        closed = true
+                        try { conn.close() } catch (cleanup: Throwable) { if (cleanup !== t) t.addSuppressed(cleanup) }
+                        finally { OpenRegistry.release(path) }
                     }
                 }
                 throw t
             } finally {
-                session.ended = true
+                session?.ended = true
             }
         }
     }
 
-    private class TxMarker(val store: Kvid) : AbstractCoroutineContextElement(TxMarker) {
+    private class TxMarker(val store: Kvid, val parent: TxMarker?) : AbstractCoroutineContextElement(TxMarker) {
         companion object Key : CoroutineContext.Key<TxMarker>
     }
 
     private suspend fun rejectInsideTransaction(what: String) {
-        if (currentCoroutineContext()[TxMarker]?.store === this) {
+        if (generateSequence(currentCoroutineContext()[TxMarker]) { it.parent }.any { it.store === this }) {
             throw KvidException.Usage("$what must not be called inside transaction { }; use the Transaction receiver")
         }
     }
@@ -309,19 +326,21 @@ class Kvid private constructor(
     private class Session(private val store: Kvid, private val txSeq: Long) : Transaction {
         var ownerJob: Job? = null
         var ended = false
+        var rollbackFailure: Throwable? = null
         private var depth = 0
 
         private suspend fun <T> run(block: () -> T): T {
             if (ended) throw KvidException.Closed("transaction session has ended")
+            rollbackFailure?.let { throw KvidException.Io("transaction is rollback-only after cleanup failure", it) }
             if (currentCoroutineContext()[Job] !== ownerJob) {
                 throw KvidException.Usage("the Transaction receiver must not be shared with other coroutines")
             }
             return withContext(store.dispatcher) { block() }
         }
 
-        override suspend fun put(text: String, options: PutOptions): DocumentId = run { Ops.put(store.conn, store.limits, txSeq, text, options) }
-        override suspend fun update(id: DocumentId, text: String, options: PutOptions): VersionId = run { Ops.update(store.conn, store.limits, txSeq, id, text, options) }
-        override suspend fun delete(id: DocumentId): VersionId = run { Ops.delete(store.conn, txSeq, id) }
+        override suspend fun put(text: String, options: PutOptions): DocumentId = transaction { run { Ops.put(store.conn, store.limits, txSeq, text, options) } }
+        override suspend fun update(id: DocumentId, text: String, options: PutOptions): VersionId = transaction { run { Ops.update(store.conn, store.limits, txSeq, id, text, options) } }
+        override suspend fun delete(id: DocumentId): VersionId = transaction { run { Ops.delete(store.conn, txSeq, id) } }
         override suspend fun get(id: DocumentId, asOfSeq: Long?): Document? = run { Ops.get(store.conn, store.limits, id, asOfSeq) }
         override suspend fun history(id: DocumentId): List<Version> = run { Ops.history(store.conn, store.limits, id) }
         override suspend fun list(options: ListOptions): Page<Document> = run { Ops.list(store.conn, store.limits, options) }
@@ -329,11 +348,14 @@ class Kvid private constructor(
 
         override suspend fun <T> transaction(block: suspend Transaction.() -> T): T {
             if (ended) throw KvidException.Closed("transaction session has ended")
+            rollbackFailure?.let { throw KvidException.Io("transaction is rollback-only after cleanup failure", it) }
             if (currentCoroutineContext()[Job] !== ownerJob) throw KvidException.Usage("the Transaction receiver must not be shared with other coroutines")
             val name = "sp${++store.savepointCounter}"
-            withContext(store.dispatcher) { store.conn.exec("SAVEPOINT $name") }
+            var started = false
             depth++
             try {
+                withContext(NonCancellable + store.dispatcher) { store.conn.exec("SAVEPOINT $name"); started = true }
+                currentCoroutineContext().ensureActive()
                 val result = block(this)
                 currentCoroutineContext().ensureActive()
                 withContext(NonCancellable + store.dispatcher) { store.conn.exec("RELEASE SAVEPOINT $name") }
@@ -341,9 +363,12 @@ class Kvid private constructor(
             } catch (t: Throwable) {
                 withContext(NonCancellable + store.dispatcher) {
                     try {
-                        store.conn.exec("ROLLBACK TO SAVEPOINT $name")
-                        store.conn.exec("RELEASE SAVEPOINT $name")
-                    } catch (cleanup: Throwable) { if (cleanup !== t) t.addSuppressed(cleanup) }
+                        if (started) store.conn.exec("ROLLBACK TO SAVEPOINT $name")
+                        if (started) store.conn.exec("RELEASE SAVEPOINT $name")
+                    } catch (cleanup: Throwable) {
+                        rollbackFailure = cleanup
+                        if (cleanup !== t) t.addSuppressed(cleanup)
+                    }
                 }
                 throw t
             } finally {
@@ -367,6 +392,7 @@ class Kvid private constructor(
                 conn.exec("BEGIN IMMEDIATE")
                 try {
                     Ops.rebuildProjection(conn)
+                    conn.exec("UPDATE kvid_meta SET commit_seq = commit_seq + 1 WHERE id = 1")
                     conn.exec("COMMIT")
                 } catch (t: Throwable) {
                     runCatching { conn.exec("ROLLBACK") }; throw t
@@ -397,6 +423,7 @@ class Kvid private constructor(
                         runCatching { conn.exec("ROLLBACK") }; throw t
                     }
                 }
+                if (retention == Retention.KEEP_ALL) conn.exec("UPDATE kvid_meta SET commit_seq = commit_seq + 1 WHERE id = 1")
                 conn.exec("VACUUM")
             }
         }
@@ -431,11 +458,15 @@ class Kvid private constructor(
                             validate(copy, readOnly = false)
                             val check = copy.queryText("PRAGMA quick_check")
                             if (check != "ok") throw KvidException.Corrupt("snapshot failed quick_check: $check")
+                            val report = Ops.verify(copy, readOnly = false)
+                            if (!report.ok) throw KvidException.Corrupt("snapshot invariants: ${report.problems.joinToString()}")
                             copy.exec("UPDATE kvid_meta SET clean_close = 1")
                         }
                     }
-                    SystemFileSystem.atomicMove(temp, dest)
-                    FileSync.syncDirectory(parent.toString())
+                    FileSync.publishNoReplace(temp.toString(), dest.toString())
+                    if (!FileSync.syncDirectory(parent.toString())) {
+                        throw KvidException.Io("snapshot published at $destination, but directory sync failed; durability is uncertain; verify before retrying")
+                    }
                 } catch (t: Throwable) {
                     runCatching { SystemFileSystem.delete(temp, mustExist = false) }
                     throw t
@@ -453,10 +484,10 @@ class Kvid private constructor(
                 val dest = Path(destination)
                 if (SystemFileSystem.exists(dest)) throw KvidException.AlreadyExists("export destination exists: $destination")
                 SystemFileSystem.sink(dest).buffered().use { sink ->
-                    Ops.forEachVersion(conn, limits) { v ->
+                    conn.readSnapshot { Ops.forEachVersion(conn, limits) { v ->
                         sink.writeString(Json.encodeToString(JsonlRecord.serializer(), JsonlRecord.from(v)))
                         sink.writeString("\n")
-                    }
+                    } }
                 }
             }
         }
@@ -547,10 +578,12 @@ internal object OpenRegistry {
 
 /** Pure SQL operations on an open connection. No locking, no dispatching: callers provide both. */
 internal object Ops {
-    private const val VERSION_COLUMNS = """v.version_id, v.doc_id, v.seq, v.event_time_ms, v.commit_time_ms, v.title,
+    private const val VERSION_COLUMNS = """v.version_id, v.doc_id, v.seq, v.event_time_ms, v.commit_time_ms,
+        CASE WHEN octet_length(v.title) <= ${Limits.MAX_TITLE_BYTES} THEN v.title END,
         CASE WHEN octet_length(v.body) <= ? THEN v.body END, octet_length(v.body),
         CASE WHEN v.metadata IS NULL OR octet_length(v.metadata) <= ? THEN v.metadata END, coalesce(octet_length(v.metadata), 0),
-        v.uri, v.tombstone, v.supersedes_version_id"""
+        CASE WHEN octet_length(v.uri) <= ${Limits.MAX_URI_BYTES} THEN v.uri END, v.tombstone, v.supersedes_version_id,
+        coalesce(octet_length(v.title), 0), coalesce(octet_length(v.uri), 0)"""
 
     // ---- writes
 
@@ -677,7 +710,7 @@ internal object Ops {
 
     fun list(conn: SQLiteConnection, limits: Limits, options: ListOptions): Page<Document> {
         val limit = options.limit.coerceIn(1, limits.pageSize)
-        val fingerprint = "list:${options.sinceEventTimeMs}:${options.untilEventTimeMs}:${options.tag}:$limit"
+        val fingerprint = Json.encodeToString(listOf("list", options.sinceEventTimeMs?.toString(), options.untilEventTimeMs?.toString(), options.tag, limit.toString()))
         val cursor = options.cursor?.let { Cursor.parse(conn, it, fingerprint) }
         val sql = buildString {
             append("SELECT c.version_id, c.doc_id FROM current c WHERE 1=1")
@@ -707,7 +740,7 @@ internal object Ops {
         if (query.isBlank()) throw KvidException.Usage("query must not be blank")
         if (query.encodeToByteArray().size > limits.queryBytes) throw KvidException.LimitExceeded("query exceeds ${limits.queryBytes} bytes")
         val limit = options.limit.coerceIn(1, limits.pageSize)
-        val fingerprint = "find:$query:${options.sinceEventTimeMs}:${options.untilEventTimeMs}:${options.tag}:$limit"
+        val fingerprint = Json.encodeToString(listOf("find", query, options.sinceEventTimeMs?.toString(), options.untilEventTimeMs?.toString(), options.tag, limit.toString()))
         val cursor = options.cursor?.let { Cursor.parse(conn, it, fingerprint) }
         val offset = cursor?.key1 ?: 0L
         val sql = buildString {
@@ -758,6 +791,9 @@ internal object Ops {
     }
 
     private fun readVersion(st: androidx.sqlite.SQLiteStatement): Version {
+        if (st.getLong(13) > Limits.MAX_TITLE_BYTES || st.getLong(14) > Limits.MAX_URI_BYTES) {
+            throw KvidException.Corrupt("stored title or uri exceeds the hard cap")
+        }
         val bodyLen = st.getLong(7)
         if (bodyLen > Limits.MAX_BODY_BYTES) throw KvidException.Corrupt("stored body of version ${st.getLong(0)} is $bodyLen bytes, above the hard cap")
         val metaLen = st.getLong(9)
@@ -776,7 +812,14 @@ internal object Ops {
     }
 
     private fun withTags(conn: SQLiteConnection, v: Version): Version {
-        val tags = conn.query("SELECT tag FROM version_tags WHERE version_id = ? ORDER BY tag", { bindLong(1, v.versionId) }) { getText(0) }
+        val tags = conn.query(
+            "SELECT CASE WHEN length(tag) <= ${Limits.MAX_TAG_CODE_POINTS} AND octet_length(tag) <= ${4 * Limits.MAX_TAG_CODE_POINTS} THEN tag END, length(tag), octet_length(tag) FROM version_tags WHERE version_id = ? ORDER BY tag LIMIT ${Limits.MAX_TAGS + 1}",
+            { bindLong(1, v.versionId) }
+        ) {
+            if (getLong(1) > Limits.MAX_TAG_CODE_POINTS || getLong(2) > 4 * Limits.MAX_TAG_CODE_POINTS) throw KvidException.Corrupt("stored tag exceeds hard cap")
+            getText(0)
+        }
+        if (tags.size > Limits.MAX_TAGS) throw KvidException.Corrupt("stored tags exceed hard cap")
         return if (tags.isEmpty()) v else v.copy(tags = tags)
     }
 
@@ -812,6 +855,12 @@ internal object Ops {
         problems += conn.query("SELECT c.doc_id FROM current c LEFT JOIN documents d ON d.doc_id = c.doc_id WHERE d.doc_id IS NULL") {
             "current projection row ${getText(0)} has no document"
         }
+        problems += conn.query(
+            """SELECT c.doc_id FROM current c JOIN versions v ON v.version_id = c.version_id
+               WHERE c.doc_id IS NOT v.doc_id OR c.event_time_ms IS NOT v.event_time_ms
+               OR c.title IS NOT v.title OR c.body IS NOT v.body OR c.uri IS NOT v.uri"""
+        ) { "current projection content differs from authoritative version for ${getText(0)}" }
+        val unchecked = if (readOnly) listOf("FTS integrity requires a writable handle") else emptyList()
         val commitSeq = conn.queryLong("SELECT commit_seq FROM kvid_meta WHERE id = 1")
         problems += conn.query("SELECT version_id FROM versions WHERE seq > ?", { bindLong(1, commitSeq) }) { "version ${getLong(0)} has seq above commit_seq $commitSeq" }
         val floor = conn.queryLong("SELECT history_floor_seq FROM kvid_meta WHERE id = 1")
@@ -828,30 +877,36 @@ internal object Ops {
                 problems += "fts integrity-check: ${e.message}"
             }
         }
-        return VerifyReport(problems.isEmpty(), problems)
+        return VerifyReport(problems.isEmpty(), problems, unchecked)
     }
 }
 
 /**
  * Opaque pagination cursor: expires after any committed write or compaction (contract, section 7).
- * Format: `v1:<commitSeq>:<floorSeq>:<fingerprintHash>:<key1>:<key2>`.
+ * Format: `v2:<commitSeq>:<floorSeq>:<exactFingerprintHex>:<key1>:<key2>`.
  */
-internal class Cursor(private val seq: Long, private val floor: Long, private val fp: Int, val key1: Long, val key2: Long) {
+internal class Cursor(private val seq: Long, private val floor: Long, private val fp: String, val key1: Long, val key2: Long) {
     constructor(conn: SQLiteConnection, fingerprint: String, key1: Long, key2: Long) : this(
         conn.queryLong("SELECT commit_seq FROM kvid_meta WHERE id = 1"),
         conn.queryLong("SELECT history_floor_seq FROM kvid_meta WHERE id = 1"),
-        fingerprint.hashCode(), key1, key2
+        fingerprintKey(fingerprint), key1, key2
     )
 
-    fun encode(): String = "v1:$seq:$floor:$fp:$key1:$key2"
+    fun encode(): String = "v2:$seq:$floor:$fp:$key1:$key2"
 
     companion object {
+        // Exact bounded query identity avoids collisions in String.hashCode().
+        private fun fingerprintKey(value: String): String = value.encodeToByteArray().joinToString("") {
+            (it.toInt() and 255).toString(16).padStart(2, '0')
+        }
+
         fun parse(conn: SQLiteConnection, encoded: String, fingerprint: String): Cursor {
+            if (encoded.length > 4 * Limits.MAX_QUERY_BYTES) throw KvidException.Usage("cursor exceeds hard cap")
             val parts = encoded.split(':')
-            if (parts.size != 6 || parts[0] != "v1") throw KvidException.Usage("malformed cursor")
-            val nums = parts.drop(1).map { it.toLongOrNull() ?: throw KvidException.Usage("malformed cursor") }
-            val cursor = Cursor(nums[0], nums[1], nums[2].toInt(), nums[3], nums[4])
-            if (cursor.fp != fingerprint.hashCode()) throw KvidException.Usage("cursor does not belong to this query")
+            if (parts.size != 6 || parts[0] != "v2") throw KvidException.Usage("malformed cursor")
+            fun number(index: Int) = parts[index].toLongOrNull() ?: throw KvidException.Usage("malformed cursor")
+            val cursor = Cursor(number(1), number(2), parts[3], number(4), number(5))
+            if (cursor.fp != fingerprintKey(fingerprint)) throw KvidException.Usage("cursor does not belong to this query")
             val seq = conn.queryLong("SELECT commit_seq FROM kvid_meta WHERE id = 1")
             val floor = conn.queryLong("SELECT history_floor_seq FROM kvid_meta WHERE id = 1")
             if (seq != cursor.seq || floor != cursor.floor) throw KvidException.CursorExpired("the store changed since this cursor was issued")
