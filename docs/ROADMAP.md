@@ -82,7 +82,7 @@ The spike targets minSdk 23 and omits iosX64 because the pinned artifact has no 
 
 ## Milestone 2: durable document store
 
-**Status: implemented, review corrections applied, full CI green at `f678eb1`; release validation incomplete** on branch `phase-2-document-store` (CI run 37217532833: JVM and Android host tests, the API 35 emulator job with 44 store tests, and the iOS simulator all green; the Android host store suite is skipped by design because the bundled natives cannot load there). `kvid-core` now carries the store in package `com.kvid.store`; the storage spike is deleted. The planning documents stay on this branch; the code branch has none.
+**Status: implemented, review corrections applied, full CI green at `f678eb1`; release validation incomplete** merged into `main` at `15877cd` on October 4, 2026 (CI run 37217532833: JVM and Android host tests, the API 35 emulator job with 44 store tests, and the iOS simulator all green; the Android host store suite is skipped by design because the bundled natives cannot load there). `kvid-core` now carries the store in package `com.kvid.store`; the storage spike is deleted. The planning documents stay on this branch; the code branch has none.
 
 What is implemented, against the persistence contract:
 
@@ -128,7 +128,7 @@ Publication never replaces an existing destination on JVM/iOS (atomic hard-link 
 
 **Reviewed code tip:** `8b47f77` on `phase-2-document-store`. Final local focused results: JVM 45 tests (including subprocess-kill recovery), iOS simulator 44, and Android Pixel 9 arm64/API 35 44; zero failures or skips in these store suites. Full CI at this corrected tip passed (run 37216476571).
 
-**Second review (Claude, October 4):** no objections to `8b47f77`; the corrections match the contract, and the snapshot temporary file is created beside its destination so hard-link publication stays on one filesystem. One evidence gap: the emulator job's log printed no test counts, the device-test task passes when the instrumentation run finds no tests, and the report artifact lives on blob storage that the cloud session cannot fetch. `f678eb1` adds a CI step that counts the JUnit results after the emulator run and fails on zero. CI run 37217532833 at `f678eb1` is green: Android emulator 44 run, 0 failed, 0 skipped; JVM/Android host and iOS simulator green. Merge candidate: `f678eb1`.
+**Second review (Claude, October 4):** no objections to `8b47f77`; the corrections match the contract, and the snapshot temporary file is created beside its destination so hard-link publication stays on one filesystem. One evidence gap: the emulator job's log printed no test counts, the device-test task passes when the instrumentation run finds no tests, and the report artifact lives on blob storage that the cloud session cannot fetch. `f678eb1` adds a CI step that counts the JUnit results after the emulator run and fails on zero. CI run 37217532833 at `f678eb1` is green: Android emulator 44 run, 0 failed, 0 skipped; JVM/Android host and iOS simulator green. Reviewed tip `f678eb1` merged into `main` at `15877cd`; the merged phase branch was deleted.
 
 The Android device compilation now explicitly includes commonTest via `sourceSetTreeName = "test"`; the original configuration did not. A local Pixel 9 arm64 emulator running Android 15/API 35 passed the reviewed suite; final test totals and code tip are recorded below. Host tests returning without execution are not Android store runtime evidence.
 
@@ -140,7 +140,7 @@ A trigger-induced SQLite automatic rollback regression verifies that caught fail
 2. Validate tag/date/URI filters, their combinations, tie order and cursor expiry; add representative BM25 ranking cases and an independent small reference calculation.
 3. Measure realistic corpora and mobile resources before setting release budgets.
 
-The Phase 2 corrected branch's CI passed at `f678eb1`; substantial Phase 3 implementation starts once it is merged. Keep portable fixtures and disk-full/failed-sync injection visible as Phase 2 acceptance gates rather than treating green happy-path tests as complete durability validation.
+The Phase 2 corrected branch's CI passed at `f678eb1` and it was merged into `main` at `15877cd`; the integration gate for Phase 3 is satisfied. Keep portable fixtures and disk-full/failed-sync injection visible as Phase 2 acceptance gates rather than treating green happy-path tests as complete durability validation.
 
 ## Milestone 3: useful offline full-text search
 
