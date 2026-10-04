@@ -69,6 +69,26 @@ Requires JDK 17, the Android SDK, and Xcode on macOS for iOS.
 
 Toolchain: Kotlin 2.5.0-Beta1, Gradle 9.8, Android Gradle Plugin 9.4, Compose Multiplatform 1.12.1.
 
+## Packaging
+
+kvid is not on Maven Central yet. The build produces everything a release needs, and CI checks it on every run.
+
+**Kotlin.** `kvid-core` publishes one Kotlin Multiplatform module with JVM, Android, iOS arm64 and iOS simulator arm64 variants:
+
+```bash
+./gradlew :kvid-core:publishToMavenLocal                         # then depend on com.kvid:kvid-core:0.1.0
+./gradlew :kvid-core:publishAllPublicationsToStagingRepository   # release bundle in kvid-core/build/staging-repo
+```
+
+```kotlin
+// build.gradle.kts of a Kotlin Multiplatform or Android project, with mavenLocal() in its repositories
+commonMain.dependencies { implementation("com.kvid:kvid-core:0.1.0") }
+```
+
+**Swift.** `./gradlew :kvid-core:assembleKvidCoreReleaseXCFramework` writes `kvid-core/build/XCFrameworks/release/KvidCore.xcframework` with device and simulator slices. Add it to an Xcode target and `import KvidCore`. The Swift API is Kotlin's Objective-C export, so suspend functions become `async` methods.
+
+Before a Maven Central release, the group ID must move to a namespace the publisher can verify, and publications must be signed.
+
 ## Experimental APIs and migration
 
 The original QR-code video pipeline in package `com.kvid.core` (`MemoryStore`, `MemoryEncoder`, `MemoryDecoder`, the QR generators and decoders, the video encoders and decoders, `TextChunker`, `SimpleEmbedding` and the in-memory vector indexes) is experimental. It is planned to move into an optional `kvid-video` module and may change or be removed.

@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
@@ -8,6 +9,7 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.android.kotlin.multiplatform.library)
+    `maven-publish`
 }
 
 kotlin {
@@ -28,14 +30,17 @@ kotlin {
     }
 
     // iosX64 (Intel simulator) is not published by androidx.sqlite 2.7.1 (ADR 0001).
+    // Swift consumers use the KvidCore XCFramework: ./gradlew :kvid-core:assembleKvidCoreReleaseXCFramework
+    val xcFramework = XCFramework("KvidCore")
     listOf(
         iosArm64(),
         iosSimulatorArm64()
     ).forEach {
         it.binaries.framework {
-            baseName = "kvidcore"
-            binaryOption("bundleId", "kvidcore")
+            baseName = "KvidCore"
+            binaryOption("bundleId", "com.kvid.core")
             isStatic = true
+            xcFramework.add(this)
         }
     }
 
@@ -116,6 +121,47 @@ tasks.withType<KotlinNativeTest>().configureEach {
                     "Core Image createCGImage returns nil on the tested simulators. " +
                     "Unset the variable to run them (docs/ROADMAP.md Appendix A)."
             )
+        }
+    }
+}
+
+// Publication: every Kotlin Multiplatform target (JVM, Android, iOS arm64 and simulator arm64) plus the
+// root module metadata. Maven Central needs the POM fields below, a javadoc jar and signatures; signing
+// applies only when signing keys are configured. Publishing stages into build/staging-repo, from which a
+// release bundle is uploaded through the Central Portal.
+val javadocJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("javadoc")
+}
+
+publishing {
+    publications.withType<MavenPublication>().configureEach {
+        artifact(javadocJar)
+        pom {
+            name.set("kvid-core")
+            description.set("Embedded, searchable document store for Kotlin Multiplatform: one portable SQLite file with versioned documents and offline full-text search.")
+            url.set("https://github.com/fluxxion82/kvid")
+            licenses {
+                license {
+                    name.set("MIT License")
+                    url.set("https://opensource.org/licenses/MIT")
+                }
+            }
+            developers {
+                developer {
+                    id.set("fluxxion82")
+                    name.set("fluxxion82")
+                }
+            }
+            scm {
+                url.set("https://github.com/fluxxion82/kvid")
+                connection.set("scm:git:https://github.com/fluxxion82/kvid.git")
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = "staging"
+            url = uri(layout.buildDirectory.dir("staging-repo"))
         }
     }
 }

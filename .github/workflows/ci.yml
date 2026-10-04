@@ -147,6 +147,18 @@ jobs:
             ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
       - name: Run the iOS sample app
         run: bash kvid-sample/iosApp/smoke-test.sh kvid-sample/iosApp/build/Debug-iphonesimulator/KvidNotes.app
+      - name: Package kvid-core (Maven staging repository and XCFramework)
+        # macOS is the only runner that builds every target, so the full publication is checked here.
+        run: |
+          ./gradlew :kvid-core:publishAllPublicationsToStagingRepository :kvid-core:assembleKvidCoreReleaseXCFramework --no-daemon --stacktrace
+          echo "Staged publications:"
+          find kvid-core/build/staging-repo -name "*.pom" | sed 's|kvid-core/build/staging-repo/||' | sort
+          for target in jvm android iosarm64 iossimulatorarm64; do
+            ls kvid-core/build/staging-repo/com/kvid/kvid-core-$target/*/*.pom > /dev/null || { echo "::error::missing $target publication"; exit 1; }
+          done
+          echo "XCFramework slices:"
+          ls kvid-core/build/XCFrameworks/release/KvidCore.xcframework
+          plutil -p kvid-core/build/XCFrameworks/release/KvidCore.xcframework/Info.plist | grep -E "LibraryIdentifier|SupportedPlatformVariant" || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
