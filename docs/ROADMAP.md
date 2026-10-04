@@ -82,21 +82,42 @@ The spike targets minSdk 23 and omits iosX64 because the pinned artifact has no 
 
 ## Milestone 2: durable document store
 
-Builds on the accepted ADR 0001 and the persistence contract; `kvid-storage-spike` is deleted once `kvid-core` carries the real store and its tests.
+**Status: implemented, under review** on branch `phase-2-document-store` (CI run 37184291494 green on JVM, Android host and the iOS simulator at commit `9f38069`). `kvid-core` now carries the store in package `com.kvid.store`; the storage spike is deleted. The planning documents stay on this branch; the code branch has none.
 
-- [ ] Raise `kvid-core` to minSdk 23 and drop `iosX64`, as ADR 0001 requires.
-- [ ] Implement `create`, `open`, `close`, `put`, `get`, `update`, `delete`, and scoped atomic transactions according to the contract.
-- [ ] Persist document text and metadata, not just vectors.
-- [ ] Add portable format fixtures written and read across all three platforms.
-- [ ] Add integrity verification and explicit corruption errors.
-- [ ] Implement recovery and rebuildable derived state.
-- [ ] Test interruption at transaction boundaries, truncated records, damaged checksums, disk-full/short-write failures, and cancellation.
-- [ ] Distinguish deterministic I/O fault injection from actual platform durability testing; neither proves every power-loss scenario.
-- [ ] Add minimal JSON Lines import/export for inspection and recovery.
+What is implemented, against the persistence contract:
 
-Keep large attachments, historical ranked search, and a full CLI outside this milestone unless they are necessary for the selected use case.
+- [x] `kvid-core` minSdk 23 and `iosX64` removed (ADR 0001).
+- [x] `Kvid.create`, `open`, `openReadOnly`, `suspend close()`: `application_id`, `kvid_meta` format/schema versions, forward-only transactional migrations (none yet), `quick_check` after an unclean close, newer major or minor refused for every open; every writable connection sets and verifies `foreign_keys=ON`, `journal_mode=DELETE`, `synchronous=EXTRA` (contract 3, 4).
+- [x] Scoped `transaction { }` with a `Transaction` receiver: no manual commit; savepoint nesting; reentry through the store, use after the block, and use from another coroutine are rejected; cancellation is checked before commit; rollback and cleanup run in a non-cancellable context on the connection dispatcher with cleanup failures suppressed (contract 3).
+- [x] Documents and versions: UUIDv7 or caller ids, `AUTOINCREMENT` version ids, `(seq, versionId)` visibility with tombstones, `get(asOfSeq)`, `history`, update creates a superseding version, delete creates a tombstone, several updates in one transaction (contract 6).
+- [x] Current-content projection (`current`) kept in the same transaction as the version write, external-content FTS5 maintained by triggers, `rebuildIndex()` from authoritative versions; `find` searches current live versions only, filters by tag and event-time range, returns higher-is-better scores and snippets (contract 7).
+- [x] `list` ordered by `(eventTime desc, versionId desc)` with keyset cursors; `find` with offset cursors; every cursor carries commit sequence, history floor and a query fingerprint and expires with `CursorExpired` after any committed write or compaction (contract 7).
+- [x] Bounds checked before writes (body, title, metadata, uri, tags) and stored lengths validated before materialising large text; hard library caps above configurable limits (contract 8).
+- [x] `KvidException` subclasses with stable codes; driver errors translated by a version-pinned message parser with unknown codes mapped to `Io` (contract 5, see deviations).
+- [x] `snapshot()`: `VACUUM INTO` a temporary file next to the destination through a fresh read-only connection, validation of the copy, durability through a write transaction under `synchronous=EXTRA`, atomic rename, parent-directory fsync via a small `expect`/`actual` (JVM `FileChannel.force`, Android `Os.fsync`, iOS `fsync`); existing destinations refused; temp files removed on failure (contract 2).
+- [x] `verify()`: `integrity_check`, `foreign_key_check`, current-version and projection invariants, sequence bound, predecessor references, FTS `integrity-check` with `rank=1` on writable handles (contract 4).
+- [x] `vacuum(KEEP_ALL | KEEP_LATEST)`: retention applied transactionally with an explicit history floor (`asOf` below it raises `HistoryUnavailable`, deletion markers retained), then `VACUUM` (contract 6).
+- [x] JSON Lines export of every retained version; import of live current versions in one transaction, preserving ids, event times, titles, metadata, uris and tags.
+- [x] Tests (common, run on JVM and the iOS simulator; skipped on the Android host runtime where the bundled natives cannot load): reopen round trip, copying a closed file, foreign and newer files, unclean-close marker, commit/rollback/cancellation/savepoints/reentry/escape, versions and as-of visibility, same-transaction ordering, caller ids and unique uri, list ordering and cursor expiry, current-only search and find cursors, projection drift and rebuild, page damage, one writable handle per path plus read-only handles, snapshots, bounds, retention floor, JSON Lines, error translation, UUIDv7, float32 blob codec.
+- [x] JVM-only: a child JVM is SIGKILLed while holding an open write transaction; the parent reopens, sees exactly the committed documents, `verify()` passes, and the hot journal is gone.
+- [ ] Android device run of the common suite (the host runtime skips it). Needs an emulator job or a device.
+- [ ] A committed cross-platform fixture file read on all three targets (today each platform round-trips its own closed file).
+- [ ] Disk-full and failed-sync injection through the store API (the spike exercised `max_page_count` on a raw connection; the store has no test hook yet).
+- [ ] Process-kill recovery on iOS and Android (the JVM test cannot run in the simulator).
+- [ ] Cold-open, peak-memory and binary-size measurements with the sample app (Milestone 4).
+- [ ] Kotlin warns that `expect object` is Beta; replace `FileSync`/`PlatformInfo` objects with top-level `expect` functions and values.
 
-**Exit criterion:** committed documents and metadata survive close/reopen on every target; interrupted writes preserve the last committed state; detected corruption surfaces explicitly, and verify checks the full database and application invariants.
+Deviations from, or decisions within, the contract for review:
+
+1. `update` creates a version with exactly the supplied fields; nothing is inherited from the previous version. Simple and explicit; an app that edits a body must resend title, tags, uri.
+2. Writable handles are coordinated per canonical path by refusing a second writable open in the same process with `Locked`, rather than sharing one connection owner between handles.
+3. `verify()` on a read-only handle cannot run FTS5's `integrity-check` (it is an `INSERT`) and skips it; the report says nothing about this today and should.
+4. Error translation still parses the driver's message (pinned to 2.7.1 and tested); no supported adapter exists in androidx.sqlite. Unknown codes map to `Io`.
+5. `find` pagination is offset-based under a cursor that expires on any write; keyset paging on `(score, versionId)` was not worth it while ranking is still Milestone 3's subject.
+6. `importJsonLines` imports live current versions only; it does not reconstruct history.
+7. The connection dispatcher is `ioDispatcher.limitedParallelism(1)` per store (an `expect val` because `Dispatchers.IO` is not visible from common code).
+
+**Exit criterion:** committed documents and metadata survive close/reopen on every target; interrupted writes preserve the last committed state; detected corruption surfaces explicitly, and verify checks the full database and application invariants. Met on JVM and the iOS simulator; the Android device run is the open item.
 
 ## Milestone 3: useful offline full-text search
 
