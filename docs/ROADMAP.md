@@ -136,21 +136,52 @@ A trigger-induced SQLite automatic rollback regression verifies that caught fail
 
 ### Milestone 3 order
 
-1. Establish the query API first: plain text by default, tokenize/quote literal terms with explicit AND/OR semantics; reserve raw FTS5 syntax for an opt-in advanced mode. Decide empty/punctuation-only and Unicode behavior, bound input and cursor lengths, and translate all invalid-query cases consistently. Existing `find` passes raw FTS5 expressions and remains an experimental API until this work lands.
-2. Validate tag/date/URI filters, their combinations, tie order and cursor expiry; add representative BM25 ranking cases and an independent small reference calculation.
-3. Measure realistic corpora and mobile resources before setting release budgets.
+1. [x] Establish the query API first: plain text by default, tokenize/quote literal terms with explicit AND/OR semantics; reserve raw FTS5 syntax for an opt-in advanced mode. Decide empty/punctuation-only and Unicode behavior, bound input and cursor lengths, and translate all invalid-query cases consistently. Done on `phase-3-search`; see Milestone 3.
+2. [x] Validate tag/date/URI filters, their combinations, tie order and cursor expiry; add representative BM25 ranking cases and an independent small reference calculation. Done with a synthetic corpus; a real notes corpus remains.
+3. [ ] Measure realistic corpora and mobile resources before setting release budgets. Synthetic-corpus timings and file size are recorded on all three CI platforms; peak memory and real corpora remain.
 
 The Phase 2 corrected branch's CI passed at `f678eb1` and it was merged into `main` at `15877cd`; the integration gate for Phase 3 is satisfied. Keep portable fixtures and disk-full/failed-sync injection visible as Phase 2 acceptance gates rather than treating green happy-path tests as complete durability validation.
 
 ## Milestone 3: useful offline full-text search
 
-- [ ] Provide lexical search with BM25 ranking, deterministic tie-breaking, and documented Unicode normalization/tokenization. With SQLite this is FTS5 configuration plus a tokenizer decision; with a custom store it is a standalone inverted index.
-- [ ] Start with basic text queries and tag, date, and URI filters. Specify AND/OR filter behavior.
-- [ ] Search the visible document versions; prevent deleted or superseded versions from leaking into current results.
-- [ ] Define chunk-to-document result aggregation before exposing chunked search.
-- [ ] Verify ranking against a representative notes/document corpus and an independent reference calculation for small cases.
-- [ ] Ensure indexes rebuild from authoritative documents and remain consistent after recovery.
-- [ ] Measure ingest time, open time, query latency, peak memory, and file size at representative corpus sizes. Record devices and workloads before setting release budgets.
+**Status: query API, filters, Unicode handling and ranking checks implemented on branch `phase-3-search`** (three commits on `main` at `15877cd`; CI run 37220640499 green at `e5d43a7`: JVM and Android host tests, API 35 emulator with 54 device tests and zero skips, iOS simulator). Chunked search, peak memory and a real-world corpus remain. Semantics are in the persistence contract, section 7.
+
+- [x] Lexical search with BM25 ranking, deterministic tie-breaking `(score desc, versionId desc)`, and documented normalization and tokenization. Tokenizer decision: FTS5 `unicode61` defaults (case folding, diacritic removal, no stemming). Titles, bodies and tags are stored in NFC; queries and tag filters are normalized the same way.
+- [x] Plain-text queries by default: whitespace-separated pieces quoted for FTS5, so operators, quotes and column filters are literal; pieces without letters or digits ignored; an empty plain query matches nothing; `MatchMode.ALL` (default) or `ANY`; 128-term bound. Raw FTS5 is opt-in through `QuerySyntax.FTS5`, and rejected expressions raise the new `InvalidQuery` (`KV_INVALID_QUERY`).
+- [x] Tag, date and uri-prefix filters, shared by `list` and `find`, combine with AND: every listed tag is required; the uri prefix is literal and case-sensitive. Cursors bind to syntax, match mode, compiled query, page size and every filter.
+- [x] Only current live versions are searchable (update, delete, rebuild and JVM process-kill recovery covered).
+- [ ] Define chunk-to-document result aggregation before exposing chunked search. Not started; no chunked search is exposed.
+- [x] Ranking checked against an independent BM25 calculation (the `fts5_aux.c` formula) for a six-document corpus, including an exact tie. [ ] A representative real notes corpus is still missing.
+- [x] Rebuilding the index reproduces ids, order and scores; search after JVM process-kill recovery matches the recovered documents.
+- [ ] Measurements: synthetic timings and file size are recorded below on all three CI platforms. Peak memory, cold open after reboot, and real corpora are not measured.
+
+**Projection change (schema 2, commit `2d762a8`).** The first measurement put 5,000 notes with about 9.7 MB of text in a 33.5 MB file. A local reproduction attributed 42% of it to the `current` projection, which stored a second copy of every live title and body for FTS5's external content. The projection now holds only ids, event time and uri, and FTS5 reads text through a view over the immutable `versions` rows. The file dropped to 20.1 MB on every platform. Schema 1 existed only on unreleased builds and is refused as an older schema. Review this change on its own; it can be dropped without affecting the query work.
+
+The change exposed a fragile corruption test. The bundled SQLite runs with auto-vacuum, so page 2 is a pointer map, and the test's fixed damage range hit live entries only while the file had more than about 40 pages. The test now damages the root page of `versions`. The Android device-test step also now lists failing tests by name, since its report artifact is not readable from the cloud session.
+
+**Measurements.** Synthetic notes corpus: 5,000 notes of 40 to 300 words from a 3,000-word Zipf-like vocabulary, ingested in 10 transactions, then 100 autocommit puts. Times are milliseconds, median/p95 where several runs were timed, from single CI runs on shared runners. JVM timings varied by up to 60% between runs on the same schema, and one iOS runner reported 3 processors, so these are observations, not budgets.
+
+| Platform | Schema | Ingest | Put | Find ALL | Find ANY | ANY + tag | List 50 | Reopen + find | File |
+|---|---|---|---|---|---|---|---|---|---|
+| JVM (Ubuntu) | 1 | 2,325 | 1.8/2.3 | 1.8/8.3 | 3.9/11.3 | 3.0/8.6 | 1.6/1.8 | 5.0 | 33.5 MB |
+| JVM (Ubuntu) | 2 | 2,271 | 1.7/2.4 | 2.0/4.7 | 3.3/6.8 | 2.0/4.2 | 1.6/2.9 | 4.0 | 20.1 MB |
+| Android API 35 x86_64 emulator | 1 | 6,162 | 4.0/5.0 | 3.6/10.3 | 6.8/13.7 | 5.2/12.0 | 3.5/4.2 | 7.5 | 33.5 MB |
+| Android API 35 x86_64 emulator | 2 | 4,068 | 2.1/7.3 | 1.9/3.9 | 2.8/6.6 | 1.8/3.9 | 1.5/1.8 | 4.5 | 20.1 MB |
+| iOS simulator (macOS arm64) | 1 | 4,134 | 1.5/2.1 | 9.5/18.5 | 15.1/19.7 | 15.1/20.2 | 18.8/21.5 | 13.5 | 33.5 MB |
+| iOS simulator (macOS arm64) | 2 | 5,770 | 1.9/3.1 | 12.0/24.9 | 14.9/20.8 | 17.7/35.8 | 22.8/75.6 | 14.8 | 20.1 MB |
+
+Open items from the measurements:
+
+- [ ] iOS `list` and `find` are roughly ten times slower than JVM and Android for the same work. Profile Kotlin/Native text decoding and the per-row version and tag queries before setting mobile budgets.
+- [ ] Page utilization: versions of 1 to 3 KB on 4 KiB pages leave much of each page empty. Evaluate page size or body compression with a real corpus.
+
+**Decisions within the contract, for review:**
+
+1. Plain text is the default and never raises `InvalidQuery`; raw FTS5 is opt-in and passes phrases, prefixes, `NEAR` and column filters through without kvid-level guarantees.
+2. Supplementary-plane characters are classified approximately when deciding whether a plain piece has tokens; a piece made only of characters SQLite does not tokenize makes an `ALL` query match nothing.
+3. Tag filters require every listed tag; there is no any-of tag filter yet. The uri prefix uses `GLOB` with escaped wildcards and is not index-assisted.
+4. Uris and metadata are stored as given, not normalized.
+5. `find` pagination stays offset-based under an expiring cursor; snippets come from the body column only.
 
 Defer stemming, advanced query syntax, phrase/prefix queries, and adaptive score cutoffs until demonstrated needs justify their complexity.
 
@@ -228,7 +259,7 @@ Keep store-specific version visibility and transaction rules out of standalone s
 2. Android runtime evidence and platform minimum changes in core.
 3. Snapshot publication and sync adapters; supported error-code translation.
 4. Representative workloads, cold-open/peak-memory budgets and native footprint.
-5. Tokenizer configuration, encrypted export design and later vector providers.
+5. Encrypted export design and later vector providers. Tokenizer configuration for 0.1 is decided: `unicode61` defaults with NFC-stored text and no stemming (Milestone 3).
 
 SQLite and the closed/snapshot portable-artifact definition are selected. The `.kvid` extension names a SQLite application database. Historical full-text search and public WAL support are deferred; they are not guarantees of 0.1.
 
