@@ -17,7 +17,7 @@ kotlin {
 
     android {
         namespace = "com.kvid.sample.shared"
-        compileSdk = libs.versions.androidCompileSdk.get().toInt()
+        compileSdk = libs.versions.sampleCompileSdk.get().toInt()
         minSdk = libs.versions.androidMinSdk.get().toInt()
         // No host tests: the bundled SQLite natives do not load on the host JVM. The model tests run on
         // the desktop JVM and the iOS simulator.

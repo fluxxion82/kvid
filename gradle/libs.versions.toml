@@ -16,6 +16,8 @@ compose-material3 = "1.9.0"
 androidx-activity-compose = "1.10.1"
 androidx-lifecycle-process = "2.9.0"
 androidTargetSdk = "36"
+# Compose 1.12 (androidx) requires consumers to compile against API 37; the store library stays on 36.
+sampleCompileSdk = "37"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }

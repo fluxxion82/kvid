@@ -6,7 +6,7 @@ plugins {
 // The Android notes app: hosts the shared NotesApp UI from :kvid-sample:shared.
 android {
     namespace = "com.kvid.sample.android"
-    compileSdk = libs.versions.androidCompileSdk.get().toInt()
+    compileSdk = libs.versions.sampleCompileSdk.get().toInt()
 
     defaultConfig {
         applicationId = "com.kvid.sample"
