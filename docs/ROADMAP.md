@@ -62,59 +62,30 @@ The full per-platform defect list is in Appendix A as an investigation checklist
 
 ## Milestone 1: choose storage architecture and define its contract
 
-Compare three approaches in a short architecture decision record before implementing a database engine:
+**Status: architecture selected; validation partially complete.** [ADR 0001](adr/0001-storage-engine.md) accepts SQLite via androidx.sqlite 2.7.1 for implementation. The [persistence contract](PERSISTENCE_CONTRACT.md) is a revised proposal, not an implemented guarantee. The corrected spike passes 16 tests each on JVM and the iOS simulator and compiles Android main.
 
-| Approach | Benefit | Cost or constraint |
-|---|---|---|
-| SQLite-backed document store | Existing transaction and recovery machinery; a portable database file; FTS5 gives BM25 ranking without writing an index | Native integration and deployment; WAL mode creates `-wal`/`-shm` sidecars while open; vectors need an extension or application-side scanning |
-| Append-only document log with rebuildable indexes | Smaller custom format; authoritative documents survive index loss | kvid owns recovery, durable writes, compaction, and indexing |
-| Custom file with embedded WAL and persisted index segments (memvid v2's shape) | Direct control over a strict single-file runtime format | Largest correctness and maintenance burden |
+- [x] SQLite 3.50.1 and FTS5 observed on JVM and iOS; Android dependency compiles.
+- [x] Default DELETE-mode connections explicitly use synchronous EXTRA and foreign keys. WAL/NORMAL is insufficient for the proposed power-loss boundary; public WAL support is deferred.
+- [x] Primitive coverage: committed reopen, orderly-close rollback, savepoints, writer contention, real read-only handles, active-reader WAL cleanup failure, and committed-only snapshot with a staged writer.
+- [x] Invalid-header NOTADB and injected FULL codes verified. FTS insert/update/delete/rebuild consistency and float raw-bit encoding verified.
+- [x] Synthetic 5,000-document timings and file size observed. Historical CI run 37176438762: JVM ingest 349 ms, 50 queries 232 ms, second-open/count 3 ms; iOS ingest 1,181 ms, queries 118 ms, second-open/count 5 ms; file 2.5 MiB. These are warm second-connection timings, not cold reopen or release budgets.
+- [x] Proposed contract specifies scoped transactions without manual commit, cancellation cleanup, tombstone visibility, same-commit ordering, retention floor, current-only FTS, and cursors expiring on writes.
+- [ ] Android runtime/native loading and the common spike suite on a device or emulator.
+- [ ] Actual process-kill recovery, failed sync, and broader corruption fixtures in Milestone 2. Orderly close is not a kill simulation.
+- [ ] Production exception-code translation: the pinned AndroidX exception has no structured result-code property.
+- [ ] Atomic snapshot publication and platform file/directory sync in Milestone 2; VACUUM INTO alone does not supply these.
+- [ ] Cold-open, peak-memory and representative mobile workloads; APK/framework size with the sample app. Revisit footprint above roughly 3 MB per ABI.
 
-**Provisional preference:** evaluate SQLite first. The Kotlin Multiplatform `androidx.sqlite` bundled driver ships one SQLite build for Android, iOS and JVM, which removes the per-platform variance that sank memvid v1 and gives transactions, crash recovery and full-text search on day one. kvid's own value then lives above it: the document model, history, portable snapshot export, optional vectors, and the archive formats. Fall back to the append-only log only if owning the format proves essential to the product or SQLite's constraints (sidecars while open, extension loading on iOS, binary size) fail the criteria below.
+The spike targets minSdk 23 and omits iosX64 because the pinned artifact has no Intel simulator variant; applying those changes to core is Milestone 2 work. Proposed exceptions, bounds, migration compatibility, compression and encryption reservations still require implementation tests.
 
-Evaluation criteria, measured on a phone with a representative notes corpus (thousands of documents, tens of MB):
-
-- [ ] FTS5 is compiled into the chosen driver on every target (verify, do not assume).
-- [ ] "Single file" is defined precisely: one portable artifact after a clean close is the target; no sidecars even during writes is a stretch goal. Decide whether temporary files during compaction or snapshot export are permitted.
-- [ ] Open time, ingest time, query latency, peak memory, and file size for each candidate.
-- [ ] Binary size added to an Android APK and an iOS app.
-- [ ] Behavior when copied while open, when the process is killed mid-transaction, and on disk-full.
-
-### Durability and concurrency
-
-- [ ] Specify whether `put` merely stages a change and whether only `commit` promises durability.
-- [ ] Specify transaction atomicity, read-your-writes behavior, rollback, and the result of closing with uncommitted work.
-- [ ] Define how incomplete records, torn writes, and incomplete transactions are recognized.
-- [ ] Specify write and durable-sync ordering and recovery after each step.
-- [ ] If using a WAL, specify checkpoint publication and safe WAL reuse, including a full-WAL policy.
-- [ ] Start with one writer. Define same-process coroutine synchronization, cross-process locking, and reader visibility during commits.
-- [ ] Define behavior on disk-full errors, cancellation, failed sync, unsupported format versions, and corruption.
-- [ ] Define a narrow platform I/O interface for positioned reads/writes, durable synchronization, locking, and file replacement. Keep encoding and recovery logic common. Buffered I/O alone does not establish durability.
-
-### Documents, versions, and history
-
-- [ ] Use stable `documentId` values, immutable `versionId` values, and separate chunk identifiers. A URI is metadata or an explicitly defined key, not an implicit identity rule.
-- [ ] Separate commit order from application event time. Define which timestamp each date filter uses and how timestamp ties are resolved.
-- [ ] Define update/delete behavior and which version is visible at a commit sequence.
-- [ ] Define retention and compaction policies. Keeping history and physically removing deleted versions are different modes with different guarantees.
-- [ ] Define whether historical search requires historical ranking statistics or only historical document visibility. Defer historical ranked search if necessary.
-- [ ] Define pagination ordering and whether cursors remain valid across commits.
-
-### Format evolution and bounds
-
-- [ ] Document versioning, feature flags, unknown-field behavior, and migration policy.
-- [ ] Bound record lengths, metadata sizes, decompression output, and allocation sizes before reading user-supplied files.
-- [ ] Choose one portable compression envelope and prove it with shared fixtures. Gzip, zlib-wrapped DEFLATE, and raw DEFLATE are distinct formats; today iOS and JVM/Android disagree.
-- [ ] Make authoritative documents recoverable independently of derived indexes; define index rebuild behavior.
-- [ ] Reserve a format path for encrypted records and authenticated metadata before freezing the format. Define nonce uniqueness, key identification, and what remains visible without a key.
-
-The header/WAL/data/index/footer layout from the earlier draft is a candidate sketch for the custom-format option only, not a committed specification.
-
-**Exit criterion:** an architecture decision record, a written persistence contract, and small platform I/O prototypes that establish the required primitives on JVM, Android, and iOS.
+**Exit criterion:** the architecture decision and proposed semantics are reviewable. Platform validation is complete only after Android runtime evidence; production durability and publication remain explicit subsequent milestone gates.
 
 ## Milestone 2: durable document store
 
-- [ ] Implement `create`, `open`, `close`, `put`, `get`, `update`, `delete`, and atomic `commit` according to the contract.
+Builds on the accepted ADR 0001 and the persistence contract; `kvid-storage-spike` is deleted once `kvid-core` carries the real store and its tests.
+
+- [ ] Raise `kvid-core` to minSdk 23 and drop `iosX64`, as ADR 0001 requires.
+- [ ] Implement `create`, `open`, `close`, `put`, `get`, `update`, `delete`, and scoped atomic transactions according to the contract.
 - [ ] Persist document text and metadata, not just vectors.
 - [ ] Add portable format fixtures written and read across all three platforms.
 - [ ] Add integrity verification and explicit corruption errors.
@@ -125,7 +96,7 @@ The header/WAL/data/index/footer layout from the earlier draft is a candidate sk
 
 Keep large attachments, historical ranked search, and a full CLI outside this milestone unless they are necessary for the selected use case.
 
-**Exit criterion:** committed documents and metadata survive close/reopen on every target; interrupted writes preserve the last committed state; corruption cannot silently produce successful reads.
+**Exit criterion:** committed documents and metadata survive close/reopen on every target; interrupted writes preserve the last committed state; detected corruption surfaces explicitly, and verify checks the full database and application invariants.
 
 ## Milestone 3: useful offline full-text search
 
@@ -209,14 +180,13 @@ Keep store-specific version visibility and transaction rules out of standalone s
 
 ## Decisions still open
 
-1. Storage engine (SQLite versus custom) and the exact meaning of single-file operation.
-2. Durability boundary, transaction API, and reader model.
-3. Document identity, history retention, and historical-search guarantees.
-4. Format versioning, compression, encryption structure, and compaction strategy.
-5. Error API: typed exceptions or `Result`, with cancellation preserved in either case (cancellation is now preserved in the existing `Result` style).
-6. Verified toolchain versions and supported platform minimums (minSdk 21 today; AGP 9.4 imposes no higher floor).
-7. Representative workloads and performance budgets.
-8. Whether `.kvid` names a custom format or an application container over another engine.
+1. Final acceptance of the proposed scoped transaction/error API and retention defaults.
+2. Android runtime evidence and platform minimum changes in core.
+3. Snapshot publication and sync adapters; supported error-code translation.
+4. Representative workloads, cold-open/peak-memory budgets and native footprint.
+5. Tokenizer configuration, encrypted export design and later vector providers.
+
+SQLite and the closed/snapshot portable-artifact definition are selected. The `.kvid` extension names a SQLite application database. Historical full-text search and public WAL support are deferred; they are not guarantees of 0.1.
 
 ## Appendix A: investigation checklist from the code review
 
