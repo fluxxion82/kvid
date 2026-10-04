@@ -32,3 +32,6 @@ internal actual object PlatformInfo {
 }
 
 internal actual val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+
+internal actual fun normalizeNfc(text: String): String =
+    java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFC)

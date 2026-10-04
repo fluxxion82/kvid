@@ -42,20 +42,53 @@ data class PutOptions(
     val documentId: DocumentId? = null
 )
 
+/** How [Kvid.find] interprets its query string (persistence contract, section 7). */
+enum class QuerySyntax {
+    /**
+     * Plain text. The query is split on whitespace into pieces. Each piece must occur in the title or
+     * body as the adjacent tokens it contains (`state-of-the-art` is one piece), pieces without any
+     * letter or digit are ignored, and FTS5 operators, quotes and column filters are ordinary text.
+     * A query with no searchable pieces matches nothing. Plain queries never raise
+     * [KvidException.InvalidQuery]; the byte and term bounds raise [KvidException.LimitExceeded].
+     */
+    PLAIN,
+    /**
+     * SQLite FTS5 syntax passed through unchanged: phrases (`"q4 plan"`), prefixes (`plan*`), `AND`,
+     * `OR`, `NOT`, `NEAR(...)` and column filters (`title:budget`). A rejected expression raises
+     * [KvidException.InvalidQuery].
+     */
+    FTS5
+}
+
+/** For [QuerySyntax.PLAIN]: whether a document must contain every piece or any piece of the query. */
+enum class MatchMode { ALL, ANY }
+
+/**
+ * Filters shared by [ListOptions] and [FindOptions] combine with AND: a document qualifies only when it
+ * satisfies every supplied filter. [tags] requires every listed tag on the current version. [uriPrefix]
+ * compares the stored uri's leading characters exactly (case-sensitive, no normalization); an empty
+ * prefix selects every document that has a uri.
+ */
 data class ListOptions(
     val limit: Int = 50,
     val cursor: String? = null,
     val sinceEventTimeMs: Long? = null,
     val untilEventTimeMs: Long? = null,
-    val tag: String? = null
+    val tags: List<String> = emptyList(),
+    val uriPrefix: String? = null
 )
 
+/** See [ListOptions] for the filter semantics and [QuerySyntax] for the query string. */
 data class FindOptions(
     val limit: Int = 20,
     val cursor: String? = null,
+    val syntax: QuerySyntax = QuerySyntax.PLAIN,
+    /** [QuerySyntax.PLAIN] only; ignored for [QuerySyntax.FTS5]. */
+    val match: MatchMode = MatchMode.ALL,
     val sinceEventTimeMs: Long? = null,
     val untilEventTimeMs: Long? = null,
-    val tag: String? = null
+    val tags: List<String> = emptyList(),
+    val uriPrefix: String? = null
 )
 
 data class Page<T>(val items: List<T>, val nextCursor: String?)
@@ -109,7 +142,11 @@ data class Limits(
         const val MAX_TAG_CODE_POINTS = 1024
         const val MAX_URI_BYTES = 64 * 1024
         const val MAX_QUERY_BYTES = 64 * 1024
+        /** UTF-8 budget for the serialized query and filters used by pagination. */
+        const val MAX_QUERY_IDENTITY_BYTES = 256 * 1024
         const val MAX_PAGE_SIZE = 5000
+        /** Distinct pieces a [QuerySyntax.PLAIN] query may contain. */
+        const val MAX_QUERY_TERMS = 128
     }
 }
 

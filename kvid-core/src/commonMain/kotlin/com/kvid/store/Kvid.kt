@@ -587,7 +587,8 @@ internal object Ops {
 
     // ---- writes
 
-    fun put(conn: SQLiteConnection, limits: Limits, txSeq: Long, text: String, options: PutOptions): DocumentId {
+    fun put(conn: SQLiteConnection, limits: Limits, txSeq: Long, rawText: String, rawOptions: PutOptions): DocumentId {
+        val (text, options) = normalized(rawText, rawOptions)
         validate(limits, text, options)
         val now = Kvid.nowMs()
         val id = options.documentId?.also { Ids.validateDocumentId(it) } ?: Ids.uuidV7(now)
@@ -597,11 +598,12 @@ internal object Ops {
         conn.update("INSERT INTO documents(doc_id, created_seq, current_version_id) VALUES (?, ?, 0)") { bindText(1, id); bindLong(2, txSeq) }
         val versionId = insertVersion(conn, id, txSeq, now, text, options, tombstone = false, supersedes = null)
         conn.update("UPDATE documents SET current_version_id = ? WHERE doc_id = ?") { bindLong(1, versionId); bindText(2, id) }
-        insertCurrent(conn, versionId, id, options.eventTimeMs ?: now, options.title, text, options.uri)
+        insertCurrent(conn, versionId, id, options.eventTimeMs ?: now, options.uri)
         return id
     }
 
-    fun update(conn: SQLiteConnection, limits: Limits, txSeq: Long, id: DocumentId, text: String, options: PutOptions): VersionId {
+    fun update(conn: SQLiteConnection, limits: Limits, txSeq: Long, id: DocumentId, rawText: String, rawOptions: PutOptions): VersionId {
+        val (text, options) = normalized(rawText, rawOptions)
         validate(limits, text, options)
         val current = currentVersionOf(conn, id) ?: throw KvidException.NotFound("no such document: $id")
         if (current.second) throw KvidException.NotFound("document is deleted: $id")
@@ -609,7 +611,7 @@ internal object Ops {
         val versionId = insertVersion(conn, id, txSeq, now, text, options, tombstone = false, supersedes = current.first)
         conn.update("UPDATE documents SET current_version_id = ? WHERE doc_id = ?") { bindLong(1, versionId); bindText(2, id) }
         conn.update("DELETE FROM current WHERE doc_id = ?") { bindText(1, id) }
-        insertCurrent(conn, versionId, id, options.eventTimeMs ?: now, options.title, text, options.uri)
+        insertCurrent(conn, versionId, id, options.eventTimeMs ?: now, options.uri)
         return versionId
     }
 
@@ -647,10 +649,11 @@ internal object Ops {
         return versionId
     }
 
-    private fun insertCurrent(conn: SQLiteConnection, versionId: Long, id: DocumentId, eventTimeMs: Long, title: String?, body: String, uri: String?) {
+    /** The version row must already exist: the insert trigger indexes its title and body. */
+    private fun insertCurrent(conn: SQLiteConnection, versionId: Long, id: DocumentId, eventTimeMs: Long, uri: String?) {
         try {
-            conn.update("INSERT INTO current(version_id, doc_id, event_time_ms, title, body, uri) VALUES (?, ?, ?, ?, ?, ?)") {
-                bindLong(1, versionId); bindText(2, id); bindLong(3, eventTimeMs); bindTextOrNull(4, title); bindText(5, body); bindTextOrNull(6, uri)
+            conn.update("INSERT INTO current(version_id, doc_id, event_time_ms, uri) VALUES (?, ?, ?, ?)") {
+                bindLong(1, versionId); bindText(2, id); bindLong(3, eventTimeMs); bindTextOrNull(4, uri)
             }
         } catch (e: KvidException.Io) {
             if (e.cause is SQLiteException && (e.cause as SQLiteException).message.orEmpty().contains("current.uri")) {
@@ -659,6 +662,10 @@ internal object Ops {
             throw e
         }
     }
+
+    /** Titles, bodies and tags are stored in Unicode NFC (contract, section 7); uris and metadata are stored as given. */
+    private fun normalized(text: String, options: PutOptions): Pair<String, PutOptions> =
+        normalizeNfc(text) to options.copy(title = options.title?.let { normalizeNfc(it) }, tags = options.tags.map { normalizeNfc(it) })
 
     private fun validate(limits: Limits, text: String, options: PutOptions) {
         if (text.encodeToByteArray().size > limits.bodyBytes) throw KvidException.LimitExceeded("body exceeds ${limits.bodyBytes} bytes")
@@ -708,23 +715,60 @@ internal object Ops {
         }
     }
 
+    /** Filters shared by list and find (contract, section 7): every supplied filter must hold. */
+    private class Filters(limits: Limits, val since: Long?, val until: Long?, tags: List<String>, val uriPrefix: String?) {
+        val tags: List<String> = tags.map { normalizeNfc(it) }.distinct()
+
+        init {
+            if (this.tags.size > limits.tagsPerVersion) throw KvidException.LimitExceeded("more than ${limits.tagsPerVersion} tag filters")
+            if (this.tags.any { it.isEmpty() }) throw KvidException.Usage("tag filters must not be empty")
+            if (this.tags.any { tag -> tag.count { !it.isLowSurrogate() } > limits.tagCodePoints }) {
+                throw KvidException.LimitExceeded("tag filter exceeds ${limits.tagCodePoints} code points")
+            }
+            uriPrefix?.let { if (it.encodeToByteArray().size > limits.uriBytes) throw KvidException.LimitExceeded("uriPrefix exceeds ${limits.uriBytes} bytes") }
+        }
+
+        fun appendSql(sb: StringBuilder) {
+            if (since != null) sb.append(" AND c.event_time_ms >= ?")
+            if (until != null) sb.append(" AND c.event_time_ms < ?")
+            if (tags.isNotEmpty()) {
+                sb.append(" AND (SELECT count(*) FROM version_tags t WHERE t.version_id = c.version_id AND t.tag IN (")
+                sb.append(tags.joinToString(",") { "?" })
+                sb.append(")) = ?")
+            }
+            if (uriPrefix != null) sb.append(" AND substr(CAST(c.uri AS BLOB), 1, length(CAST(? AS BLOB))) = CAST(? AS BLOB)")
+        }
+
+        /** Binds the filter parameters starting at index [first]; returns the next free index. */
+        fun bind(st: androidx.sqlite.SQLiteStatement, first: Int): Int {
+            var i = first
+            since?.let { st.bindLong(i++, it) }
+            until?.let { st.bindLong(i++, it) }
+            tags.forEach { st.bindText(i++, it) }
+            if (tags.isNotEmpty()) st.bindLong(i++, tags.size.toLong())
+            uriPrefix?.let { st.bindText(i++, it); st.bindText(i++, it) }
+            return i
+        }
+
+        fun fingerprint(): List<String?> = listOf(since?.toString(), until?.toString(), Json.encodeToString(tags), uriPrefix)
+
+
+    }
+
     fun list(conn: SQLiteConnection, limits: Limits, options: ListOptions): Page<Document> {
         val limit = options.limit.coerceIn(1, limits.pageSize)
-        val fingerprint = Json.encodeToString(listOf("list", options.sinceEventTimeMs?.toString(), options.untilEventTimeMs?.toString(), options.tag, limit.toString()))
+        val filters = Filters(limits, options.sinceEventTimeMs, options.untilEventTimeMs, options.tags, options.uriPrefix)
+        val fingerprint = Json.encodeToString(listOf("list", limit.toString()) + filters.fingerprint())
+        Cursor.validateFingerprint(fingerprint)
         val cursor = options.cursor?.let { Cursor.parse(conn, it, fingerprint) }
         val sql = buildString {
             append("SELECT c.version_id, c.doc_id FROM current c WHERE 1=1")
-            if (options.sinceEventTimeMs != null) append(" AND c.event_time_ms >= ?")
-            if (options.untilEventTimeMs != null) append(" AND c.event_time_ms < ?")
-            if (options.tag != null) append(" AND EXISTS (SELECT 1 FROM version_tags t WHERE t.version_id = c.version_id AND t.tag = ?)")
+            filters.appendSql(this)
             if (cursor != null) append(" AND (c.event_time_ms < ? OR (c.event_time_ms = ? AND c.version_id < ?))")
             append(" ORDER BY c.event_time_ms DESC, c.version_id DESC LIMIT ?")
         }
         val rows = conn.query(sql, {
-            var i = 1
-            options.sinceEventTimeMs?.let { bindLong(i++, it) }
-            options.untilEventTimeMs?.let { bindLong(i++, it) }
-            options.tag?.let { bindText(i++, it) }
+            var i = filters.bind(this, 1)
             cursor?.let { bindLong(i++, it.key1); bindLong(i++, it.key1); bindLong(i++, it.key2) }
             bindLong(i, (limit + 1).toLong())
         }) { getLong(0) to getText(1) }
@@ -736,31 +780,41 @@ internal object Ops {
         return Page(page, next)
     }
 
-    fun find(conn: SQLiteConnection, limits: Limits, query: String, options: FindOptions): Page<Hit> {
-        if (query.isBlank()) throw KvidException.Usage("query must not be blank")
-        if (query.encodeToByteArray().size > limits.queryBytes) throw KvidException.LimitExceeded("query exceeds ${limits.queryBytes} bytes")
+    fun find(conn: SQLiteConnection, limits: Limits, rawQuery: String, options: FindOptions): Page<Hit> {
+        if (rawQuery.encodeToByteArray().size > limits.queryBytes) throw KvidException.LimitExceeded("query exceeds ${limits.queryBytes} bytes")
+        val query = normalizeNfc(rawQuery)
         val limit = options.limit.coerceIn(1, limits.pageSize)
-        val fingerprint = Json.encodeToString(listOf("find", query, options.sinceEventTimeMs?.toString(), options.untilEventTimeMs?.toString(), options.tag, limit.toString()))
+        val filters = Filters(limits, options.sinceEventTimeMs, options.untilEventTimeMs, options.tags, options.uriPrefix)
+        val expression = when (options.syntax) {
+            QuerySyntax.PLAIN -> PlainQuery.compile(query, options.match) ?: return Page(emptyList(), null)
+            QuerySyntax.FTS5 -> {
+                if (query.isBlank()) throw KvidException.InvalidQuery("empty FTS5 query")
+                query
+            }
+        }
+        val fingerprint = Json.encodeToString(
+            listOf("find", options.syntax.name, options.match.name, expression, limit.toString()) + filters.fingerprint()
+        )
+        Cursor.validateFingerprint(fingerprint)
         val cursor = options.cursor?.let { Cursor.parse(conn, it, fingerprint) }
         val offset = cursor?.key1 ?: 0L
         val sql = buildString {
             append("SELECT c.version_id, c.doc_id, bm25(current_fts), snippet(current_fts, 1, '[', ']', '…', 12) FROM current_fts JOIN current c ON c.version_id = current_fts.rowid WHERE current_fts MATCH ?")
-            if (options.sinceEventTimeMs != null) append(" AND c.event_time_ms >= ?")
-            if (options.untilEventTimeMs != null) append(" AND c.event_time_ms < ?")
-            if (options.tag != null) append(" AND EXISTS (SELECT 1 FROM version_tags t WHERE t.version_id = c.version_id AND t.tag = ?)")
+            filters.appendSql(this)
             append(" ORDER BY bm25(current_fts), c.version_id DESC LIMIT ? OFFSET ?")
         }
         val rows = try {
             conn.query(sql, {
-                var i = 1
-                bindText(i++, query)
-                options.sinceEventTimeMs?.let { bindLong(i++, it) }
-                options.untilEventTimeMs?.let { bindLong(i++, it) }
-                options.tag?.let { bindText(i++, it) }
-                bindLong(i++, (limit + 1).toLong()); bindLong(i, offset)
+                bindText(1, expression)
+                val i = filters.bind(this, 2)
+                bindLong(i, (limit + 1).toLong()); bindLong(i + 1, offset)
             }) { Triple(getLong(0), getDouble(2), getText(3)) }
         } catch (e: KvidException.Io) {
-            if (e.cause?.message.orEmpty().contains("fts5: syntax error")) throw KvidException.Usage("invalid full-text query: $query")
+            // FTS5 reports a rejected expression as SQLITE_ERROR from the statement carrying MATCH.
+            val cause = e.cause
+            if (options.syntax == QuerySyntax.FTS5 && cause is SQLiteException && SqliteErrors.primaryCode(cause) == SqliteErrors.SQLITE_ERROR) {
+                throw KvidException.InvalidQuery("rejected FTS5 query: ${SqliteErrors.driverMessage(cause)}", cause)
+            }
             throw e
         }
         val page = rows.take(limit).map { (vid, rank, snippet) ->
@@ -828,8 +882,8 @@ internal object Ops {
     fun rebuildProjection(conn: SQLiteConnection) {
         conn.exec("DELETE FROM current")
         conn.exec(
-            """INSERT INTO current(version_id, doc_id, event_time_ms, title, body, uri)
-               SELECT v.version_id, v.doc_id, v.event_time_ms, v.title, v.body, v.uri
+            """INSERT INTO current(version_id, doc_id, event_time_ms, uri)
+               SELECT v.version_id, v.doc_id, v.event_time_ms, v.uri
                FROM documents d JOIN versions v ON v.version_id = d.current_version_id WHERE v.tombstone = 0"""
         )
         conn.exec("INSERT INTO current_fts(current_fts) VALUES ('rebuild')")
@@ -857,8 +911,7 @@ internal object Ops {
         }
         problems += conn.query(
             """SELECT c.doc_id FROM current c JOIN versions v ON v.version_id = c.version_id
-               WHERE c.doc_id IS NOT v.doc_id OR c.event_time_ms IS NOT v.event_time_ms
-               OR c.title IS NOT v.title OR c.body IS NOT v.body OR c.uri IS NOT v.uri"""
+               WHERE c.doc_id IS NOT v.doc_id OR c.event_time_ms IS NOT v.event_time_ms OR c.uri IS NOT v.uri"""
         ) { "current projection content differs from authoritative version for ${getText(0)}" }
         val unchecked = if (readOnly) listOf("FTS integrity requires a writable handle") else emptyList()
         val commitSeq = conn.queryLong("SELECT commit_seq FROM kvid_meta WHERE id = 1")
@@ -895,13 +948,22 @@ internal class Cursor(private val seq: Long, private val floor: Long, private va
     fun encode(): String = "v2:$seq:$floor:$fp:$key1:$key2"
 
     companion object {
+        fun validateFingerprint(value: String) {
+            if (value.encodeToByteArray().size > Limits.MAX_QUERY_IDENTITY_BYTES) {
+                throw KvidException.LimitExceeded("combined query and filters exceed ${Limits.MAX_QUERY_IDENTITY_BYTES} bytes")
+            }
+        }
+
         // Exact bounded query identity avoids collisions in String.hashCode().
-        private fun fingerprintKey(value: String): String = value.encodeToByteArray().joinToString("") {
-            (it.toInt() and 255).toString(16).padStart(2, '0')
+        private fun fingerprintKey(value: String): String {
+            validateFingerprint(value)
+            return value.encodeToByteArray().joinToString("") {
+                (it.toInt() and 255).toString(16).padStart(2, '0')
+            }
         }
 
         fun parse(conn: SQLiteConnection, encoded: String, fingerprint: String): Cursor {
-            if (encoded.length > 4 * Limits.MAX_QUERY_BYTES) throw KvidException.Usage("cursor exceeds hard cap")
+            if (encoded.length > 2 * Limits.MAX_QUERY_IDENTITY_BYTES + 256) throw KvidException.Usage("cursor exceeds hard cap")
             val parts = encoded.split(':')
             if (parts.size != 6 || parts[0] != "v2") throw KvidException.Usage("malformed cursor")
             fun number(index: Int) = parts[index].toLongOrNull() ?: throw KvidException.Usage("malformed cursor")

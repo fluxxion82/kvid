@@ -49,8 +49,8 @@ class KvidStoreTest {
         val path = dir.file("notes.kvid")
         val store = Kvid.create(path)
         try {
-            store.put("authoritative")
-            BundledSQLiteDriver().open(path).use { it.execSQL("UPDATE current SET body = 'wrong' ") }
+            store.put("authoritative", PutOptions(uri = "note://a"))
+            BundledSQLiteDriver().open(path).use { it.execSQL("UPDATE current SET uri = 'note://wrong'") }
             assertFalse(store.verify().ok)
         } finally { store.close() }
     }
@@ -98,7 +98,7 @@ class KvidStoreTest {
         val store = Kvid.create(path)
         try {
             store.put("authoritative")
-            BundledSQLiteDriver().open(path).use { it.execSQL("UPDATE current SET body = 'wrong'") }
+            BundledSQLiteDriver().open(path).use { it.execSQL("UPDATE current SET event_time_ms = event_time_ms + 1") }
             assertFailsWith<KvidException.Corrupt> { store.snapshot(dir.file("copy.kvid")) }
             assertFalse(dir.exists("copy.kvid"))
         } finally { store.close() }
@@ -459,7 +459,7 @@ class KvidStoreTest {
         assertEquals(listOf("doc 1"), page3.items.map { it.body })
         assertNull(page3.nextCursor)
 
-        assertEquals(listOf("doc 4", "doc 2"), store.list(ListOptions(tag = "even")).items.map { it.body })
+        assertEquals(listOf("doc 4", "doc 2"), store.list(ListOptions(tags = listOf("even"))).items.map { it.body })
         assertEquals(listOf("doc 3", "doc 2"), store.list(ListOptions(sinceEventTimeMs = 2000, untilEventTimeMs = 4000)).items.map { it.body })
         assertFailsWith<KvidException.Usage> { store.list(ListOptions(limit = 3, cursor = page1.nextCursor)) }
 
@@ -478,10 +478,14 @@ class KvidStoreTest {
         assertEquals(setOf(plan, standup), hits.items.map { it.document.id }.toSet())
         assertTrue(hits.items.all { it.score > 0 }, "scores are reported higher-is-better")
         assertTrue(hits.items.first { it.document.id == plan }.snippet!!.contains("[plan]"))
-        assertEquals(listOf(plan), store.find("plan", FindOptions(tag = "work")).items.map { it.document.id })
-        assertEquals(listOf(plan), store.find("\"Q4 plan\"").items.map { it.document.id })
-        assertFailsWith<KvidException.Usage> { store.find("AND") }
-        assertFailsWith<KvidException.Usage> { store.find("   ") }
+        assertEquals(listOf(plan), store.find("plan", FindOptions(tags = listOf("work"))).items.map { it.document.id })
+        assertEquals(listOf(plan), store.find("\"Q4 plan\"", FindOptions(syntax = QuerySyntax.FTS5)).items.map { it.document.id })
+        assertTrue(store.find("\"plan Q4\"", FindOptions(syntax = QuerySyntax.FTS5)).items.isEmpty(), "FTS5 phrases are ordered")
+        assertEquals(listOf(plan), store.find("\"plan Q4\"").items.map { it.document.id }, "plain queries do not interpret quotes")
+        assertEquals(listOf(plan), store.find("AND").items.map { it.document.id }, "plain queries treat operators as words")
+        assertFailsWith<KvidException.InvalidQuery> { store.find("AND", FindOptions(syntax = QuerySyntax.FTS5)) }
+        assertTrue(store.find("   ").items.isEmpty(), "a plain query without terms matches nothing")
+        assertFailsWith<KvidException.InvalidQuery> { store.find("   ", FindOptions(syntax = QuerySyntax.FTS5)) }
 
         store.update(standup, "Daily notes: nothing blocked.")
         assertEquals(listOf(plan), store.find("plan").items.map { it.document.id }, "superseded text is not searchable")
@@ -524,9 +528,18 @@ class KvidStoreTest {
         val store = Kvid.create(path)
         repeat(50) { store.put("row $it with enough text to occupy space ".repeat(20)) }
         store.close()
+        // Damage live b-tree structure: the root page of `versions`. A fixed file offset is not enough,
+        // because the bundled SQLite uses auto-vacuum, so page 2 is a pointer map whose unused tail is
+        // legitimately ignored, and the used part depends on the file size.
+        val (root, pageSize) = BundledSQLiteDriver().open(path).use { raw ->
+            val root = raw.prepare("SELECT rootpage FROM sqlite_schema WHERE name = 'versions'").use { st -> st.step(); st.getLong(0).toInt() }
+            val pageSize = raw.prepare("PRAGMA page_size").use { st -> st.step(); st.getLong(0).toInt() }
+            root to pageSize
+        }
         val bytes = readFile(path)
-        assertTrue(bytes.size > 3 * 4096)
-        for (i in 4096 + 200 until 4096 + 1200) bytes[i] = 0x5A.toByte()   // damage inside page 2
+        assertTrue(bytes.size >= root * pageSize)
+        val start = (root - 1) * pageSize
+        for (i in start until start + 1000) bytes[i] = 0x5A.toByte()
         overwriteFile(path, bytes)
         val outcome = runCatching {
             val reopened = Kvid.open(path)

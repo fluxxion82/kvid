@@ -1,6 +1,7 @@
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -72,9 +73,10 @@ kotlin {
 
 // Print failing tests with their messages and causes to the console so CI logs are diagnosable
 // without downloading the HTML/XML reports. Applies to JVM, Android host and Kotlin/Native test tasks.
+// Standard output is shown too so the `[kvid-measure]` lines reach the CI log.
 tasks.withType<AbstractTestTask>().configureEach {
     testLogging {
-        events("failed", "skipped")
+        events(TestLogEvent.FAILED, TestLogEvent.SKIPPED, TestLogEvent.STANDARD_OUT)
         exceptionFormat = TestExceptionFormat.FULL
         showExceptions = true
         showCauses = true
