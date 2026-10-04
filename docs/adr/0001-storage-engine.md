@@ -61,14 +61,29 @@ Tests in `kvid-storage-spike/src/commonTest` run on JVM (Ubuntu CI job) and the 
 
 | Check | Where | Result |
 |---|---|---|
-| `sqlite_version()` and `PRAGMA compile_options` contain `ENABLE_FTS5` | all targets | pending |
-| FTS5 table, `MATCH`, `bm25()` ordering, prefix and phrase queries | all targets | pending |
-| Uncommitted write lost on close, committed write present on reopen | all targets | pending |
-| Exactly one file after close in `DELETE` mode; `-wal`/`-shm` removed after checkpoint and close in WAL mode | all targets | pending |
-| `VACUUM INTO` snapshot while open passes `integrity_check` and has the same rows | all targets | pending |
-| `float32` vectors round-trip through a BLOB | all targets | pending |
-| Ingest and query timings for 5 000 short documents | JVM, iOS simulator | pending |
-| Binary size added to an Android APK and an iOS framework | manual | pending |
+| Dependency resolves and compiles | JVM, Android, iosArm64, iosSimulatorArm64 | **yes** (run 37176438762). `iosX64` has no published variant and was dropped from the spike. |
+| `sqlite_version()` and `PRAGMA compile_options` contain `ENABLE_FTS5` | JVM | **yes**: SQLite 3.50.1, FTS5 enabled, `DEFAULT_SYNCHRONOUS=2` (FULL), `DEFAULT_WAL_SYNCHRONOUS=1` (NORMAL) |
+| | iOS simulator | IOS_PENDING |
+| FTS5 table, `MATCH`, `bm25()` ordering, prefix, phrase and column queries, `snippet()` | JVM | **pass** |
+| | iOS simulator | IOS_PENDING |
+| External-content FTS kept in sync by triggers; `rebuild` reproduces the index from content | JVM | **pass** |
+| | iOS simulator | IOS_PENDING |
+| Uncommitted write lost on close, committed write present on reopen; read-your-writes inside a transaction | JVM | **pass** |
+| | iOS simulator | IOS_PENDING |
+| Exactly one file after close in `DELETE` mode; `-wal`/`-shm` removed after switching back to `DELETE` and closing | JVM | **pass** |
+| | iOS simulator | IOS_PENDING |
+| `VACUUM INTO` snapshot while open passes `integrity_check` and holds the committed rows only | JVM | **pass** |
+| | iOS simulator | IOS_PENDING |
+| Corruption surfaces as an error (`file is not a database`, code 26), never as a partial read | JVM | **pass** |
+| | iOS simulator | IOS_PENDING |
+| Disk full (`max_page_count`) surfaces as an error (code 13) and leaves state unchanged | JVM | **pass** |
+| | iOS simulator | IOS_PENDING |
+| `float32` vectors round-trip through a BLOB bit-exactly | JVM | **pass** |
+| | iOS simulator | IOS_PENDING |
+| Ingest and query timings, 5 000 documents of 20 to 80 words with FTS5 triggers | JVM (GitHub `ubuntu-latest`) | ingest 349 ms, 50 full-text queries 232 ms, reopen and count 3 ms, file 2.5 MiB |
+| | iOS simulator (GitHub `macos-latest`) | IOS_TIMING_PENDING |
+| Android host tests with the bundled driver | Android | not attempted in the spike (no host test builder); the Android variant compiles. To establish before Milestone 2 if host tests are wanted. |
+| Binary size added to an Android APK and an iOS framework | manual | pending (needs the sample app) |
 
 ## When to revisit
 
