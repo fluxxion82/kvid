@@ -35,3 +35,6 @@ gradle.properties.local
 test-results/
 *.log
 kvid-examples/kvid-data/
+
+# Planning documents belong on feature/phase branches, not main.
+/docs/

@@ -256,6 +256,6 @@ Honest state as of October 2026:
 
 The five iOS QR rendering tests run by default. CI explicitly excludes them with `KVID_SKIP_IOS_QR_RENDERING_TESTS=true` while the simulator rendering defect is unresolved; the task logs this exclusion. The known decoder round-trip failure remains ignored.
 
-See `docs/ROADMAP.md` for the plan to fix these and where the project is heading.
+Planning documents are maintained on feature/phase branches; the `docs/` directory is excluded from `main`.
 
 MIT License

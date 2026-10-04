@@ -11,6 +11,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  main-document-policy:
+    name: Main excludes planning docs
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject tracked docs on main or its proposed merge tree
+        run: |
+          if [ -n "$(git ls-files -- docs/)" ]; then
+            echo "::error::Remove tracked docs/ files from the main integration branch. Keep planning docs on feature/phase branches."
+            exit 1
+          fi
+
   jvm-and-android:
     name: JVM + Android (host) tests
     runs-on: ubuntu-latest
