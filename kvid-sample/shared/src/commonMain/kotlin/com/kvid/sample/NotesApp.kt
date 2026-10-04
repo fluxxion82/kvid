@@ -27,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,11 +60,13 @@ fun NotesScreen(model: NotesModel) {
         }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            Text(
-                "Notes",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp)
-            )
+            Row(
+                Modifier.fillMaxWidth().padding(start = 16.dp, top = 16.dp, end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Notes", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                TextButton(onClick = { scope.launch { model.backup() } }) { Text("Back up") }
+            }
             OutlinedTextField(
                 value = state.query,
                 onValueChange = model::setQuery,
@@ -85,9 +88,14 @@ fun NotesScreen(model: NotesModel) {
                     }
                 }
             }
-            state.message?.let { message ->
+            (state.message ?: state.notice)?.let { text ->
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                    Text(message, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                    Text(
+                        text,
+                        color = if (state.message != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f)
+                    )
                     TextButton(onClick = model::clearMessage) { Text("Dismiss") }
                 }
             }

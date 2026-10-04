@@ -8,6 +8,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Owns the app's single writable [Kvid] handle for one path, following the store's lifecycle rules:
@@ -59,6 +61,19 @@ class StoreSession(
                 if (!closeRequested) closeNow()
             }
         }
+    }
+
+    /**
+     * Writes a consistent, verified copy of the committed store into the `backups` directory next to it,
+     * named by the current time, and returns its path. Copying the live file is not a backup.
+     */
+    @OptIn(ExperimentalTime::class)
+    suspend fun backup(): String = use { store ->
+        val directory = Path(Path(path).parent ?: Path("."), "backups")
+        SystemFileSystem.createDirectories(directory)
+        val destination = Path(directory, "notes-${Clock.System.now().toEpochMilliseconds()}.kvid").toString()
+        store.snapshot(destination)
+        destination
     }
 
     private suspend fun closeNow() {

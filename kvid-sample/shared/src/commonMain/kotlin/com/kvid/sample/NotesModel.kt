@@ -33,7 +33,10 @@ data class NotesState(
     val tags: List<TagCount> = emptyList(),
     val draft: Draft? = null,
     val history: List<HistoryEntry>? = null,
+    /** A store failure to show; cleared by [NotesModel.clearMessage]. */
     val message: String? = null,
+    /** A completed action to confirm, such as where a backup was written; cleared by [NotesModel.clearMessage]. */
+    val notice: String? = null,
     val loading: Boolean = true
 )
 
@@ -116,7 +119,13 @@ class NotesModel(private val session: StoreSession) {
 
     fun closeHistory() = mutableState.update { it.copy(history = null) }
 
-    fun clearMessage() = mutableState.update { it.copy(message = null) }
+    /** Writes a snapshot of the store; [NotesState.notice] names the file. */
+    suspend fun backup() = report {
+        val destination = session.backup()
+        mutableState.update { it.copy(notice = "Backed up to $destination") }
+    }
+
+    fun clearMessage() = mutableState.update { it.copy(message = null, notice = null) }
 
     private inline fun report(block: () -> Unit) {
         try {

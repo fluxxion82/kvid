@@ -1,5 +1,7 @@
 package com.kvid.sample
 
+import com.kvid.store.Kvid
+import com.kvid.store.use
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -52,6 +54,28 @@ class NotesModelTest {
         assertEquals(listOf("Buy a new stove fuel canister."), model.state.value.notes.map { it.title })
         model.showHistory(trip.id)
         assertTrue(model.state.value.history!!.last().deleted, "deletion is kept as a version")
+        session.closeWhenIdle()
+    }
+
+    @Test fun backupWritesAVerifiedSnapshotAndTheStoreKeepsWorking() = sampleTest { path ->
+        val session = StoreSession(path, onCreate = SampleNotes::seed)
+        val model = NotesModel(session)
+        model.refresh()
+        val live = model.state.value.notes.size
+        model.backup()
+        val notice = assertNotNull(model.state.value.notice)
+        val backupPath = notice.removePrefix("Backed up to ")
+        Kvid.openReadOnly(backupPath).use { copy ->
+            assertEquals(live.toLong(), copy.stats().liveDocuments)
+            assertTrue(copy.verify().ok)
+        }
+        model.newNote()
+        model.editDraft(model.state.value.draft!!.copy(body = "after the backup"))
+        model.saveDraft()
+        assertEquals(live + 1, model.state.value.notes.size, "the live store stays writable")
+        Kvid.openReadOnly(backupPath).use { assertEquals(live.toLong(), it.stats().liveDocuments, "the backup is a fixed copy") }
+        model.clearMessage()
+        assertNull(model.state.value.notice)
         session.closeWhenIdle()
     }
 
