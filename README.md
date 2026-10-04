@@ -23,6 +23,7 @@ Toolchain: Kotlin 2.5.0-Beta1, Gradle 9.8, Android Gradle Plugin 9.4 (KMP librar
 ## Modules
 - `kvid-core/` – shared APIs and platform wiring under `src/commonMain`, `androidMain`, `jvmMain`, and `iosMain`
 - `kvid-examples/` – runnable samples and benchmarks invoked via `./gradlew :kvid-examples:run`
+- `kvid-storage-spike/` – throwaway verification tests for SQLite via the androidx.sqlite bundled driver; not a published module
 
 ## Build and Test
 ```bash
@@ -255,7 +256,5 @@ Honest state as of October 2026:
 - `SimpleEmbedding` is a hashing placeholder, not a semantic model.
 
 The five iOS QR rendering tests run by default. CI explicitly excludes them with `KVID_SKIP_IOS_QR_RENDERING_TESTS=true` while the simulator rendering defect is unresolved; the task logs this exclusion. The known decoder round-trip failure remains ignored.
-
-Planning documents are maintained on feature/phase branches; the `docs/` directory is excluded from `main`.
 
 MIT License

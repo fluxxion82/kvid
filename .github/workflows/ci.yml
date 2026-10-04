@@ -44,7 +44,9 @@ jobs:
         if: always()
         with:
           name: jvm-test-reports
-          path: kvid-core/build/reports/tests
+          path: |
+            kvid-core/build/reports/tests
+            kvid-storage-spike/build/reports/tests
 
   ios:
     name: iOS simulator tests
@@ -61,9 +63,11 @@ jobs:
           # Explicit quarantine of the known Core Image simulator defect.
           # Local rendering tests remain enabled unless this opt-out is set.
           KVID_SKIP_IOS_QR_RENDERING_TESTS: 'true'
-        run: ./gradlew :kvid-core:iosSimulatorArm64Test --no-daemon --stacktrace
+        run: ./gradlew :kvid-core:iosSimulatorArm64Test :kvid-storage-spike:iosSimulatorArm64Test --no-daemon --stacktrace
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ios-test-reports
-          path: kvid-core/build/reports/tests
+          path: |
+            kvid-core/build/reports/tests
+            kvid-storage-spike/build/reports/tests
