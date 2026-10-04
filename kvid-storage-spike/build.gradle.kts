@@ -24,7 +24,8 @@ kotlin {
         // (ADR 0001, verification). Android compiles; JVM and iOS run the tests.
     }
 
-    iosX64()
+    // androidx.sqlite 2.7.1 publishes iosArm64 and iosSimulatorArm64 only (no iosX64 / Intel simulator
+    // variant), so the spike drops iosX64. kvid-core still declares it; see ADR 0001 consequences.
     iosArm64()
     iosSimulatorArm64()
 

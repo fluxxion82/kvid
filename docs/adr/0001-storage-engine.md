@@ -20,7 +20,7 @@ The persistence contract in `docs/PERSISTENCE_CONTRACT.md` lists what the engine
 - Pro: FTS5 gives tokenised full-text search with `bm25()` ranking, prefix queries, phrase queries, `highlight()` and `snippet()`, with external-content tables so the text is stored once.
 - Pro: one SQLite build on all platforms removes the per-platform behaviour differences that sank memvid v1. `addExtension()` (2.6.0+) leaves a door open for a vector extension later.
 - Pro: kvid's effort goes into the document model, history, snapshot and search semantics rather than into a storage engine.
-- Con: minSdk rises from 21 to 23.
+- Con: minSdk rises from 21 to 23, and the Intel iOS simulator target (`iosX64`) must be dropped: version 2.7.1 publishes `iosArm64` and `iosSimulatorArm64` only (first CI run of the spike, run 37176292080).
 - Con: binary size. The bundled SQLite adds native code per ABI on Android and to the iOS framework. To be measured.
 - Con: in WAL mode, `-wal` and `-shm` sidecars exist while open. Mitigated by default `DELETE` journal mode and by checkpoint-and-switch on `close()` (contract, section 2).
 - Con: vectors are not native. First implementation stores `float32` blobs and scans exactly, which is adequate for on-device corpus sizes; HNSW or an extension comes only if measured necessary (roadmap Milestone 5).
@@ -49,7 +49,7 @@ The decision is confirmed only when the verification below passes on JVM, Androi
 
 ## Consequences
 
-- `kvid-core` will depend on `androidx.sqlite:sqlite` and `sqlite-bundled`; Android minSdk becomes 23.
+- `kvid-core` will depend on `androidx.sqlite:sqlite` and `sqlite-bundled`; Android minSdk becomes 23 and the `iosX64` target is removed (Apple Silicon simulators only).
 - The persistence contract is written against SQLite semantics; the fallback would require re-proving sections 3 to 6.
 - A `kvid-storage-spike` module holds the verification tests until Milestone 2 replaces it with the real store. It is deliberately throwaway.
 - Vectors start as exact search over blobs. The current `HnswVectorIndex` is not carried into the store.
