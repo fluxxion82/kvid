@@ -174,7 +174,7 @@ The change exposed a fragile corruption test. The bundled SQLite runs with auto-
 
 Open items from the measurements:
 
-- [ ] iOS `list` and `find` are roughly ten times slower than JVM and Android for the same work. Profile Kotlin/Native text decoding and the per-row version and tag queries before setting mobile budgets.
+- [x] iOS `list` and `find` were roughly ten times slower than JVM and Android. Cause: CI ran the measurement in an unoptimized debug Kotlin/Native binary. Batching page loads (Phase 4) did not change it; an optimized test binary did (list median 15.0 ms debug, 0.4 ms optimized; see Milestone 4). Measure iOS with `iosSimulatorArm64ReleaseTest`.
 - [ ] Page utilization: versions of 1 to 3 KB on 4 KiB pages leave much of each page empty. Evaluate page size or body compression with a real corpus.
 
 **Decisions within the contract, for review:**
@@ -191,13 +191,37 @@ Defer stemming, advanced query syntax, phrase/prefix queries, and adaptive score
 
 ## Milestone 4: mobile proof and first release
 
-- [ ] Build a small Android/iOS notes sample (Compose Multiplatform): create, edit, delete, close/reopen, search, and filter.
-- [ ] Exercise background/foreground transitions, serialized concurrent calls, and recovery after process interruption.
-- [ ] Expose a documented resource lifecycle, including `close` and transaction ownership.
-- [ ] Provide basic document history if supported by the retention contract.
-- [ ] Validate backup/export from a consistent committed snapshot. Copying a live writable file must not be an undocumented backup strategy.
+**Status: in progress on branch `phase-4-mobile-sample`** (five commits on `main` at `c299d31`; CI run 37228349307 green at `e3c017a`). Ready for review; packaging, snapshot UI and the open items below remain.
+
+- [x] Notes sample (Compose Multiplatform 1.12.1, Material 3 1.9.0): `kvid-sample/shared` holds the UI, `NotesModel` and `StoreSession` for desktop, Android and iOS; `kvid-sample/androidApp` and the XcodeGen-generated `kvid-sample/iosApp` host it. Create, edit, delete, list, search while typing (whole words), tag chips, version history, close and reopen.
+- [x] Background/foreground transitions and recovery after process interruption, checked on running apps in CI. Android API 35 emulator: cold launch about 1.1 s creates and seeds the store; leaving the foreground closes it cleanly; a fresh process reopens it; killing the process with the store open, relaunching and leaving the foreground leaves a recovered, cleanly closed file with `quick_check` ok. iOS simulator: launch creates and seeds the store; moving another app to the front closes it cleanly. The checks read the store file from the device (`kvid-sample/check_store.py`).
+- [x] Serialized concurrent calls: `StoreSession` leases defer a background close until running work finishes, and a new use cancels a pending close (sample tests on the desktop JVM and iOS simulator).
+- [x] Documented resource lifecycle on the `Kvid` class: one writable handle per path per process, ownership at application scope on Android and iOS, transaction ownership, process death, and `close` semantics. `close()` can no longer be cancelled once called (a cancelled caller used to leave the handle open and its path reserved), and `use { }` closes after success, failure or cancellation; regression tests cover both.
+- [x] Basic document history is in the sample (versions oldest to newest, deletions kept).
+- [ ] Validate backup/export from a consistent committed snapshot in the sample (the store API and its tests exist; the sample has no export action yet).
 - [ ] Publish only targets that meet the acceptance criteria; document packaging for Kotlin and Swift consumers (Maven Central plus an XCFramework).
-- [ ] Provide a clear migration statement for the existing experimental APIs (`MemoryStore`, `MemoryEncoder`, `MemoryDecoder`) and stored artifacts.
+- [x] Migration statement for the experimental APIs and stored artifacts in the README: the QR/video classes are experimental and planned for `kvid-video`; their `.bin` indexes and MP4/QR artifacts are not compatible with `.kvid` stores and do not migrate automatically; data moves by re-adding text or importing JSON Lines. The README now leads with the store and the sample.
+
+Library changes in this phase:
+
+- `list()` and `find()` load a page with one version query and one tag query instead of two queries per row; tags keep the per-version hard cap through a window function; `history()` loads tags together.
+- `tagCounts()` returns tags of live current versions with document counts, most used first; also on `Transaction`.
+
+Measurements at `e3c017a` (same synthetic 5,000-note corpus as Milestone 3, median/p95 ms, single CI runs):
+
+| Platform | Ingest | Put | Find ALL | Find ANY | ANY + tag | List 50 | Reopen + find | File |
+|---|---|---|---|---|---|---|---|---|
+| Android API 35 emulator | 3,140 | 2.3/3.1 | 1.7/4.8 | 2.8/6.0 | 2.0/4.8 | 0.8/3.1 | 4.5 | 20.1 MB |
+| iOS simulator, debug binary | 4,345 | 3.0/5.0 | 11.0/21.4 | 13.9/21.8 | 14.3/18.1 | 15.0/24.1 | 11.6 | 20.1 MB |
+| iOS simulator, optimized binary | 1,336 | 1.6/2.9 | 0.8/2.9 | 1.9/5.0 | 1.1/2.5 | 0.4/0.8 | 5.4 | 20.1 MB |
+
+Open items:
+
+- [ ] The iOS app links Compose's ICU data object built for iOS 18.5 while the sample targets iOS 16.0 (linker warning). Run the sample on the minimum iOS version, or raise the sample's deployment target.
+- [ ] Search while typing matches whole words only; a prefix option for the last plain-query term is a demonstrated need from the sample. Decide whether to add it to `QuerySyntax.PLAIN`.
+- [ ] Compose 1.12 requires the sample to compile against Android API 37; `kvid-core` stays on 36.
+- [ ] Android runtime evidence is API 35 only; API 23 and physical devices remain (Milestone 2).
+- [ ] Peak memory is still unmeasured.
 
 **First-release boundary:** durable documents, metadata, BM25, basic filters, portable files, and a working mobile sample. No embedding download is required.
 
