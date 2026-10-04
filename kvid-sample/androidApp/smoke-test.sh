@@ -3,6 +3,7 @@
 #   1. a fresh launch creates and seeds the store and keeps it open in the foreground;
 #   2. leaving the foreground closes it cleanly (ProcessLifecycleOwner ON_STOP);
 #   3. a process killed with the store open relaunches, recovers and works.
+# Returning a live process to the foreground does not reopen the store by itself; the next use does.
 set -euo pipefail
 PKG=com.kvid.sample
 ACTIVITY="$PKG/com.kvid.sample.android.MainActivity"
@@ -37,10 +38,13 @@ assert_no_crash "after leaving the foreground"
 pull_store
 python3 "$CHECK" "$WORK/notes.kvid" 1 6        # closed cleanly in the background
 
+# Returning a live process to the foreground does not touch the store; it reopens on the next use.
+# A fresh process opens it while composing the list, so restart to get an open store to kill.
+adb shell am force-stop "$PKG"
 adb shell am start -W -n "$ACTIVITY"
 sleep 10
 pull_store
-python3 "$CHECK" "$WORK/notes.kvid" 0 6        # reopened on return to the foreground
+python3 "$CHECK" "$WORK/notes.kvid" 0 6        # a new process reopened the store
 adb shell am force-stop "$PKG"                 # kill with the store open
 sleep 2
 adb shell am start -W -n "$ACTIVITY"
