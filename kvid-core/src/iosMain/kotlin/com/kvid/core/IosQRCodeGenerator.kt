@@ -24,6 +24,7 @@ import kotlinx.cinterop.usePinned
 import platform.CoreGraphics.CGAffineTransformMakeScale
 import platform.CoreImage.createCGImage
 import platform.CoreImage.filterWithName
+import platform.CoreImage.kCIContextUseSoftwareRenderer
 import platform.Foundation.setValue
 
 /**
@@ -69,7 +70,9 @@ class IosQRCodeGenerator : QRCodeGenerator {
                 CGAffineTransformMakeScale(10.0, 10.0)
             )
 
-            val context = CIContext.context()
+            // Use the CPU renderer: QR rasterization does not need a GPU, and the default
+            // (Metal-backed) context returns nil from createCGImage on headless CI simulators.
+            val context = CIContext.contextWithOptions(mapOf(kCIContextUseSoftwareRenderer to true))
             val cgImage = context.createCGImage(
                 scaledImage,
                 scaledImage.extent
@@ -146,11 +149,4 @@ class IosQRCodeGenerator : QRCodeGenerator {
 
         return pixels
     }
-}
-
-/**
- * Extension function to apply a transformation to a CIImage
- */
-private fun CIImage.imageByApplyingTransform(transform: platform.CoreGraphics.CGAffineTransform): CIImage {
-    return this.imageByApplyingTransform(transform) as CIImage
 }
