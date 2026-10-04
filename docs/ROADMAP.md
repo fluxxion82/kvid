@@ -1,6 +1,6 @@
 # kvid roadmap
 
-_Revised October 4, 2026. This merges the owner's Codex-reviewed revision of the roadmap with the state of the `phase-0-baseline` branch. Unchecked items are planned work, not implementation claims. Where something was verified by running it, the text says so; everything else comes from source inspection._
+_Revised October 4, 2026 (CI green at `a997698`). This merges the owner's Codex-reviewed revision of the roadmap with the state of the `phase-0-baseline` branch. Unchecked items are planned work, not implementation claims. Where something was verified by running it, the text says so; everything else comes from source inspection._
 
 ## Direction
 
@@ -53,7 +53,7 @@ The full per-platform defect list is in Appendix A as an investigation checklist
 - [x] Replace tautological tests with behavioral tests where coverage is needed; remove assertions that establish no behavior. Removed: data-class construction and enum-count "integration" tests, `100 < 10000`, byte-in-0..255, `assertNotNull` on non-null `Result`, a print-only benchmark that ran as a unit test, the whole iOS video decoder test file (16 tests that never called the decoder). Added: HNSW recall against exact search, HNSW top-k equals exact top-k on a small set, exact sentence-boundary chunking, corrupted compressed payload fails, vectors and search results survive save/load, export JSON round trip, an ignored iOS QR round trip that documents the known decoder failure.
 - [x] Preserve coroutine cancellation through error handling. `Result` versus typed exceptions remains a separate API decision (open decision 5).
 - [x] Every test task prints failed and skipped events with full exception messages and causes, so CI logs are diagnosable without the report artifacts.
-- [ ] Confirm the first fully green CI run (Ubuntu and macOS jobs) and record the commit here. Ubuntu has been green since the first run; macOS becomes green once the five Core Image rendering tests are skipped (next run after `5dcd1a7`).
+- [x] First fully green CI run: commit `a997698`, run 37171137198 (https://github.com/fluxxion82/kvid/actions/runs/37171137198). Ubuntu green on all four runs; macOS green with the five Core Image rendering tests skipped and one decoder round-trip test ignored (82 passed, 6 skipped).
 - [ ] Reproduce the Core Image failure on a local Mac. If the generator works there, the skip reason becomes "GitHub runner limitation" and the tests can be gated on an environment variable; if it fails there too, Phase 1's pure-Kotlin QR encoder replaces it.
 
 **Exit criterion:** reproducible build instructions and CI results for the actual branch, with platform limitations stated accurately.
