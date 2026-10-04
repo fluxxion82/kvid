@@ -55,6 +55,8 @@ class SqliteCapabilityTest {
             assertEquals(listOf(1L), search("\"Q4 plan\"").map { it.first }, "phrase query")
             assertEquals(listOf(5L), search("title:budget").map { it.first }, "column filter")
             assertEquals(setOf(1L, 5L), search("budget").map { it.first }.toSet(), "both columns searched")
+            assertEquals(listOf(6L, 1L), search("plan").map { it.first }, "the shorter matching document ranks first")
+            assertTrue(search("plan")[0].second < search("plan")[1].second, "better matches have lower raw BM25 scores")
             assertTrue(search("plan").all { it.second < 0.0 }, "bm25() returns negative scores, lower is better")
 
             val snippet = conn.query(
@@ -67,11 +69,13 @@ class SqliteCapabilityTest {
 
     @Test
     fun externalContentFtsStaysInSyncThroughTriggers() {
-        // The contract stores text once (versions table) and indexes it through an external-content FTS table.
+        // A generic external-content table demonstrates trigger primitives only.
+        // Production current-version visibility still needs a separate projection and tests.
         SpikeDb.openInMemory().use { conn ->
             conn.exec("CREATE TABLE versions(version_id INTEGER PRIMARY KEY, title TEXT, body TEXT, tombstone INTEGER NOT NULL DEFAULT 0)")
             conn.exec("CREATE VIRTUAL TABLE versions_fts USING fts5(title, body, content='versions', content_rowid='version_id')")
             conn.exec("CREATE TRIGGER versions_ai AFTER INSERT ON versions BEGIN INSERT INTO versions_fts(rowid, title, body) VALUES (new.version_id, new.title, new.body); END")
+            conn.exec("CREATE TRIGGER versions_au AFTER UPDATE ON versions BEGIN INSERT INTO versions_fts(versions_fts, rowid, title, body) VALUES ('delete', old.version_id, old.title, old.body); INSERT INTO versions_fts(rowid, title, body) VALUES (new.version_id, new.title, new.body); END")
             conn.exec("CREATE TRIGGER versions_ad AFTER DELETE ON versions BEGIN INSERT INTO versions_fts(versions_fts, rowid, title, body) VALUES ('delete', old.version_id, old.title, old.body); END")
 
             conn.exec("INSERT INTO versions(title, body) VALUES ('first', 'alpha beta'), ('second', 'beta gamma'), ('third', 'gamma delta')")
@@ -82,10 +86,14 @@ class SqliteCapabilityTest {
             val afterDelete = conn.query("SELECT rowid FROM versions_fts WHERE versions_fts MATCH 'beta' ORDER BY rowid") { getLong(0) }
             assertEquals(listOf(1L), afterDelete, "deleting the content row must drop it from the index")
 
-            conn.exec("INSERT INTO versions_fts(versions_fts) VALUES ('integrity-check')")
+            conn.exec("UPDATE versions SET body = 'gamma epsilon' WHERE version_id = 1")
+            assertEquals(emptyList(), conn.query("SELECT rowid FROM versions_fts WHERE versions_fts MATCH 'beta'") { getLong(0) })
+            assertEquals(listOf(1L), conn.query("SELECT rowid FROM versions_fts WHERE versions_fts MATCH 'epsilon'") { getLong(0) })
+            // rank=1 checks index/content agreement, not just the index's internal structure.
+            conn.exec("INSERT INTO versions_fts(versions_fts, rank) VALUES ('integrity-check', 1)")
             conn.exec("INSERT INTO versions_fts(versions_fts) VALUES ('rebuild')")
             val rebuilt = conn.query("SELECT rowid FROM versions_fts WHERE versions_fts MATCH 'gamma' ORDER BY rowid") { getLong(0) }
-            assertEquals(listOf(3L), rebuilt, "rebuild from authoritative content must reproduce the index")
+            assertEquals(listOf(1L, 3L), rebuilt, "rebuild from authoritative content must reproduce the index")
         }
     }
 }

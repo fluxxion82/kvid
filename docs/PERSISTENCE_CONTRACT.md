@@ -1,172 +1,96 @@
 # kvid persistence contract
 
-_Status: **Proposed**, version 0.1, October 2026. This document is the contract that Milestone 2 implements and tests against. It is written for the storage decision in [ADR 0001](adr/0001-storage-engine.md) (SQLite through the androidx.sqlite bundled driver). Where a rule would change under the fallback engine (append-only log), the rule says so. Every "must" here is a test to write._
+_Status: **Proposed**, version 0.1. Revised after Phase 1 review. This is the specification for Milestone 2, not an implemented API. The spike verifies selected SQLite primitives; the test matrix below remains required for the real store. See [ADR 0001](adr/0001-storage-engine.md)._
 
 ## 1. Terms
 
-| Term | Meaning |
-|---|---|
-| **Store** | One kvid database. On disk it is one SQLite file, by convention `name.kvid`. |
-| **Document** | A logical record identified by a stable `documentId`. A document has one or more versions. |
-| **Version** | An immutable snapshot of a document's content and metadata, identified by a store-wide monotonic `versionId`. Updates create versions; they never modify one. |
-| **Current version** | The newest non-tombstone version of a document. |
-| **Tombstone** | A version that marks the document deleted. |
-| **Chunk** | A derived slice of a version's text used by search or embeddings. Chunks have their own ids and are never authoritative. |
-| **Commit sequence (`seq`)** | A store-wide counter incremented once per committed write transaction. Every version records the `seq` it was committed in. |
-| **Event time** | The application-meaningful timestamp of a version (when the note was written, when the message was sent). Supplied by the caller; defaults to the wall clock at `put` time. |
-| **Commit time** | Wall-clock time at commit. Informational only. |
-| **Snapshot** | A single-file copy of the store's committed state, produced while the store is open or closed. |
+A store is a SQLite application database, conventionally `name.kvid`. A document has a stable `documentId`; immutable versions have store-wide `versionId` values. The current version is the newest version **including tombstones**: if it is a tombstone, the document is absent. Derived chunks and vectors are rebuildable, not authoritative.
 
-## 2. What "single file" means
+A commit sequence (`seq`) increments once per committed write transaction. Versions in the same transaction share a sequence; order them by `(seq, versionId)`. Event time is supplied by the application, defaulting to put time. Commit time is informational and does not define visibility.
 
-- **Portable artifact.** After `close()` returns, or after `snapshot()` returns, the store is exactly one file that can be copied, attached, backed up, or opened elsewhere. This is the guarantee the project is built around.
-- **While open.** In the default journal mode (`DELETE`), SQLite creates a `-journal` file next to the store only for the duration of a write transaction and removes it at commit or rollback. In `WAL` mode (opt-in, for write-heavy workloads) `-wal` and `-shm` files exist while the store is open; kvid checkpoints and removes them in `close()` by switching the journal mode back to `DELETE`. No kvid API relies on sidecars surviving `close()`.
-- **Temporary files.** `vacuum()` and `snapshot()` may create temporary files in the store's directory or the platform temporary directory. They are removed on completion or on the next `open()`.
-- **Copying a live store** (for example by a sync client or a backup agent) while a write transaction is in flight is **unsupported** and may yield an unopenable copy. Apps that need a consistent copy call `snapshot()`, which is safe while open. This is documented behaviour, not a bug.
+## 2. Portable files and snapshots
 
-Under the fallback engine, the "while open" rule becomes: the store is always one file; the write-ahead region lives inside it.
+Default journal mode is `DELETE`. A write may create a `-journal` file. After successful clean close of all coordinated handles, with no other process writing, the database is one portable file. Copying an open writable database is unsupported; use `snapshot()`.
 
-## 3. Durability boundary
+WAL is deferred from the public 0.1 API. A checkpoint and switch to `DELETE` cannot guarantee sidecar removal with an active reader or another process using the file. The spike tests both successful cleanup and a reader preventing the switch.
 
-- `put`, `update`, `delete` **stage** work inside the current transaction. They promise nothing about durability.
-- `commit()` returns only after SQLite has completed its atomic commit with `PRAGMA synchronous = FULL` (`NORMAL` under WAL, where the WAL is synced at commit). After `commit()` returns, the committed state survives process death and power loss to the extent the platform's `fsync` is honest. On iOS the store additionally issues `F_FULLFSYNC`-equivalent behaviour through SQLite's default VFS; this is documented as SQLite's guarantee, not kvid's.
-- **Auto-commit mode (default).** When no explicit transaction is open, each write call is its own transaction and is durable when the call returns.
-- **Explicit transactions.** `transaction { }` opens a write transaction, runs the block, commits on normal exit and rolls back on any exception, including `CancellationException`, which is rethrown. Nested calls use SQLite savepoints: an inner failure rolls back to its savepoint and the exception propagates.
-- **Read-your-writes.** Inside a transaction, reads observe the transaction's own staged writes.
-- **Close with uncommitted work.** `close()` rolls back any open transaction and returns normally. It never commits implicitly. A debug flag may make this throw.
+A snapshot contains committed state only. Use a fresh read connection, rather than the writer connection with staged work, and bind the output pathname. `VACUUM INTO` creates a consistent database but does **not** atomically publish a destination: interruption can leave incomplete output. Export to an owned temporary path on the destination filesystem, validate the database and kvid invariants, sync it, atomically rename it, and sync the parent directory where supported. Reject an existing destination in 0.1. Return only after publication succeeds. Platform adapters must establish their rename and sync guarantees.
 
-## 4. Recovery and corruption
+Reject snapshot and close calls from inside a managed transaction. Clean up only temporary files owned by this operation; never broadly delete matching files on open. A failure before rename must leave no published destination and must preserve the source. A sync failure after rename can leave a published file with uncertain durability; report that outcome and verify the owned destination before retrying.
 
-- Torn writes and interrupted transactions are detected and rolled back by SQLite's journal on the next `open()`. kvid adds nothing here and does not claim to.
-- `open()` runs `PRAGMA quick_check` when the file's `kvid_meta.last_clean_close` flag is not set (unclean shutdown), and `verify()` runs `PRAGMA integrity_check` plus kvid's own consistency checks (every document's `current_version_id` exists; every FTS row maps to a version).
-- A file whose header is not SQLite, or whose `integrity_check` fails, raises `KvidException.Corrupt`. Reads never silently succeed on a corrupt store.
-- A file whose `kvid_meta.format_major` is newer than the library raises `KvidException.UnsupportedFormat`. Older minor versions are migrated forward on open; migrations are forward-only and run inside one transaction.
-- Fault injection in tests is deterministic (truncate the file, flip bytes, kill between statements). These tests establish the behaviours above; they do not prove every power-loss scenario and the docs must not say they do.
+## 3. Transactions and durability
 
-## 5. Concurrency
+Every writable connection explicitly configures and verifies `foreign_keys = ON`, `journal_mode = DELETE`, and `synchronous = EXTRA` (3). SQLite's bundled defaults are insufficient for this contract: DELETE/FULL omits a directory sync after journal unlink. A future WAL mode must use FULL (2) or EXTRA (3); WAL/NORMAL can lose recent commits after power loss. These guarantees depend on the filesystem and storage honoring sync requests. SQLite's default Apple VFS does not imply `fullfsync = ON`.
 
-- **One writer per store, per process.** A `Kvid` instance owns one SQLite connection. All public operations are `suspend` functions serialised through a `Mutex`; blocking SQLite calls run on `Dispatchers.IO` (JVM, Android) or a dedicated single-thread dispatcher (native).
-- **Cross-process.** SQLite's file locking applies. A second process opening the same file for writing receives `KvidException.Locked` after `busy_timeout` (default 5 s) rather than blocking indefinitely.
-- **Readers.** `openReadOnly()` opens with `SQLITE_OPEN_READONLY` and observes committed state only. Readers in the same process see a write the moment `commit()` returns; a reader mid-query sees a consistent snapshot of the transaction it started in.
-- Under WAL mode, readers do not block the writer and the writer does not block readers.
+Outside `transaction { }`, each write commits before returning. Inside it, writes stage work; normal block completion commits, and an exception rolls back. There is no separately callable `commit()` that could prematurely commit a managed block. IDs returned inside the block are provisional until commit succeeds.
 
-## 6. Failure semantics
+The transaction receiver is an explicit scoped session. Hold the store's operation gate for the block and route session reads/writes directly to its connection; reacquiring a non-reentrant Mutex would deadlock. Reject reentry through the enclosing store, use after the session ends, and sharing the session with child coroutines. Nested session transactions use savepoints. Reads through the session see staged writes.
 
-| Condition | Behaviour |
-|---|---|
-| Disk full (`SQLITE_FULL`) | Transaction rolled back; `KvidException.DiskFull`; store remains at last committed state |
-| I/O error or failed sync (`SQLITE_IOERR`) | Transaction rolled back; `KvidException.Io` with the SQLite code; store remains at last committed state |
-| Cancellation during a transaction | Rolled back; `CancellationException` rethrown unchanged |
-| Lock timeout (`SQLITE_BUSY`) | `KvidException.Locked`; nothing written |
-| Not a kvid store / wrong magic | `KvidException.NotAStore` |
-| Newer format major | `KvidException.UnsupportedFormat` with both versions |
-| Corruption | `KvidException.Corrupt` |
-| Input over a bound (section 11) | `KvidException.LimitExceeded` before any write |
+Check cancellation before commit. On cancellation or failure, perform rollback and connection cleanup in a non-cancellable context on the connection dispatcher, then propagate the original exception; retain cleanup failures as suppressed causes. Cancellation after commit cannot undo it. Blocking SQLite calls need not stop immediately on cancellation; this bundled build omits the progress callback.
 
-All `KvidException`s carry a stable `code` string (for example `KV_DISK_FULL`) for logging and for non-Kotlin consumers.
+`suspend close()` serializes with operations, waits for an active managed transaction to finish, and closes resources. It does not implement synchronous `AutoCloseable`. Roll back residual uncommitted work during failure cleanup; never implicitly commit it.
 
-## 7. Platform I/O interface
+## 4. Recovery, validation, and compatibility
 
-With SQLite as the engine, kvid does not implement positioned writes, journaling or locking itself. The platform surface it owns is small and is the only `expect`/`actual` in the store:
+SQLite owns transaction journal recovery. kvid validates application identity and metadata, uses `quick_check` after a detected unclean shutdown, and exposes `verify()` with `integrity_check`, foreign-key checks, current-version/tombstone invariants, and FTS external-content consistency (`integrity-check` with `rank = 1`). A clean-close marker is advisory, particularly across processes.
 
-- `appDataDirectory()` and `temporaryDirectory()` resolution.
-- `snapshot(destination)` through `VACUUM INTO`, which produces a complete single file atomically (SQLite writes to the destination and syncs it).
-- `delete(path)` and `exists(path)` through kotlinx-io.
+SQLite does not inspect every page on every read. An invalid header is not evidence that arbitrary corruption can never return readable rows. Detected corruption must surface explicitly; unaccessed corruption requires verification. Refuse non-kvid databases as `NotAStore`, and damaged recognized stores as `Corrupt`; document ambiguous invalid-header classification.
 
-Under the fallback engine this interface would grow to positioned read/write, `fsync`, advisory locking and atomic rename, and the contract in sections 3 to 6 would have to be re-proven by kvid's own tests. That cost is the main reason the ADR prefers SQLite.
+`user_version` and a `kvid_meta` row identify schema and format versions. Refuse unsupported newer major **or minor** versions for writable opens. Read-only compatibility with newer formats requires an explicit supported capability set, not merely ignoring columns. Run each forward migration and its version update transactionally; a failed migration leaves the previous schema intact.
 
-## 8. Identity, versions and history
+## 5. Concurrency and errors
 
-- `documentId` is a kvid-generated UUIDv7 string: stable for the document's life, time-ordered, safe to use as a sync identifier. Callers may supply their own id on `put` provided it is unique in the store.
-- `versionId` is a store-wide monotonic `Long` (SQLite `INTEGER PRIMARY KEY AUTOINCREMENT`). It never repeats, even after deletion.
-- Chunks have their own `chunkId` scoped to a version. They are derived data: deleting and rebuilding them must not change any document or version.
-- `uri` is metadata. It may carry a unique index when the app asks for one (`PutOptions(uniqueUri = true)`); it is never an implicit identity rule.
+Coordinate writable handles by canonical path within a process, with one serialized connection owner. Run blocking calls on an appropriate connection dispatcher; never use a connection concurrently. Read-only handles use `SQLITE_OPEN_READONLY` and see committed state at the start of their read transaction. An existing read transaction continues seeing its old snapshot after a write commits.
 
-### Visibility
+SQLite serializes write transactions across processes, not writable opens: a second process may open successfully and subsequently contend at BEGIN or a write. Configure a busy timeout (default 5 seconds); it is a contention policy, not a strict end-to-end elapsed-time bound. DELETE-mode readers can block writer commits; WAL has different reader/writer behavior and remains deferred.
 
-- `update(documentId, …)` inserts a new version with `supersedes = previousVersionId` and sets the document's current version. `delete(documentId)` inserts a tombstone version.
-- The version visible at commit sequence `S` is the newest version of the document with `seq <= S`; if that version is a tombstone the document is invisible at `S`. "Now" is `S = latest committed seq`.
-- `get(documentId)` returns the current version. `get(documentId, asOfSeq = S)` and `history(documentId)` read older versions when retention keeps them.
+Use typed `KvidException` subclasses with stable kvid code strings, preserving underlying causes. Proposed mappings: `DiskFull`, `Io`, `Locked`, `NotAStore`, `UnsupportedFormat`, `Corrupt`, `LimitExceeded`, `HistoryUnavailable`, and `CursorExpired`. Cancellation propagates unchanged. Bounds fail before writes; lock failures roll back staged work. For FULL, explicitly clean up and verify rollback, as the spike does for its injected case.
 
-### Retention
+An I/O or sync failure can leave the commit outcome uncertain. Mark the connection unusable, reopen/recover, and resolve through a durable operation identifier before retrying; do not promise that every failed commit leaves precisely the previous state. SQLite atomicity and certainty of the caller's observed outcome are different guarantees.
 
-| Mode | Guarantee |
-|---|---|
-| `KEEP_ALL` (default) | Every version is retained until `vacuum(retention)` is called with a different mode. `asOf` reads and `history` are complete. |
-| `KEEP_LATEST` | Superseded and tombstoned versions may be removed by `vacuum()`. `asOf` reads older than the oldest retained version raise `KvidException.HistoryUnavailable`. |
+**Implementation gate:** androidx.sqlite 2.7.1 `SQLiteException` exposes a message, not a structured result code. Spike assertions inspect the pinned driver's message only. Milestone 2 must establish a supported error-code adapter or explicitly tested, version-pinned translation with unknown failures mapped to `Io`; parsing messages is not a stable driver API.
 
-Keeping history and reclaiming space are different operations: `vacuum()` first applies the retention policy inside a transaction, then runs SQLite `VACUUM` to shrink the file. Interrupting either step leaves the store at its last committed state.
+## 6. Documents and retained history
 
-### Time
+Generate UUIDv7 document identifiers, or accept a unique caller ID. Identifiers support identity but do not implement synchronization/conflict resolution. Use AUTOINCREMENT version IDs: committed IDs are never reused, while rolled-back provisional IDs may be. `uri` is metadata; uniqueness is a store-wide schema option, not a per-insert request that silently changes the index.
 
-- Date filters (`since`, `until`) use **event time**. `asOfSeq` uses **commit order**. A query may use both.
-- Ordering ties on event time are broken by `versionId` descending. This makes every ordering total and every cursor deterministic.
-- `commitTime` is stored for display and audit only; no query semantics depend on it, because device clocks move.
+Update creates a version and records its predecessor; delete creates a tombstone. At sequence S, select the largest `(seq, versionId)` with `seq <= S`. A selected tombstone means absent. `get(id, asOfSeq)` and history support retained versions, including multiple updates in one transaction.
 
-## 9. Search visibility
+`KEEP_ALL` retains all versions. `KEEP_LATEST` compaction retains the latest live version or a deletion marker so old content cannot resurrect. Store an explicit global history floor; reject as-of requests below it, even for deleted documents. Pruned predecessor references must remain representable without dangling foreign keys. Apply retention transactionally before SQLite VACUUM. A failure during later physical shrinking does not undo already committed retention.
 
-- Full-text search indexes **current versions only** in version 0.1. A search with `asOfSeq` filters the candidate set to versions visible at `S` but ranks with the current index statistics. This is "historical visibility, not historical ranking" and the API documentation says so. Historical ranking is deferred until a use case needs it.
-- Deleted and superseded versions never appear in a search without `asOfSeq`.
-- Chunk hits are aggregated to one result per document before ranking is applied; the best chunk's score and snippet represent the document.
+## 7. Search and pagination
 
-## 10. Pagination
+Version 0.1 searches **current live versions only**. Historical full-text search is deferred: a current-only index cannot retrieve superseded text by filtering `asOfSeq`. Reject unsupported historical search options. Historical `get` and history remain supported.
 
-- Listing order: `(eventTime desc, versionId desc)`. Search order: `(score desc, versionId desc)`.
-- A cursor encodes the last key of the page and the `seq` the page was computed at. Cursors stay valid across commits: the next page continues from the key, and rows committed after the cursor's `seq` may appear or not, which is documented. A cursor never repeats a row and never skips a row that existed at its `seq`.
-- Cursors are opaque strings; their format is versioned and may change between kvid versions. Apps must not parse them.
+Index a current-content projection distinct from immutable version history, updating it and its external-content FTS triggers in the same transaction. Rebuild only that projection. Initially index entire versions; define chunk-to-document aggregation before adding chunked search. SQLite BM25 scores are lower-is-better; expose their negation if the public API uses descending score order.
 
-## 11. Bounds
+List by `(eventTime desc, versionId desc)` and search by `(score desc, versionId desc)`. Event-time filters use event time. Cursors encode the last key, committed sequence, retention/schema epoch, and query/filter fingerprint. Invalidate them with `CursorExpired` after a committed write or compaction. Ranking and current visibility change after writes, so cross-commit no-skip/no-duplicate guarantees require a retained read snapshot and are deferred. Cursors are opaque and versioned.
 
-Checked before any write; violating input raises `KvidException.LimitExceeded`.
+## 8. Bounds and encoding
 
-| Limit | Default | Configurable |
-|---|---|---|
-| Body size | 16 MiB | yes, up to SQLite's `max_length` |
-| Metadata JSON | 64 KiB | yes |
-| Tags per version | 256 | yes |
-| Tag length | 128 chars | yes |
-| Title length | 1 KiB | yes |
-| Blob attachment | 64 MiB | yes |
-| Chunks per version | 10 000 | yes |
+Default write limits: body 16 MiB UTF-8, metadata JSON 64 KiB UTF-8, title 1 KiB UTF-8, 256 tags of at most 128 Unicode code points, attachment 64 MiB, and 10,000 derived chunks. Bound identifiers, queries, page sizes and stored metadata as well. Configuration has hard library caps and cannot trust limits read from an arbitrary database.
 
-Reading a store never allocates based on an unvalidated length from the file: SQLite enforces its own page and record bounds, and kvid's `kvid_meta` values are parsed with explicit maximum lengths.
+Validate stored byte lengths before materializing large TEXT/BLOB fields; SQLite's much larger internal limits do not enforce these application bounds. Bound decompressed output and expansion before allocation. Test malformed lengths and compression bombs.
 
-## 12. Format evolution
+Bodies are uncompressed UTF-8 TEXT. Optional blob compression uses zlib-wrapped DEFLATE (RFC 1950), with explicit raw/deflate encoding. Cross-platform fixture tests remain required. This does not repair the independent video's existing `GZ:` gzip/raw-DEFLATE mismatch.
 
-- `PRAGMA user_version` holds the schema version. `kvid_meta` (a one-row table) holds `format_major`, `format_minor`, `created_by`, `created_at`, `last_clean_close`, and the embedding configuration (section 14).
-- Unknown tables and columns are ignored by older readers within the same major version; new minor versions only add. A major bump means an older library must refuse the file.
-- Migrations are forward-only, idempotent, and run inside one transaction on `open()`. A failed migration rolls back and the file remains openable by the previous library version.
+Vectors use little-endian float32 blobs and include model/tokenizer revisions, dimensions, pooling, normalization and metric. Validate dimensions and reject non-finite values for retrieval; codec preservation of NaN payloads is a wire-format test, not permission to index NaNs. Model mismatch may disable vectors or require re-embedding; lexical access remains available.
 
-## 13. Compression and encoding
+## 9. Encryption reservation
 
-- Document bodies are stored as UTF-8 `TEXT`, uncompressed, because full-text search needs the text and SQLite pages compress well under file-level backup anyway.
-- Blob attachments may be compressed. The one portable envelope is **zlib-wrapped DEFLATE (RFC 1950)**, recorded in an `encoding` column (`0` raw, `1` deflate). Gzip and raw DEFLATE are not accepted. A fixture blob committed to the repository must decode to the same bytes on JVM, Android and iOS; this is the test that fixes the current gzip-versus-raw-DEFLATE mismatch in the video pipeline as well.
+0.1 databases are plaintext. Reserved encryption metadata does not guarantee that encryption can be introduced as a compatible minor change. Design authenticated coverage, nonce lifecycle, keys, rotation and migration separately.
 
-## 14. Embeddings as derived data
+Encrypted snapshot export protects the exported artifact; the open database, journals and decrypted working files remain plaintext unless an encrypted database implementation is selected. Per-row encryption also requires a policy for plaintext indexes and metadata leakage. Integrity checks and hashes do not authenticate content.
 
-- The store records the full embedding configuration in `kvid_meta`: model id, model revision or hash, tokenizer revision, dimensions, pooling, normalisation and distance metric. A store with no configuration has no vectors.
-- Vectors live in a `vectors(chunk_id, embedding BLOB)` table as little-endian `float32`. They are derived: `rebuildVectors()` regenerates them from text; `clearVectors()` drops them.
-- Opening a store whose configuration differs from the embedder provided by the app raises `KvidException.ModelMismatch`. The app chooses to re-embed or to open without vectors.
-
-## 15. Encryption reservation
-
-Version 0.1 stores are plaintext. The following is reserved so that adding encryption is a minor version, not a new format:
-
-- `kvid_meta.encryption` (`none` today), `key_id`, and a `nonce BLOB` column on `versions` and `blobs`, unused until encryption is enabled.
-- Planned first mode: **whole-snapshot encryption**, where `snapshot(destination, key)` produces an AEAD-encrypted single file and `open` of such a file requires the key. It keeps full-text search working on the open store and protects the file at rest and in transit.
-- Planned second mode: per-row AEAD of body and metadata with a unique 96-bit nonce per row and the `key_id` in the header. Full-text search is unavailable in this mode unless the index is also encrypted, which is out of scope. What remains visible without the key: table layout, row counts, sizes, timestamps and ids.
-- Checksums (`integrity_check`, content hashes) detect accidental corruption only. Authentication comes from the AEAD tag, not from checksums.
-
-## 16. API surface (version 0.1)
+## 10. Proposed API
 
 ```kotlin
-class Kvid private constructor(...) : AutoCloseable {
+class Kvid private constructor(...) {
     companion object {
         suspend fun create(path: String, options: StoreOptions = StoreOptions()): Kvid
         suspend fun open(path: String, options: StoreOptions = StoreOptions()): Kvid
         suspend fun openReadOnly(path: String): Kvid
     }
-
     suspend fun put(text: String, options: PutOptions = PutOptions()): DocumentId
     suspend fun update(id: DocumentId, text: String, options: PutOptions = PutOptions()): VersionId
     suspend fun delete(id: DocumentId): VersionId
@@ -174,34 +98,30 @@ class Kvid private constructor(...) : AutoCloseable {
     suspend fun history(id: DocumentId): List<Version>
     suspend fun find(query: String, options: FindOptions = FindOptions()): Page<Hit>
     suspend fun list(options: ListOptions = ListOptions()): Page<Document>
-    suspend fun <T> transaction(block: suspend Kvid.() -> T): T
-    suspend fun commit()                       // no-op in auto-commit mode
+    suspend fun <T> transaction(block: suspend Transaction.() -> T): T
     suspend fun snapshot(destination: String)
     suspend fun verify(): VerifyReport
     suspend fun vacuum(retention: Retention = Retention.KEEP_ALL)
     suspend fun stats(): StoreStats
-    override fun close()
+    suspend fun close()
 }
 ```
 
-`Result` is not used in this API; failures are `KvidException` subclasses with stable codes (open decision 5 in the roadmap is thereby proposed as "typed exceptions"). `CancellationException` always propagates.
+`Transaction` exposes scoped writes, reads and nested transaction blocks only. Snapshot, vacuum and close are outside its surface. Types and defaults remain proposed; the real implementation must test ownership and lifecycle before publishing this API.
 
-## 17. Test matrix this contract implies
+## 11. Required production test matrix
 
-| Rule | Test |
-|---|---|
-| 2 portable artifact | write, close, list directory: exactly one file; copy, open copy, read |
-| 2 WAL sidecars removed on close | open in WAL, write, assert `-wal` exists, close, assert gone |
-| 2 snapshot while open | write, `snapshot()`, open snapshot read-only, `integrity_check` ok, counts match |
-| 3 staged vs committed | insert without commit, kill connection, reopen: absent; commit: present |
-| 3 transaction rollback on exception and on cancellation | block throws / job cancelled: no rows |
-| 4 corruption detected | truncate file, flip bytes: `Corrupt`, never a partial read |
-| 4 unsupported format | bump `format_major`: `UnsupportedFormat` |
-| 5 locked | second connection with a write lock held: `Locked` within timeout |
-| 6 disk full | SQLite `max_page_count` set tiny: `DiskFull`, state unchanged |
-| 8 visibility | update twice, delete, `asOfSeq` at each seq returns the expected version |
-| 8 retention | `KEEP_LATEST` + `vacuum()` removes superseded; `asOf` older raises `HistoryUnavailable` |
-| 10 cursor | insert during pagination: no duplicates, no skips of pre-existing rows |
-| 11 bounds | oversize body: `LimitExceeded`, no row written |
-| 13 envelope | committed deflate fixture decodes identically on all three targets |
-| 14 model mismatch | open with a different embedder config: `ModelMismatch` |
+- Every target: close/reopen, copy closed artifact, Android device runtime/native loading, portable cross-platform fixtures.
+- Managed transactions: staged reads, exception/cancellation rollback, nested savepoints, forbidden reentry and child sharing, close races, cancellation at commit boundary.
+- Recovery: actual subprocess termination mid-transaction and around commit; distinguish this from orderly connection close. Inject truncation, page damage, FULL, failed sync and ambiguous commit outcomes.
+- Snapshots: active staged writer, genuine read-only source, interrupted export, existing destination, atomic publication and sync failure; verify original and exported state.
+- Identity/history: multiple updates in one transaction, tombstones, committed ID reuse prevention, rollback IDs, retention floor and predecessor pruning.
+- Search: current projection after update/delete/recovery, external-content integrity, rebuild equivalence, score order, cursor expiration after writes/compaction.
+- Bounds: oversized input and stored lengths, decompression bombs, malformed vectors; migrations and newer minor/major rejection.
+- Platform durability and mobile performance: device tests, binary footprint, cold open, peak memory and representative corpus. Process tests and injected faults do not prove every power-loss scenario.
+
+## References
+
+- [SQLite synchronous modes](https://www.sqlite.org/pragma.html#pragma_synchronous) and [fullfsync](https://www.sqlite.org/pragma.html#pragma_fullfsync).
+- [VACUUM INTO](https://www.sqlite.org/lang_vacuum.html): consistent output and interruption behavior.
+- [Isolation](https://www.sqlite.org/isolation.html), [AUTOINCREMENT](https://www.sqlite.org/autoinc.html), and [FTS5 integrity checks](https://www.sqlite.org/fts5.html#the_integrity_check_command).

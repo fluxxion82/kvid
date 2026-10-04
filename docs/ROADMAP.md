@@ -62,69 +62,30 @@ The full per-platform defect list is in Appendix A as an investigation checklist
 
 ## Milestone 1: choose storage architecture and define its contract
 
-**Status: complete** (October 4, 2026). Deliverables: [ADR 0001](adr/0001-storage-engine.md) (accepted), [the persistence contract](PERSISTENCE_CONTRACT.md) (version 0.1, proposed), and the `kvid-storage-spike` module whose tests ran green on JVM and the iOS simulator in CI run 37176438762 and compile for Android.
+**Status: architecture selected; validation partially complete.** [ADR 0001](adr/0001-storage-engine.md) accepts SQLite via androidx.sqlite 2.7.1 for implementation. The [persistence contract](PERSISTENCE_CONTRACT.md) is a revised proposal, not an implemented guarantee. The corrected spike passes 16 tests each on JVM and the iOS simulator and compiles Android main.
 
-**Decision:** SQLite through the `androidx.sqlite` bundled driver (2.7.1). One SQLite 3.50.1 build with FTS5 on every target; transactions, crash recovery, `VACUUM INTO` snapshots and `integrity_check` come from SQLite; kvid's value lives in the document model, history, portable snapshots, search semantics and optional vectors. The append-only log and the memvid-style custom WAL format were rejected for now (ADR 0001, options B and C).
+- [x] SQLite 3.50.1 and FTS5 observed on JVM and iOS; Android dependency compiles.
+- [x] Default DELETE-mode connections explicitly use synchronous EXTRA and foreign keys. WAL/NORMAL is insufficient for the proposed power-loss boundary; public WAL support is deferred.
+- [x] Primitive coverage: committed reopen, orderly-close rollback, savepoints, writer contention, real read-only handles, active-reader WAL cleanup failure, and committed-only snapshot with a staged writer.
+- [x] Invalid-header NOTADB and injected FULL codes verified. FTS insert/update/delete/rebuild consistency and float raw-bit encoding verified.
+- [x] Synthetic 5,000-document timings and file size observed. Historical CI run 37176438762: JVM ingest 349 ms, 50 queries 232 ms, second-open/count 3 ms; iOS ingest 1,181 ms, queries 118 ms, second-open/count 5 ms; file 2.5 MiB. These are warm second-connection timings, not cold reopen or release budgets.
+- [x] Proposed contract specifies scoped transactions without manual commit, cancellation cleanup, tombstone visibility, same-commit ordering, retention floor, current-only FTS, and cursors expiring on writes.
+- [ ] Android runtime/native loading and the common spike suite on a device or emulator.
+- [ ] Actual process-kill recovery, failed sync, and broader corruption fixtures in Milestone 2. Orderly close is not a kill simulation.
+- [ ] Production exception-code translation: the pinned AndroidX exception has no structured result-code property.
+- [ ] Atomic snapshot publication and platform file/directory sync in Milestone 2; VACUUM INTO alone does not supply these.
+- [ ] Cold-open, peak-memory and representative mobile workloads; APK/framework size with the sample app. Revisit footprint above roughly 3 MB per ABI.
 
-Measured on GitHub runners with 5 000 documents of 20 to 80 words indexed by FTS5:
+The spike targets minSdk 23 and omits iosX64 because the pinned artifact has no Intel simulator variant; applying those changes to core is Milestone 2 work. Proposed exceptions, bounds, migration compatibility, compression and encryption reservations still require implementation tests.
 
-| Target | Ingest | 50 full-text queries | Reopen and count | File |
-|---|---|---|---|---|
-| JVM (`ubuntu-latest`) | 349 ms | 232 ms | 3 ms | 2.5 MiB |
-| iOS simulator (`macos-latest`, arm64) | 1 181 ms | 118 ms | 5 ms | 2.5 MiB |
-
-Evaluation criteria:
-
-- [x] FTS5 is compiled into the chosen driver on every target: verified by `PRAGMA compile_options` on JVM and iOS; the Android artifact is the same source build and compiles.
-- [x] "Single file" is defined precisely (contract, section 2): one portable artifact after `close()` or `snapshot()`; `-journal` allowed during a write; WAL sidecars removed on close; temporary files allowed during `vacuum()` and `snapshot()`; copying a live store is unsupported, `snapshot()` is the supported path. Verified by the `DurabilityTest` cases on both targets.
-- [x] Open time, ingest time, query latency and file size measured on CI runners (table above). Peak memory and on-device numbers are still to be recorded with the Milestone 4 sample app.
-- [ ] Binary size added to an Android APK and an iOS framework: measured with the sample app (Milestone 4). ADR 0001 carries the 3 MB-per-ABI revisit threshold.
-- [x] Behavior on corruption (error code 26, never a partial read), disk-full (error code 13, state unchanged) and close without commit (rolled back) verified on both targets. Process kill mid-transaction is simulated by close-without-commit; a real kill test belongs to Milestone 2's fault-injection suite.
-
-Consequences recorded in the ADR: Android minSdk rises to 23, and the `iosX64` (Intel simulator) target is dropped because androidx.sqlite 2.7.1 publishes `iosArm64` and `iosSimulatorArm64` only.
-
-### Durability and concurrency
-
-Specified in the persistence contract, sections 3 to 7:
-
-- [x] `put`/`update`/`delete` stage; only `commit()` (or the end of an auto-commit call) promises durability.
-- [x] Transaction atomicity, read-your-writes, rollback on exception and cancellation, savepoints for nesting, rollback on close with uncommitted work.
-- [x] Torn writes and incomplete transactions are SQLite's journal to detect; kvid adds `quick_check` after unclean close and `integrity_check` in `verify()`.
-- [x] Write and sync ordering: `synchronous = FULL` (`NORMAL` under WAL), SQLite's commit protocol.
-- [x] WAL checkpoint publication and reuse are SQLite's; kvid switches back to `DELETE` on close.
-- [x] One writer per store per process serialised by a `Mutex`; cross-process via SQLite locking with `busy_timeout`; read-only opens see committed state.
-- [x] Disk-full, cancellation, failed sync, unsupported format and corruption map to `KvidException` codes.
-- [x] Platform I/O surface is reduced to directory resolution, `VACUUM INTO`, `exists` and `delete`.
-
-### Documents, versions, and history
-
-Specified in the contract, sections 8 to 10:
-
-- [x] UUIDv7 `documentId`, monotonic `versionId`, separate chunk ids; `uri` is metadata with an optional unique index.
-- [x] Event time versus commit sequence; filters use event time, `asOfSeq` uses commit order; ties broken by `versionId`.
-- [x] Update creates a superseding version, delete creates a tombstone; visibility at a sequence is defined.
-- [x] Retention modes `KEEP_ALL` and `KEEP_LATEST`; `vacuum()` applies retention then shrinks.
-- [x] Historical visibility only, not historical ranking, in version 0.1; documented.
-- [x] Total orderings and cursor validity across commits.
-
-### Format evolution and bounds
-
-Specified in the contract, sections 11 to 15:
-
-- [x] `user_version` plus a `kvid_meta` row; forward-only, transactional migrations; newer major refused.
-- [x] Explicit bounds on body, metadata, tags, title, blobs and chunks, checked before any write.
-- [x] One compression envelope for blobs: zlib-wrapped DEFLATE, with a cross-platform fixture test to write.
-- [x] Documents are authoritative; FTS and vectors rebuild from them (`rebuild` verified in the spike).
-- [x] Encryption reserved: `kvid_meta.encryption`, `key_id`, per-row `nonce` column; whole-snapshot encryption planned first.
-
-**Exit criterion met:** an architecture decision record, a written persistence contract, and platform prototypes that establish the required primitives on JVM and iOS, with Android compiling against the same artifact.
+**Exit criterion:** the architecture decision and proposed semantics are reviewable. Platform validation is complete only after Android runtime evidence; production durability and publication remain explicit subsequent milestone gates.
 
 ## Milestone 2: durable document store
 
 Builds on the accepted ADR 0001 and the persistence contract; `kvid-storage-spike` is deleted once `kvid-core` carries the real store and its tests.
 
 - [ ] Raise `kvid-core` to minSdk 23 and drop `iosX64`, as ADR 0001 requires.
-- [ ] Implement `create`, `open`, `close`, `put`, `get`, `update`, `delete`, and atomic `commit` according to the contract.
+- [ ] Implement `create`, `open`, `close`, `put`, `get`, `update`, `delete`, and scoped atomic transactions according to the contract.
 - [ ] Persist document text and metadata, not just vectors.
 - [ ] Add portable format fixtures written and read across all three platforms.
 - [ ] Add integrity verification and explicit corruption errors.
@@ -135,7 +96,7 @@ Builds on the accepted ADR 0001 and the persistence contract; `kvid-storage-spik
 
 Keep large attachments, historical ranked search, and a full CLI outside this milestone unless they are necessary for the selected use case.
 
-**Exit criterion:** committed documents and metadata survive close/reopen on every target; interrupted writes preserve the last committed state; corruption cannot silently produce successful reads.
+**Exit criterion:** committed documents and metadata survive close/reopen on every target; interrupted writes preserve the last committed state; detected corruption surfaces explicitly, and verify checks the full database and application invariants.
 
 ## Milestone 3: useful offline full-text search
 
@@ -219,14 +180,13 @@ Keep store-specific version visibility and transaction rules out of standalone s
 
 ## Decisions still open
 
-1. Storage engine (SQLite versus custom) and the exact meaning of single-file operation.
-2. Durability boundary, transaction API, and reader model.
-3. Document identity, history retention, and historical-search guarantees.
-4. Format versioning, compression, encryption structure, and compaction strategy.
-5. Error API: typed exceptions or `Result`, with cancellation preserved in either case (cancellation is now preserved in the existing `Result` style).
-6. Verified toolchain versions and supported platform minimums (minSdk 21 today; AGP 9.4 imposes no higher floor).
-7. Representative workloads and performance budgets.
-8. Whether `.kvid` names a custom format or an application container over another engine.
+1. Final acceptance of the proposed scoped transaction/error API and retention defaults.
+2. Android runtime evidence and platform minimum changes in core.
+3. Snapshot publication and sync adapters; supported error-code translation.
+4. Representative workloads, cold-open/peak-memory budgets and native footprint.
+5. Tokenizer configuration, encrypted export design and later vector providers.
+
+SQLite and the closed/snapshot portable-artifact definition are selected. The `.kvid` extension names a SQLite application database. Historical full-text search and public WAL support are deferred; they are not guarantees of 0.1.
 
 ## Appendix A: investigation checklist from the code review
 

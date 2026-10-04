@@ -16,7 +16,23 @@ import kotlin.random.Random
 object SpikeDb {
     private val driver = BundledSQLiteDriver()
 
-    fun open(path: String): SQLiteConnection = driver.open(path)
+    // Configure each connection explicitly; bundled defaults differ between DELETE and WAL.
+    // EXTRA adds directory synchronization in DELETE mode and is equivalent to FULL in WAL.
+    fun open(path: String): SQLiteConnection {
+        val connection = driver.open(path)
+        try {
+            connection.execSQL("PRAGMA synchronous = EXTRA")
+            connection.execSQL("PRAGMA foreign_keys = ON")
+            return connection
+        } catch (failure: Throwable) {
+            try {
+                connection.close()
+            } catch (cleanupFailure: Throwable) {
+                if (cleanupFailure !== failure) failure.addSuppressed(cleanupFailure)
+            }
+            throw failure
+        }
+    }
 
     fun openInMemory(): SQLiteConnection = driver.open(":memory:")
 

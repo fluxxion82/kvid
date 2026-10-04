@@ -13,7 +13,7 @@ import kotlin.time.TimeSource
 
 /**
  * ADR 0001: order-of-magnitude timings for a notes-sized corpus. Numbers are printed for the ADR;
- * the assertions are deliberately loose so simulator and CI variance cannot make this flaky.
+ * timings are observational, not correctness assertions or phone performance budgets.
  */
 class TimingTest {
     private lateinit var dir: TempDir
@@ -65,9 +65,7 @@ class TimingTest {
             val openMs = open.elapsedNow().inWholeMilliseconds
             val fileBytes = conn.scalarLong("SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()")
 
-            println("[spike] ingest 5000 docs: ${ingestMs} ms; 50 fts queries: ${searchMs} ms (${hits} hits); reopen+count: ${openMs} ms; file: ${fileBytes / 1024} KiB")
-            assertTrue(ingestMs < 60_000, "ingest took ${ingestMs} ms")
-            assertTrue(searchMs < 30_000, "queries took ${searchMs} ms")
+            println("[spike] ingest 5000 docs: ${ingestMs} ms; 50 fts queries: ${searchMs} ms (${hits} hits); second-open+count: ${openMs} ms; file: ${fileBytes / 1024} KiB")
             assertTrue(hits > 0)
         }
     }

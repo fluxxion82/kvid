@@ -1,6 +1,6 @@
 # ADR 0001: Storage engine for the kvid document store
 
-_Status: **Accepted** (October 4, 2026), on the verification below: JVM and the iOS simulator ran every check green on CI run 37176438762 with the identical SQLite 3.50.1 build, and the Android variant compiles against the same artifact. Binary size is carried into Milestone 2 as a measurement, not a blocker._
+_Status: **Accepted for implementation** (October 4, 2026), with outstanding platform and production validation: JVM and the iOS simulator ran every check green on CI run 37176438762 with the identical SQLite 3.50.1 build, and the Android variant compiles against the same artifact. Binary size is carried into Milestone 2 as a measurement, not a blocker._
 
 ## Context
 
@@ -22,7 +22,7 @@ The persistence contract in `docs/PERSISTENCE_CONTRACT.md` lists what the engine
 - Pro: kvid's effort goes into the document model, history, snapshot and search semantics rather than into a storage engine.
 - Con: minSdk rises from 21 to 23, and the Intel iOS simulator target (`iosX64`) must be dropped: version 2.7.1 publishes `iosArm64` and `iosSimulatorArm64` only (first CI run of the spike, run 37176292080).
 - Con: binary size. The bundled SQLite adds native code per ABI on Android and to the iOS framework. To be measured.
-- Con: in WAL mode, `-wal` and `-shm` sidecars exist while open. Mitigated by default `DELETE` journal mode and by checkpoint-and-switch on `close()` (contract, section 2).
+- Con: in WAL mode, `-wal` and `-shm` sidecars exist while open. Mitigated by default `DELETE` journal mode and by deferring public WAL support until handle coordination and checkpoint/switch failure are specified (contract, section 2).
 - Con: vectors are not native. First implementation stores `float32` blobs and scans exactly, which is adequate for on-device corpus sizes; HNSW or an extension comes only if measured necessary (roadmap Milestone 5).
 - Con: a dependency on Google's release cadence and on their Kotlin version compatibility.
 
@@ -45,7 +45,7 @@ Everything in B plus an embedded write-ahead log and segment catalog.
 
 **Option A, SQLite via the androidx.sqlite bundled driver.** kvid's identity is the document model and what it does with documents (history, search, portability, optional vectors, archive export), not a storage engine.
 
-The verification below passed on JVM and iOS and compiles on Android. Remaining condition: if the bundled library adds more than roughly 3 MB per ABI to the sample app, revisit; everything else in the acceptance criteria is established.
+The verification below passed on JVM and iOS and compiles on Android. Remaining condition: if the bundled library adds more than roughly 3 MB per ABI to the sample app, revisit; Android runtime/native loading, genuine process-interruption recovery, snapshot publication, and production error translation also remain implementation gates. The spike establishes engine primitives, not the complete persistence contract.
 
 ## Consequences
 
@@ -57,7 +57,7 @@ The verification below passed on JVM and iOS and compiles on Android. Remaining 
 
 ## Verification
 
-Tests in `kvid-storage-spike/src/commonTest` run on JVM (Ubuntu CI job) and the iOS simulator (macOS CI job); the Android target compiles in CI and the same tests run as Android host tests only if the bundled driver ships host natives, which is itself one of the facts to establish.
+Tests in `kvid-storage-spike/src/commonTest` run on JVM (Ubuntu CI job) and the iOS simulator (macOS CI job); the Android target compiles in CI and Android runtime tests are not configured in this module. Compilation does not establish native loading or device behavior.
 
 | Check | Where | Result |
 |---|---|---|
@@ -74,14 +74,14 @@ Tests in `kvid-storage-spike/src/commonTest` run on JVM (Ubuntu CI job) and the 
 | | iOS simulator | **pass** |
 | `VACUUM INTO` snapshot while open passes `integrity_check` and holds the committed rows only | JVM | **pass** |
 | | iOS simulator | **pass** |
-| Corruption surfaces as an error (`file is not a database`, code 26), never as a partial read | JVM | **pass** |
+| Corruption surfaces as an error (`file is not a database`, code 26), for the invalid-header fixture; arbitrary page corruption is not covered | JVM | **pass** |
 | | iOS simulator | **pass** |
 | Disk full (`max_page_count`) surfaces as an error (code 13) and leaves state unchanged | JVM | **pass** |
 | | iOS simulator | **pass** |
 | `float32` vectors round-trip through a BLOB bit-exactly | JVM | **pass** |
 | | iOS simulator | **pass** |
-| Ingest and query timings, 5 000 documents of 20 to 80 words with FTS5 triggers | JVM (GitHub `ubuntu-latest`) | ingest 349 ms, 50 full-text queries 232 ms, reopen and count 3 ms, file 2.5 MiB |
-| | iOS simulator (GitHub `macos-latest`, arm64) | ingest 1 181 ms, 50 full-text queries 118 ms, reopen and count 5 ms, file 2.5 MiB |
+| Ingest and query timings, 5 000 documents of 20 to 80 words with FTS5 triggers | JVM (GitHub `ubuntu-latest`) | ingest 349 ms, 50 full-text queries 232 ms, second connection open and count (warm) 3 ms, file 2.5 MiB |
+| | iOS simulator (GitHub `macos-latest`, arm64) | ingest 1 181 ms, 50 full-text queries 118 ms, second connection open and count (warm) 5 ms, file 2.5 MiB |
 | Android host tests with the bundled driver | Android | not attempted in the spike (no host test builder); the Android variant compiles. To establish before Milestone 2 if host tests are wanted. |
 | Binary size added to an Android APK and an iOS framework | manual | pending (needs the sample app) |
 
@@ -90,3 +90,13 @@ Tests in `kvid-storage-spike/src/commonTest` run on JVM (Ubuntu CI job) and the 
 - A target where FTS5 is absent or the bundled driver cannot load.
 - Measured binary size or open time unacceptable for the sample app.
 - A product requirement for a strict single file while open (no `-journal`), which SQLite cannot give in `DELETE` mode during a write.
+
+## Review corrections and additional evidence
+
+The expanded spike passes 16 tests on JVM and 16 on the Apple Silicon iOS simulator locally, and compiles Android main. Writable spike connections now explicitly use EXTRA and enable foreign keys. Additional cases exercise a real read-only connection, a snapshot while a writer still has staged changes, BUSY with two writers, an active WAL reader preventing journal-mode switching, savepoint rollback, committed ID non-reuse, explicit FULL/NOTADB/READONLY codes, FTS update/delete/rebuild consistency with rank=1 verification, and float raw bits including negative zero and NaN payloads. These are primitive checks, not a kvid implementation.
+
+The timing test opens a second connection while the first remains open; it does not measure cold reopen. Historical CI timings above are synthetic observations, not release budgets. Wall-clock pass/fail thresholds were removed; correctness checks remain.
+
+Orderly close is not a process kill. A replaced invalid header is not arbitrary page-corruption coverage. FULL injected through max_page_count is not a failed-sync test. The driver's message contains error codes, but its exception API does not expose a structured code; production translation remains a gate. Snapshot validation, atomic rename and platform sync remain application work. Binary footprint, peak memory, cold-open and mobile-device measurements remain pending.
+
+See the revised [persistence contract](../PERSISTENCE_CONTRACT.md) for EXTRA versus FULL/NORMAL, committed-only snapshot publication, scoped transaction ownership, current-only search, cursor expiration and retained-history semantics.
