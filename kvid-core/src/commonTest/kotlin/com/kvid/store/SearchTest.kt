@@ -1,10 +1,13 @@
 package com.kvid.store
 
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import androidx.sqlite.execSQL
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -151,6 +154,26 @@ class SearchTest {
         assertTrue(store.verify().ok)
         assertTrue(before[3].single().first == ids[0])
         assertTrue(before.flatten().none { it.first == ids[1] }, "the deleted document stays out of the rebuilt index")
+        store.close()
+    }
+
+    @Test fun indexedTextIsStoredOnceAndDriftIsDetected() = storeTest { dir ->
+        val path = dir.file("a.kvid")
+        val store = Kvid.create(path)
+        val id = store.put("the original searchable text", PutOptions(title = "Original"))
+        BundledSQLiteDriver().open(path).use { raw ->
+            raw.prepare("SELECT count(*) FROM pragma_table_info('current') WHERE name IN ('title', 'body')").use { st ->
+                st.step(); assertEquals(0L, st.getLong(0), "the projection holds no copy of the text")
+            }
+            raw.execSQL("UPDATE versions SET body = 'replaced behind the index' WHERE doc_id = '$id'")
+        }
+        val report = store.verify()
+        assertFalse(report.ok)
+        assertTrue(report.problems.any { it.startsWith("fts integrity-check") }, report.problems.joinToString())
+        store.rebuildIndex()
+        assertTrue(store.verify().ok, store.verify().problems.joinToString())
+        assertEquals(listOf(id), store.ids("replaced"))
+        assertTrue(store.ids("original searchable").isEmpty())
         store.close()
     }
 

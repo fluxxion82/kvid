@@ -49,8 +49,8 @@ class KvidStoreTest {
         val path = dir.file("notes.kvid")
         val store = Kvid.create(path)
         try {
-            store.put("authoritative")
-            BundledSQLiteDriver().open(path).use { it.execSQL("UPDATE current SET body = 'wrong' ") }
+            store.put("authoritative", PutOptions(uri = "note://a"))
+            BundledSQLiteDriver().open(path).use { it.execSQL("UPDATE current SET uri = 'note://wrong'") }
             assertFalse(store.verify().ok)
         } finally { store.close() }
     }
@@ -98,7 +98,7 @@ class KvidStoreTest {
         val store = Kvid.create(path)
         try {
             store.put("authoritative")
-            BundledSQLiteDriver().open(path).use { it.execSQL("UPDATE current SET body = 'wrong'") }
+            BundledSQLiteDriver().open(path).use { it.execSQL("UPDATE current SET event_time_ms = event_time_ms + 1") }
             assertFailsWith<KvidException.Corrupt> { store.snapshot(dir.file("copy.kvid")) }
             assertFalse(dir.exists("copy.kvid"))
         } finally { store.close() }

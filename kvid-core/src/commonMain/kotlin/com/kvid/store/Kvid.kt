@@ -598,7 +598,7 @@ internal object Ops {
         conn.update("INSERT INTO documents(doc_id, created_seq, current_version_id) VALUES (?, ?, 0)") { bindText(1, id); bindLong(2, txSeq) }
         val versionId = insertVersion(conn, id, txSeq, now, text, options, tombstone = false, supersedes = null)
         conn.update("UPDATE documents SET current_version_id = ? WHERE doc_id = ?") { bindLong(1, versionId); bindText(2, id) }
-        insertCurrent(conn, versionId, id, options.eventTimeMs ?: now, options.title, text, options.uri)
+        insertCurrent(conn, versionId, id, options.eventTimeMs ?: now, options.uri)
         return id
     }
 
@@ -611,7 +611,7 @@ internal object Ops {
         val versionId = insertVersion(conn, id, txSeq, now, text, options, tombstone = false, supersedes = current.first)
         conn.update("UPDATE documents SET current_version_id = ? WHERE doc_id = ?") { bindLong(1, versionId); bindText(2, id) }
         conn.update("DELETE FROM current WHERE doc_id = ?") { bindText(1, id) }
-        insertCurrent(conn, versionId, id, options.eventTimeMs ?: now, options.title, text, options.uri)
+        insertCurrent(conn, versionId, id, options.eventTimeMs ?: now, options.uri)
         return versionId
     }
 
@@ -649,10 +649,11 @@ internal object Ops {
         return versionId
     }
 
-    private fun insertCurrent(conn: SQLiteConnection, versionId: Long, id: DocumentId, eventTimeMs: Long, title: String?, body: String, uri: String?) {
+    /** The version row must already exist: the insert trigger indexes its title and body. */
+    private fun insertCurrent(conn: SQLiteConnection, versionId: Long, id: DocumentId, eventTimeMs: Long, uri: String?) {
         try {
-            conn.update("INSERT INTO current(version_id, doc_id, event_time_ms, title, body, uri) VALUES (?, ?, ?, ?, ?, ?)") {
-                bindLong(1, versionId); bindText(2, id); bindLong(3, eventTimeMs); bindTextOrNull(4, title); bindText(5, body); bindTextOrNull(6, uri)
+            conn.update("INSERT INTO current(version_id, doc_id, event_time_ms, uri) VALUES (?, ?, ?, ?)") {
+                bindLong(1, versionId); bindText(2, id); bindLong(3, eventTimeMs); bindTextOrNull(4, uri)
             }
         } catch (e: KvidException.Io) {
             if (e.cause is SQLiteException && (e.cause as SQLiteException).message.orEmpty().contains("current.uri")) {
@@ -875,8 +876,8 @@ internal object Ops {
     fun rebuildProjection(conn: SQLiteConnection) {
         conn.exec("DELETE FROM current")
         conn.exec(
-            """INSERT INTO current(version_id, doc_id, event_time_ms, title, body, uri)
-               SELECT v.version_id, v.doc_id, v.event_time_ms, v.title, v.body, v.uri
+            """INSERT INTO current(version_id, doc_id, event_time_ms, uri)
+               SELECT v.version_id, v.doc_id, v.event_time_ms, v.uri
                FROM documents d JOIN versions v ON v.version_id = d.current_version_id WHERE v.tombstone = 0"""
         )
         conn.exec("INSERT INTO current_fts(current_fts) VALUES ('rebuild')")
@@ -904,8 +905,7 @@ internal object Ops {
         }
         problems += conn.query(
             """SELECT c.doc_id FROM current c JOIN versions v ON v.version_id = c.version_id
-               WHERE c.doc_id IS NOT v.doc_id OR c.event_time_ms IS NOT v.event_time_ms
-               OR c.title IS NOT v.title OR c.body IS NOT v.body OR c.uri IS NOT v.uri"""
+               WHERE c.doc_id IS NOT v.doc_id OR c.event_time_ms IS NOT v.event_time_ms OR c.uri IS NOT v.uri"""
         ) { "current projection content differs from authoritative version for ${getText(0)}" }
         val unchecked = if (readOnly) listOf("FTS integrity requires a writable handle") else emptyList()
         val commitSeq = conn.queryLong("SELECT commit_seq FROM kvid_meta WHERE id = 1")
