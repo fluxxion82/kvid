@@ -181,7 +181,7 @@ Open items from the measurements:
 
 1. Plain text is the default and never raises `InvalidQuery`; raw FTS5 is opt-in and passes phrases, prefixes, `NEAR` and column filters through without kvid-level guarantees.
 2. Supplementary-plane characters are classified approximately when deciding whether a plain piece has tokens; a piece made only of characters SQLite does not tokenize makes an `ALL` query match nothing.
-3. Tag filters require every listed tag; there is no any-of tag filter yet. The uri prefix uses `GLOB` with escaped wildcards and is not index-assisted.
+3. Tag filters require every listed tag; there is no any-of tag filter yet. The uri prefix compares UTF-8 bytes literally (including NUL) and is not index-assisted.
 4. Uris and metadata are stored as given, not normalized.
 5. `find` pagination stays offset-based under an expiring cursor; snippets come from the body column only.
 
@@ -202,6 +202,12 @@ Defer stemming, advanced query syntax, phrase/prefix queries, and adaptive score
 - [x] Packaging for Kotlin and Swift consumers, documented in the README and checked by the macOS CI job: `maven-publish` with POM metadata and javadoc jars stages the root module and its JVM, Android, iOS arm64 and iOS simulator arm64 publications; the release `KvidCore.xcframework` has device and simulator slices. All three platforms meet the CI acceptance checks.
 - [ ] Publish to Maven Central: needs a group ID in a verifiable namespace (`com.kvid` likely is not; `io.github.fluxxion82` would be), signing keys, and a Central Portal account. This is the owner's release decision.
 - [x] Migration statement for the experimental APIs and stored artifacts in the README: the QR/video classes are experimental and planned for `kvid-video`; their `.bin` indexes and MP4/QR artifacts are not compatible with `.kvid` stores and do not migrate automatically; data moves by re-adding text or importing JSON Lines. The README now leads with the store and the sample.
+
+**Codex review corrections (`028f348`, final CI pending).** A deterministic regression reproduced an obsolete search response replacing the list after the user typed a new query. Refreshes are now serialized and publish results or failures only while their query and selected tags are still current; separate regressions reproduce both obsolete responses. The staged publication's external consumer also failed to compile public `JsonObject` metadata because serialization was an implementation dependency; it is now an API dependency. CI compiles an isolated consumer against the root Maven coordinates. Packaging documentation now explicitly says artifacts are unsigned and a Central release still requires signing configuration.
+
+Local review verification: 63 JVM store tests, 62 iOS simulator store tests, 10 desktop sample tests and 10 iOS sample tests; zero failures and zero skips. The external consumer compiles after the dependency correction, and the Android debug sample APK builds. Merge and release are separate decisions; neither is performed by this review.
+
+Recommended decisions, awaiting the owner: verify `sterlingalbury.com` through Central's DNS TXT challenge and use `com.sterlingalbury`; add an opt-in final-term prefix mode for plain queries and enable it in the sample; use iOS 18.5 as the sample minimum until an older runtime is validated, without changing the library minimum. No namespace, query API or iOS target change is made by these review corrections. Signing keys and Portal credentials belong in release secrets, with offline backups; no credentials are required for local staging checks.
 
 Library changes in this phase:
 
