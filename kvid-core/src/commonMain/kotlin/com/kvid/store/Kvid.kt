@@ -79,7 +79,7 @@ class Kvid private constructor(
     private var closed = false
     private var savepointCounter = 0
 
-    internal data class Meta(val formatMajor: Int, val formatMinor: Int, val uniqueUri: Boolean)
+    internal data class Meta(val formatMajor: Int, val formatMinor: Int, val uniqueUri: Boolean, val schemaVersion: Int = Schema.SCHEMA_VERSION)
 
     // ------------------------------------------------------------------ lifecycle
 
@@ -125,8 +125,11 @@ class Kvid private constructor(
                 val conn = SqliteErrors.guard("open $canonical") { driver.open(canonical, SQLITE_OPEN_READWRITE) }
                 try {
                     conn.exec("PRAGMA busy_timeout = ${options.busyTimeoutMs}")
-                    val meta = validate(conn, readOnly = false)
+                    val validated = validate(conn, readOnly = false)
                     configureWritable(conn, options)
+                    // Migrations run on the configured connection, so foreign keys and durability apply.
+                    if (validated.schemaVersion < Schema.SCHEMA_VERSION) migrate(conn, validated.schemaVersion)
+                    val meta = validated.copy(schemaVersion = Schema.SCHEMA_VERSION)
                     conn.exec("UPDATE kvid_meta SET clean_close = 0")
                     Kvid(canonical, conn, readOnly = false, options, meta)
                 } catch (t: Throwable) {
@@ -200,19 +203,34 @@ class Kvid private constructor(
             }
             if (userVersion < Schema.SCHEMA_VERSION) {
                 if (readOnly) throw KvidException.UnsupportedFormat("schema version $userVersion needs migration; open writable first", major, minor)
-                migrate(conn, userVersion)
+                if ((userVersion until Schema.SCHEMA_VERSION).any { it !in Schema.migrations }) {
+                    // There is no path from this version. Never relabel unknown structures as current.
+                    throw KvidException.UnsupportedFormat("no migration exists from schema $userVersion to ${Schema.SCHEMA_VERSION}", major, minor)
+                }
             }
             if (row[3] == 0L) {
                 val check = conn.queryText("PRAGMA quick_check")
                 if (check != "ok") throw KvidException.Corrupt("quick_check after unclean close: $check")
             }
-            return Meta(major, minor, row[2] == 1L)
+            return Meta(major, minor, row[2] == 1L, userVersion)
         }
 
+        /** Forward-only migrations, each in its own transaction with its version bump (contract, section 4). */
         private fun migrate(conn: SQLiteConnection, from: Int) {
-            // Forward-only migrations, each in its own transaction with the version bump (contract, section 4).
-            // There is no supported older schema yet. Never relabel unknown structures as v1.
-            throw KvidException.UnsupportedFormat("no migration exists from schema $from to ${Schema.SCHEMA_VERSION}", Schema.FORMAT_MAJOR, Schema.FORMAT_MINOR)
+            for (version in from until Schema.SCHEMA_VERSION) {
+                val statements = Schema.migrations[version]
+                    ?: throw KvidException.UnsupportedFormat("no migration exists from schema $version", Schema.FORMAT_MAJOR, Schema.FORMAT_MINOR)
+                conn.exec("BEGIN IMMEDIATE")
+                try {
+                    if (conn.queryLong("PRAGMA user_version").toInt() != version) throw KvidException.Locked("schema changed during migration")
+                    statements.forEach { conn.exec(it) }
+                    conn.exec("PRAGMA user_version = ${version + 1}")
+                    conn.exec("COMMIT")
+                } catch (t: Throwable) {
+                    runCatching { conn.exec("ROLLBACK") }
+                    throw t
+                }
+            }
         }
 
         private fun canonicalize(path: String, mustExist: Boolean): String {
@@ -229,6 +247,9 @@ class Kvid private constructor(
         }
 
         internal fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
+
+        /** Largest [indexVectors] batch. */
+        const val MAX_EMBED_BATCH = 256
     }
 
     /**
@@ -266,6 +287,108 @@ class Kvid private constructor(
     suspend fun find(query: String, options: FindOptions = FindOptions()): Page<Hit> = read { Ops.find(conn, limits, query, options) }
     /** Tags of live current versions, most used first, ties by tag; at most [limit], capped by [Limits.pageSize]. */
     suspend fun tagCounts(limit: Int = 100): List<TagCount> = read { Ops.tagCounts(conn, limits, limit) }
+
+    // ------------------------------------------------------------------ vectors (optional)
+
+    /** The spec recorded with the store's vectors, or null before any vector was indexed. */
+    suspend fun embeddingSpec(): EmbeddingSpec? = read { Ops.embeddingSpec(conn) }
+
+    /** The recorded spec and how many live documents have, or still lack, a vector. */
+    suspend fun vectorStatus(): VectorStatus = read { Ops.vectorStatus(conn) }
+
+    /**
+     * Embeds live documents that have no vector yet, in batches of [batchSize], until none remain or
+     * [maxDocuments] were embedded. The text of a version is its title, a blank line and its body.
+     *
+     * The embedder runs outside the store lock, so reads and writes continue meanwhile; each batch is
+     * then written in its own short transaction, skipping versions that were superseded or deleted while
+     * it was embedding. The first batch records the embedder's spec; a different spec raises
+     * [KvidException.EmbeddingMismatch] before anything is written. Vectors are derived data: deleting
+     * them never loses documents, and lexical search never depends on them.
+     */
+    suspend fun indexVectors(embedder: Embedder, batchSize: Int = 32, maxDocuments: Int = Int.MAX_VALUE): VectorIndexReport {
+        require(batchSize in 1..MAX_EMBED_BATCH) { "batchSize must be within 1..$MAX_EMBED_BATCH" }
+        require(maxDocuments >= 0) { "maxDocuments must not be negative" }
+        rejectInsideTransaction("indexVectors")
+        if (readOnly) throw KvidException.ReadOnly("store opened read-only: $path")
+        val spec = embedder.spec
+        Ops.requireSpec(read { Ops.embeddingSpec(conn) }, spec)
+        var embedded = 0
+        while (embedded < maxDocuments) {
+            val batch = read { Ops.pendingInputs(conn, minOf(batchSize, maxDocuments - embedded)) }
+            if (batch.isEmpty()) break
+            val vectors = embedder.embed(batch.map { it.second })
+            if (vectors.size != batch.size) throw KvidException.InvalidVector("the embedder returned ${vectors.size} vectors for ${batch.size} texts")
+            val prepared = batch.mapIndexed { i, (versionId, _) -> versionId to VectorCodec.prepare(spec, vectors[i], "the vector for version $versionId") }
+            embedded += maintenanceWrite { Ops.storeVectors(conn, spec, prepared) }
+        }
+        return VectorIndexReport(embedded, read { Ops.vectorStatus(conn).pending })
+    }
+
+    /** Deletes every vector and the recorded spec, so a different embedding model can be indexed. */
+    suspend fun resetVectors() {
+        if (readOnly) throw KvidException.ReadOnly("store opened read-only: $path")
+        maintenanceWrite { Ops.resetVectors(conn) }
+    }
+
+    /**
+     * Exact nearest-neighbour search over live embedded documents: the query is embedded with [embedder]
+     * and compared with every stored vector passing the filters, best first, ties by newer version.
+     * Returns an empty page while the store has no vectors; raises [KvidException.EmbeddingMismatch] if
+     * the embedder's spec differs from the recorded one. [Hit.snippet] is null.
+     */
+    suspend fun findSimilar(query: String, embedder: Embedder, options: SimilarOptions = SimilarOptions()): Page<Hit> {
+        if (query.encodeToByteArray().size > limits.queryBytes) throw KvidException.LimitExceeded("query exceeds ${limits.queryBytes} bytes")
+        val text = normalizeNfc(query)
+        val recorded = read { Ops.embeddingSpec(conn) }
+        Ops.requireSpec(recorded, embedder.spec)
+        val vector = if (recorded == null) null else embedQuery(embedder, text)
+        return read { Ops.findSimilar(conn, limits, embedder.spec, vector, "text:$text", options) }
+    }
+
+    /** As [findSimilar] with a query vector the caller already has, produced by a model with [spec]. */
+    suspend fun findSimilar(vector: FloatArray, spec: EmbeddingSpec, options: SimilarOptions = SimilarOptions()): Page<Hit> {
+        val identity = "vector:" + Float32Blob.encode(vector).joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
+        return read { Ops.findSimilar(conn, limits, spec, vector, identity, options) }
+    }
+
+    /**
+     * Hybrid search: reciprocal rank fusion of [find]'s lexical ranking and [findSimilar]'s vector
+     * ranking, each over its top [FusionOptions.candidates], with [options]' query syntax and filters
+     * applied to both. [Hit.score] is the fused score and [Hit.snippet] comes from the lexical match when
+     * there is one. Until the store has vectors, results follow the lexical ranking alone.
+     */
+    suspend fun findHybrid(
+        query: String, embedder: Embedder, options: FindOptions = FindOptions(), fusion: FusionOptions = FusionOptions()
+    ): Page<Hit> {
+        if (query.encodeToByteArray().size > limits.queryBytes) throw KvidException.LimitExceeded("query exceeds ${limits.queryBytes} bytes")
+        val recorded = read { Ops.embeddingSpec(conn) }
+        Ops.requireSpec(recorded, embedder.spec)
+        val vector = if (recorded == null || query.isBlank()) null else embedQuery(embedder, normalizeNfc(query))
+        return read { Ops.findHybrid(conn, limits, query, embedder.spec, vector, options, fusion) }
+    }
+
+    private suspend fun embedQuery(embedder: Embedder, text: String): FloatArray =
+        embedder.embed(listOf(text)).singleOrNull() ?: throw KvidException.InvalidVector("the embedder did not return exactly one query vector")
+
+    /** A short write transaction outside the Transaction API, for derived data. Expires cursors. */
+    private suspend fun <T> maintenanceWrite(block: () -> T): T {
+        rejectInsideTransaction("vector maintenance")
+        return gate.withLock {
+            ensureOpen()
+            withContext(NonCancellable + dispatcher) {
+                conn.exec("BEGIN IMMEDIATE")
+                try {
+                    val result = block()
+                    conn.exec("UPDATE kvid_meta SET commit_seq = commit_seq + 1 WHERE id = 1")
+                    conn.exec("COMMIT")
+                    result
+                } catch (t: Throwable) {
+                    runCatching { conn.exec("ROLLBACK") }; throw t
+                }
+            }
+        }
+    }
     suspend fun stats(): StoreStats = read { Ops.stats(conn, meta) }
 
     private val limits get() = options.limits
@@ -650,6 +773,7 @@ internal object Ops {
         val versionId = insertVersion(conn, id, txSeq, now, text, options, tombstone = false, supersedes = current.first)
         conn.update("UPDATE documents SET current_version_id = ? WHERE doc_id = ?") { bindLong(1, versionId); bindText(2, id) }
         conn.update("DELETE FROM current WHERE doc_id = ?") { bindText(1, id) }
+        conn.update("DELETE FROM version_vectors WHERE version_id = ?") { bindLong(1, current.first) }
         insertCurrent(conn, versionId, id, options.eventTimeMs ?: now, options.uri)
         return versionId
     }
@@ -661,6 +785,7 @@ internal object Ops {
         val versionId = insertVersion(conn, id, txSeq, now, "", PutOptions(eventTimeMs = now), tombstone = true, supersedes = current.first)
         conn.update("UPDATE documents SET current_version_id = ? WHERE doc_id = ?") { bindLong(1, versionId); bindText(2, id) }
         conn.update("DELETE FROM current WHERE doc_id = ?") { bindText(1, id) }
+        conn.update("DELETE FROM version_vectors WHERE version_id = ?") { bindLong(1, current.first) }
         return versionId
     }
 
@@ -862,6 +987,136 @@ internal object Ops {
         return Page(page, next)
     }
 
+    // ---- vectors (contract, section 8): derived data for current versions, one embedding spec per store
+
+    fun embeddingSpec(conn: SQLiteConnection): EmbeddingSpec? =
+        conn.queryOne("SELECT embedding_config FROM kvid_meta WHERE id = 1") { textOrNull(0) }?.let { VectorCodec.decodeSpec(it) }
+
+    fun vectorStatus(conn: SQLiteConnection): VectorStatus {
+        val embedded = conn.queryLong("SELECT count(*) FROM current c JOIN version_vectors x ON x.version_id = c.version_id")
+        return VectorStatus(embeddingSpec(conn), embedded, conn.queryLong("SELECT count(*) FROM current") - embedded)
+    }
+
+    /** Embedding inputs for up to [count] live versions that have no vector, oldest version first. */
+    fun pendingInputs(conn: SQLiteConnection, count: Int): List<Pair<Long, String>> {
+        val ids = conn.query(
+            "SELECT c.version_id FROM current c WHERE NOT EXISTS (SELECT 1 FROM version_vectors x WHERE x.version_id = c.version_id) ORDER BY c.version_id LIMIT ?",
+            { bindLong(1, count.toLong()) }
+        ) { getLong(0) }
+        return loadVersions(conn, ids).map { it.versionId to embeddingInput(it.title, it.body) }
+    }
+
+    fun requireSpec(recorded: EmbeddingSpec?, provided: EmbeddingSpec) {
+        if (recorded != null && recorded != provided) {
+            throw KvidException.EmbeddingMismatch("the store's vectors were made with $recorded, not $provided; call resetVectors() to change models", recorded, provided)
+        }
+    }
+
+    /** Stores prepared vectors for versions that are still current and unembedded; records the spec on first use. */
+    fun storeVectors(conn: SQLiteConnection, spec: EmbeddingSpec, vectors: List<Pair<Long, FloatArray>>): Int {
+        val recorded = embeddingSpec(conn)
+        requireSpec(recorded, spec)
+        if (recorded == null) conn.update("UPDATE kvid_meta SET embedding_config = ? WHERE id = 1") { bindText(1, VectorCodec.encodeSpec(spec)) }
+        var written = 0
+        for ((versionId, vector) in vectors) {
+            conn.update("INSERT OR IGNORE INTO version_vectors(version_id, vector) SELECT version_id, ? FROM current WHERE version_id = ?") {
+                bindBlob(1, Float32Blob.encode(vector)); bindLong(2, versionId)
+            }
+            written += conn.queryLong("SELECT changes()").toInt()
+        }
+        return written
+    }
+
+    fun resetVectors(conn: SQLiteConnection) {
+        conn.exec("DELETE FROM version_vectors")
+        conn.exec("UPDATE kvid_meta SET embedding_config = NULL WHERE id = 1")
+    }
+
+    /** Every live embedded version passing [filters], scored against a prepared query, best first. */
+    private fun rankByVector(conn: SQLiteConnection, spec: EmbeddingSpec, query: FloatArray, filters: Filters): List<Pair<Long, Double>> {
+        val bytes = spec.dimensions * 4L
+        val sql = buildString {
+            append("SELECT c.version_id, length(x.vector), CASE WHEN length(x.vector) = ? THEN x.vector END FROM current c JOIN version_vectors x ON x.version_id = c.version_id WHERE 1=1")
+            filters.appendSql(this)
+        }
+        val scored = conn.query(sql, { bindLong(1, bytes); filters.bind(this, 2) }) {
+            val versionId = getLong(0)
+            if (getLong(1) != bytes) throw KvidException.Corrupt("vector of version $versionId has ${getLong(1)} bytes, the spec needs $bytes")
+            versionId to VectorCodec.dot(query, Float32Blob.decode(getBlob(2)))
+        }
+        return scored.sortedWith(compareByDescending<Pair<Long, Double>> { it.second }.thenByDescending { it.first })
+    }
+
+    fun findSimilar(
+        conn: SQLiteConnection, limits: Limits, spec: EmbeddingSpec, vector: FloatArray?, queryIdentity: String, options: SimilarOptions
+    ): Page<Hit> {
+        val limit = options.limit.coerceIn(1, limits.pageSize)
+        val filters = Filters(limits, options.sinceEventTimeMs, options.untilEventTimeMs, options.tags, options.uriPrefix)
+        val recorded = embeddingSpec(conn)
+        requireSpec(recorded, spec)
+        val prepared = vector?.let { VectorCodec.prepare(spec, it, "query vector") }
+        val fingerprint = Json.encodeToString(listOf("similar", VectorCodec.encodeSpec(spec), queryIdentity, limit.toString()) + filters.fingerprint())
+        Cursor.validateFingerprint(fingerprint)
+        val cursor = options.cursor?.let { Cursor.parse(conn, it, fingerprint) }
+        val offset = cursor?.key1 ?: 0L
+        // No vectors yet, or the store gained its first ones after the caller decided not to embed.
+        if (recorded == null || prepared == null) return Page(emptyList(), null)
+        val ranked = rankByVector(conn, spec, prepared, filters)
+        val window = ranked.drop(offset.toInt()).take(limit)
+        val page = loadVersions(conn, window.map { it.first }).zip(window) { v, (_, score) -> Hit(Document(v.documentId, v), score, null) }
+        val next = if (ranked.size > offset + limit) Cursor(conn, fingerprint, offset + limit, 0).encode() else null
+        return Page(page, next)
+    }
+
+    /**
+     * Reciprocal rank fusion of the lexical [find] ranking and the vector ranking (contract, section 7),
+     * each limited to [FusionOptions.candidates]. Documents found by both rankings appear once.
+     */
+    fun findHybrid(
+        conn: SQLiteConnection, limits: Limits, query: String, spec: EmbeddingSpec, vector: FloatArray?,
+        options: FindOptions, fusion: FusionOptions
+    ): Page<Hit> {
+        val limit = options.limit.coerceIn(1, limits.pageSize)
+        val filters = Filters(limits, options.sinceEventTimeMs, options.untilEventTimeMs, options.tags, options.uriPrefix)
+        val recorded = embeddingSpec(conn)
+        requireSpec(recorded, spec)
+        val fingerprint = Json.encodeToString(
+            listOf(
+                "hybrid", options.syntax.name, options.match.name, options.prefixLastTerm.toString(), normalizeNfc(query),
+                VectorCodec.encodeSpec(spec), fusion.toString(), limit.toString()
+            ) + filters.fingerprint()
+        )
+        Cursor.validateFingerprint(fingerprint)
+        val cursor = options.cursor?.let { Cursor.parse(conn, it, fingerprint) }
+        val offset = cursor?.key1 ?: 0L
+
+        val lexical = find(conn, limits, query, options.copy(limit = fusion.candidates, cursor = null)).items
+        val semantic = if (recorded == null || vector == null) emptyList() else {
+            rankByVector(conn, spec, VectorCodec.prepare(spec, vector, "query vector"), filters).take(fusion.candidates)
+        }
+        val fused = HashMap<Long, Double>()
+        // A ranking with weight 0 contributes nothing, including its documents.
+        if (fusion.lexicalWeight > 0.0) lexical.forEachIndexed { i, hit ->
+            val versionId = hit.document.version.versionId
+            fused[versionId] = (fused[versionId] ?: 0.0) + fusion.lexicalWeight / (fusion.k + i + 1)
+        }
+        if (fusion.semanticWeight > 0.0) semantic.forEachIndexed { i, (versionId, _) ->
+            fused[versionId] = (fused[versionId] ?: 0.0) + fusion.semanticWeight / (fusion.k + i + 1)
+        }
+        val ranked = fused.entries.sortedWith(compareByDescending<Map.Entry<Long, Double>> { it.value }.thenByDescending { it.key })
+        val window = ranked.drop(offset.toInt()).take(limit)
+
+        val lexicalHits = lexical.associateBy { it.document.version.versionId }
+        val loaded = loadVersions(conn, window.map { it.key }.filter { it !in lexicalHits }).associateBy { it.versionId }
+        val page = window.map { (versionId, score) ->
+            val lexicalHit = lexicalHits[versionId]
+            val version = lexicalHit?.document?.version ?: loaded.getValue(versionId)
+            Hit(Document(version.documentId, version), score, lexicalHit?.snippet)
+        }
+        val next = if (ranked.size > offset + limit) Cursor(conn, fingerprint, offset + limit, 0).encode() else null
+        return Page(page, next)
+    }
+
     fun tagCounts(conn: SQLiteConnection, limits: Limits, limit: Int): List<TagCount> = conn.query(
         """SELECT CASE WHEN length(t.tag) <= ${Limits.MAX_TAG_CODE_POINTS} AND octet_length(t.tag) <= ${4 * Limits.MAX_TAG_CODE_POINTS} THEN t.tag END,
                   length(t.tag), octet_length(t.tag), count(*)
@@ -987,6 +1242,17 @@ internal object Ops {
             """SELECT c.doc_id FROM current c JOIN versions v ON v.version_id = c.version_id
                WHERE c.doc_id IS NOT v.doc_id OR c.event_time_ms IS NOT v.event_time_ms OR c.uri IS NOT v.uri"""
         ) { "current projection content differs from authoritative version for ${getText(0)}" }
+        val specText = conn.queryOne("SELECT embedding_config FROM kvid_meta WHERE id = 1") { textOrNull(0) }
+        if (specText == null) {
+            if (conn.queryLong("SELECT count(*) FROM version_vectors") > 0) problems += "vectors exist without a recorded embedding spec"
+        } else {
+            val spec = try { VectorCodec.decodeSpec(specText) } catch (e: KvidException.Corrupt) { problems += e.message.orEmpty(); null }
+            if (spec != null) {
+                problems += conn.query("SELECT version_id FROM version_vectors WHERE length(vector) <> ?", { bindLong(1, spec.dimensions * 4L) }) {
+                    "vector of version ${getLong(0)} does not have ${spec.dimensions} dimensions"
+                }
+            }
+        }
         val unchecked = if (readOnly) listOf("FTS integrity requires a writable handle") else emptyList()
         val commitSeq = conn.queryLong("SELECT commit_seq FROM kvid_meta WHERE id = 1")
         problems += conn.query("SELECT version_id FROM versions WHERE seq > ?", { bindLong(1, commitSeq) }) { "version ${getLong(0)} has seq above commit_seq $commitSeq" }

@@ -10,6 +10,7 @@ It started as a Kotlin port of [memvid](https://github.com/memvid/memvid). memvi
 - Versioned documents: updates and deletes keep history; `get(id, asOfSeq)` reads a document as it was.
 - Offline full-text search with BM25 ranking, snippets, Unicode case and accent folding, and plain-text queries by default. `FindOptions(prefixLastTerm = true)` lets the last word match as a prefix for search while typing.
 - Filters shared by listing and search: event-time range, tags (all required) and uri prefix; tag counts for filter UIs.
+- Optional semantic and hybrid search: plug in an `Embedder`, and the store records the model's identity, keeps vectors as derived data, refuses vectors from a different model, and fuses lexical and vector rankings. No model ships with the core library.
 - Portable files: `snapshot()` publishes a consistent, verified copy; `verify()` checks the whole store; JSON Lines export and import.
 - Typed failures (`KvidException` with stable codes) and enforced size bounds.
 

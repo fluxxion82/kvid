@@ -19,9 +19,10 @@ internal object Schema {
     const val FORMAT_MINOR = 1
     /**
      * `PRAGMA user_version`; bump with every forward migration. Schema 2 removed the duplicated title and
-     * body from `current`; schema 1 existed only before any release and has no migration.
+     * body from `current`; schema 1 existed only before any release and has no migration. Schema 3 adds
+     * `version_vectors` (migration from 2 in [migrations]).
      */
-    const val SCHEMA_VERSION = 2
+    const val SCHEMA_VERSION = 3
     const val CREATED_BY = "kvid-core 0.1.0"
 
     val createStatements: List<String> = listOf(
@@ -73,6 +74,7 @@ internal object Schema {
             uri TEXT
         )""",
         "CREATE INDEX current_event_time ON current(event_time_ms, version_id)",
+        VERSION_VECTORS,
         """CREATE VIEW current_content AS
             SELECT c.version_id AS version_id, v.title AS title, v.body AS body
             FROM current c JOIN versions v ON v.version_id = c.version_id""",
@@ -98,4 +100,20 @@ internal object Schema {
     )
 
     const val UNIQUE_URI_INDEX = "CREATE UNIQUE INDEX current_unique_uri ON current(uri) WHERE uri IS NOT NULL"
+
+    /**
+     * Derived embedding vectors, one per embedded version, as little-endian float32 blobs. Only current
+     * versions are searched; a version's vector is removed when a write supersedes or deletes it, and
+     * retention removes vectors with their versions. The embedding configuration that produced them is
+     * `kvid_meta.embedding_config`.
+     */
+    private const val VERSION_VECTORS = """CREATE TABLE version_vectors(
+            version_id INTEGER PRIMARY KEY NOT NULL REFERENCES versions(version_id) ON DELETE CASCADE,
+            vector BLOB NOT NULL
+        )"""
+
+    /** Statements upgrading schema `n` to `n + 1`, applied in one transaction with the version bump. */
+    val migrations: Map<Int, List<String>> = mapOf(
+        2 to listOf(VERSION_VECTORS)
+    )
 }
