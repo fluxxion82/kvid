@@ -240,16 +240,31 @@ Open items:
 
 **Handoff after Phase 4.** Start code work from `main` at `bc55ded` or later, and read planning from this branch separately. Phase 4 review found no remaining code blockers; the merged `phase-4-mobile-sample` branch is removed as part of cleanup. Review the semantic-search scope below before implementation. Namespace verification, Portal credentials/signing, API 23 and physical-device evidence, peak memory, and remaining durability fault-injection work are still open; merging Phase 4 does not mark them complete. The merge commit triggers its own main CI run; the identical phase tree already has passing CI.
 
-- [ ] Support one real embedding implementation first; verify tokenizer, pooling, normalization, and output parity across supported platforms.
-- [ ] Record the full embedding configuration in the file: model/revision or hash, tokenizer revision, dimensions, pooling, normalization, and distance metric. Refuse to mix models.
-- [ ] Treat embeddings as derived data; define missing-model behavior and explicit re-embedding/index migration.
-- [ ] Keep exact vector search as the correctness baseline and initial implementation.
+**Phase 5 status (October 5).** The store-side vector layer is implemented on branch `phase-5-semantic-search` (one commit on `main` at `bc55ded`; CI run 37256251770 green at `2c32e74`: JVM and Android host tests, Android emulator with 72 device tests and the sample smoke run, iOS simulator tests, the optimized measurement, sample build and smoke run, packaging). It works with any `Embedder` and ships no model. The runtime for the first real model is proposed in [ADR 0002](adr/0002-embedding-runtime.md) (ONNX Runtime with `BAAI/bge-small-en-v1.5` in an optional `kvid-embed-onnx` module) and awaits owner and Codex acceptance before implementation.
+
+- [ ] Support one real embedding implementation first; verify tokenizer, pooling, normalization, and output parity across supported platforms. Proposed in ADR 0002.
+- [x] Record the full embedding configuration in the file: model/revision or hash, tokenizer revision, dimensions, pooling, normalization, and distance metric. Refuse to mix models. `EmbeddingSpec` in `kvid_meta.embedding_config`; `EmbeddingMismatch` before the model runs or anything is written.
+- [x] Treat embeddings as derived data; define missing-model behavior and explicit re-embedding/index migration. Vectors are removed when a write supersedes their version; without vectors, semantic search is empty and hybrid search is lexical, and no model runs; `resetVectors()` switches models; schema 2 stores migrate to schema 3 on a writable open (the first real migration).
+- [x] Keep exact vector search as the correctness baseline and initial implementation. `findSimilar` scans every live embedded version with the shared filters, cursors and tie order; tests compare it with a brute-force reference.
 - [ ] Introduce HNSW only after measurements establish a benefit. Evaluate recall@k versus latency and memory across parameters and multiple seeded datasets. The current implementation is a reference, not a release candidate: it recomputes the farthest result inside its inner loop and persists as CSV text.
 - [ ] Benchmark graph construction and query behavior; avoid fragile wall-clock assertions in ordinary unit tests.
-- [ ] Add hybrid search with document-level deduplication and measured reciprocal-rank-fusion settings.
+- [ ] Add hybrid search with document-level deduplication and measured reciprocal-rank-fusion settings. `findHybrid` is implemented (k = 60, 100 candidates per ranking, weights; each document once; lexical snippets kept) and tested against an independent fusion calculation; the settings still need measuring on an evaluation corpus with a real model.
 - [ ] Add token-aware chunking when the real tokenizer is available.
 
 ONNX Runtime with a shared model (for example `bge-small-en-v1.5`, 384 dimensions) is the candidate for portable vectors across platforms, not a required default. Platform-native (Apple `NLContextualEmbedding`) and remote models may be separate providers with distinct identities. Do not impose a model download on lexical-only users.
+
+Store-side vector measurements at `2c32e74` (the Milestone 3 corpus, 5,100 documents, pseudo-random 384-dimension vectors standing in for `bge-small`; store costs only, no model inference; medians in ms):
+
+| Platform | Store all vectors | Exact similar | Hybrid | File with vectors |
+|---|---|---|---|---|
+| JVM (Ubuntu) | 367 | 16.0 | 21.8 | 30.6 MB (20.1 MB without) |
+| Android API 35 emulator | 601 | 38.2 | 48.9 | 30.6 MB |
+| iOS simulator, optimized binary | 332 | 33.8 | 40.9 | 30.6 MB |
+| iOS simulator, debug binary | 5,154 | 1,232 | 1,258 | 30.6 MB |
+
+At this size exact search is well within interactive latency on every target, so HNSW is not justified yet. Vectors add about 2 KB per document (1.5 KB of float32 plus page overhead).
+
+Next steps, in order: accept or revise ADR 0002; then the pure-Kotlin WordPiece tokenizer with exact parity against Hugging Face `tokenizers`; then the ONNX Runtime embedder for JVM and Android with embedding parity against Python ONNX Runtime; then iOS through cinterop; then an evaluation corpus to measure semantic and hybrid retrieval and tune fusion; then semantic search in the sample.
 
 **Exit criterion:** semantic retrieval improves a representative evaluation corpus and has explicit model compatibility and resource costs.
 

@@ -36,7 +36,7 @@ SQLite owns transaction journal recovery. kvid validates application identity an
 
 SQLite does not inspect every page on every read. An invalid header is not evidence that arbitrary corruption can never return readable rows. Detected corruption must surface explicitly; unaccessed corruption requires verification. Refuse non-kvid databases as `NotAStore`, and damaged recognized stores as `Corrupt`; document ambiguous invalid-header classification.
 
-`user_version` and a `kvid_meta` row identify schema and format versions. Refuse unsupported newer major **or minor** versions for writable opens. Read-only compatibility with newer formats requires an explicit supported capability set, not merely ignoring columns. Run each forward migration and its version update transactionally; a failed migration leaves the previous schema intact.
+`user_version` and a `kvid_meta` row identify schema and format versions. Refuse unsupported newer major **or minor** versions for writable opens. Read-only compatibility with newer formats requires an explicit supported capability set, not merely ignoring columns. Run each forward migration and its version update transactionally; a failed migration leaves the previous schema intact. Migrations run when a store is opened writable, after the connection is configured (foreign keys, journal mode, synchronous). A read-only open of an older schema fails with `UnsupportedFormat` and asks for a writable open first. Schema 2 to 3 (adding `version_vectors`) is the first migration; schemas with no migration path are refused unchanged.
 
 ## 5. Concurrency and errors
 
@@ -44,7 +44,7 @@ Coordinate writable handles by canonical path within a process, with one seriali
 
 SQLite serializes write transactions across processes, not writable opens: a second process may open successfully and subsequently contend at BEGIN or a write. Configure a busy timeout (default 5 seconds); it is a contention policy, not a strict end-to-end elapsed-time bound. DELETE-mode readers can block writer commits; WAL has different reader/writer behavior and remains deferred.
 
-Use typed `KvidException` subclasses with stable kvid code strings, preserving underlying causes. Proposed mappings: `DiskFull`, `Io`, `Locked`, `NotAStore`, `UnsupportedFormat`, `Corrupt`, `LimitExceeded`, `HistoryUnavailable`, `CursorExpired`, and `InvalidQuery` (an opt-in FTS5 expression the engine rejected). Cancellation propagates unchanged. Bounds fail before writes; lock failures roll back staged work. For FULL, explicitly clean up and verify rollback, as the spike does for its injected case.
+Use typed `KvidException` subclasses with stable kvid code strings, preserving underlying causes. Proposed mappings: `DiskFull`, `Io`, `Locked`, `NotAStore`, `UnsupportedFormat`, `Corrupt`, `LimitExceeded`, `HistoryUnavailable`, `CursorExpired`, `InvalidQuery` (an opt-in FTS5 expression the engine rejected), `EmbeddingMismatch` (an embedder whose spec differs from the store's recorded spec) and `InvalidVector` (wrong dimensions or a non-finite value). Cancellation propagates unchanged. Bounds fail before writes; lock failures roll back staged work. For FULL, explicitly clean up and verify rollback, as the spike does for its injected case.
 
 An I/O or sync failure can leave the commit outcome uncertain. Mark the connection unusable, reopen/recover, and resolve through a durable operation identifier before retrying; do not promise that every failed commit leaves precisely the previous state. SQLite atomicity and certainty of the caller's observed outcome are different guarantees.
 
@@ -72,6 +72,8 @@ The serialized query/filter identity has a combined UTF-8 budget of 256 KiB (inc
 
 **Filters.** `list` and `find` share one filter set, and every supplied filter must hold: event-time range `[since, until)`, every listed tag on the current version (normalized, deduplicated, bounded like write tags), and a uri prefix compared literally and case-sensitively (an empty prefix selects documents that have a uri).
 
+**Semantic and hybrid search.** `findSimilar` is exact: it scores every live embedded version passing the filters (cosine or dot product, higher is better) and orders by `(score desc, versionId desc)`; with no stored vectors it returns an empty page without running the model. `findHybrid` applies reciprocal rank fusion to the lexical ranking (with `FindOptions`' syntax, match, prefix and filters) and the vector ranking (same filters), each limited to the top `candidates` (default 100): a document scores the sum of `weight / (k + rank)` over the rankings that contain it (k = 60 by default), appears once, and keeps the lexical snippet when it has one. A ranking with weight 0 is left out; without stored vectors the result follows the lexical ranking. Fusion settings remain to be measured on an evaluation corpus. Cursors bind to the spec, the query (text, or the exact vector bytes) and the fusion settings, and expire like other cursors.
+
 List by `(eventTime desc, versionId desc)` and search by `(score desc, versionId desc)`. Scores are FTS5 `bm25()` negated: k1 1.2, b 0.75, unit column weights, document length summed over title and body, IDF floored at 1e-6. Event-time filters use event time. Cursors encode the last key, committed sequence, retention/schema epoch, and query/filter fingerprint (syntax, match mode, compiled query, page size and every filter). Invalidate them with `CursorExpired` after a committed write or compaction. Ranking and current visibility change after writes, so cross-commit no-skip/no-duplicate guarantees require a retained read snapshot and are deferred. Cursors are opaque and versioned.
 
 ## 8. Bounds and encoding
@@ -83,6 +85,8 @@ Validate stored byte lengths before materializing large TEXT/BLOB fields; SQLite
 Bodies are uncompressed UTF-8 TEXT. Optional blob compression uses zlib-wrapped DEFLATE (RFC 1950), with explicit raw/deflate encoding. Cross-platform fixture tests remain required. This does not repair the independent video's existing `GZ:` gzip/raw-DEFLATE mismatch.
 
 Vectors use little-endian float32 blobs and include model/tokenizer revisions, dimensions, pooling, normalization and metric. Validate dimensions and reject non-finite values for retrieval; codec preservation of NaN payloads is a wire-format test, not permission to index NaNs. Model mismatch may disable vectors or require re-embedding; lexical access remains available.
+
+**Vectors as implemented (schema 3).** `version_vectors` holds at most one vector per version, keyed by version id with cascading deletion under retention. A write that supersedes or deletes a version removes that version's vector in the same transaction; only current versions are searched, and their vectors survive projection rebuilds. `kvid_meta.embedding_config` records the `EmbeddingSpec` (model, weights digest, tokenizer, dimensions up to 8,192, pooling, normalization, metric, input-token limit) with the first stored vectors. Every later indexing or semantic query must present an equal spec, otherwise `EmbeddingMismatch` is raised before the model runs or anything is written; `resetVectors()` deletes all vectors and the spec. The embedded text of a version is its title, a blank line and its body (the body alone without a title). Cosine vectors are L2-normalized before storage and queries; a zero vector stays zero. Indexing runs the embedder outside the store lock and stores each batch in its own transaction, skipping versions that stopped being current meanwhile; each batch commits like any write and expires cursors. `verify()` reports vectors without a recorded spec, an unreadable spec, and vectors of the wrong length.
 
 ## 9. Encryption reservation
 
@@ -114,6 +118,8 @@ class Kvid private constructor(...) {
     suspend fun close()
 }
 ```
+
+Optional vectors (section 8) add `embeddingSpec()`, `vectorStatus()`, `indexVectors(embedder, batchSize, maxDocuments)`, `resetVectors()`, `findSimilar(query, embedder, SimilarOptions)`, `findSimilar(vector, spec, SimilarOptions)` and `findHybrid(query, embedder, FindOptions, FusionOptions)`. `tagCounts(limit)` returns tags of live current versions with document counts. None of these is on `Transaction`: embedding never runs inside a write transaction.
 
 `Transaction` exposes scoped writes, reads and nested transaction blocks only. Snapshot, vacuum and close are outside its surface. Types and defaults remain proposed; the real implementation must test ownership and lifecycle before publishing this API.
 
