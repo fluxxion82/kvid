@@ -85,6 +85,12 @@ data class FindOptions(
     val syntax: QuerySyntax = QuerySyntax.PLAIN,
     /** [QuerySyntax.PLAIN] only; ignored for [QuerySyntax.FTS5]. */
     val match: MatchMode = MatchMode.ALL,
+    /**
+     * [QuerySyntax.PLAIN] only: the last searchable piece also matches words that start with it, so
+     * `budget pla` finds "budget planning". For search while typing. Off by default: every piece
+     * matches whole words. Ignored for [QuerySyntax.FTS5], which has its own `*` prefix syntax.
+     */
+    val prefixLastTerm: Boolean = false,
     val sinceEventTimeMs: Long? = null,
     val untilEventTimeMs: Long? = null,
     val tags: List<String> = emptyList(),

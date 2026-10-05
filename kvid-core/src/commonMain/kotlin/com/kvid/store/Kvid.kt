@@ -825,7 +825,7 @@ internal object Ops {
         val limit = options.limit.coerceIn(1, limits.pageSize)
         val filters = Filters(limits, options.sinceEventTimeMs, options.untilEventTimeMs, options.tags, options.uriPrefix)
         val expression = when (options.syntax) {
-            QuerySyntax.PLAIN -> PlainQuery.compile(query, options.match) ?: return Page(emptyList(), null)
+            QuerySyntax.PLAIN -> PlainQuery.compile(query, options.match, options.prefixLastTerm) ?: return Page(emptyList(), null)
             QuerySyntax.FTS5 -> {
                 if (query.isBlank()) throw KvidException.InvalidQuery("empty FTS5 query")
                 query

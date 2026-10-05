@@ -9,22 +9,31 @@ package com.kvid.store
  * FTS5 would tokenize to nothing (punctuation, symbols, most emoji) are dropped instead of being passed
  * on as empty phrases, so `plan ???` means `plan`. Pieces are deduplicated case-insensitively so a
  * repeated word does not weigh twice in the score.
+ *
+ * With `prefixLastTerm`, the last searchable piece becomes an FTS5 prefix phrase (`"pla"*`): its final
+ * token matches any indexed token that starts with it, after the same case and accent folding. That
+ * suits search while typing; every other piece still has to match whole tokens.
  */
 internal object PlainQuery {
     /** The FTS5 expression, or null when the query has no searchable pieces. */
-    fun compile(query: String, match: MatchMode): String? {
+    fun compile(query: String, match: MatchMode, prefixLastTerm: Boolean = false): String? {
         val pieces = LinkedHashMap<String, String>()
+        var lastKey: String? = null
         for (rawPiece in split(query)) {
             // FTS5 treats NUL as the end of its expression; preserve it as a token separator.
             val piece = rawPiece.replace('\u0000', ' ')
             if (!hasTokenCharacter(piece)) continue
             val key = piece.lowercase()
             if (key !in pieces) pieces[key] = piece
+            lastKey = key
         }
         if (pieces.isEmpty()) return null
         if (pieces.size > Limits.MAX_QUERY_TERMS) throw KvidException.LimitExceeded("query has more than ${Limits.MAX_QUERY_TERMS} terms")
         val operator = if (match == MatchMode.ALL) " AND " else " OR "
-        return pieces.values.joinToString(operator) { "\"" + it.replace("\"", "\"\"") + "\"" }
+        return pieces.entries.joinToString(operator) { (key, piece) ->
+            val quoted = "\"" + piece.replace("\"", "\"\"") + "\""
+            if (prefixLastTerm && key == lastKey) "$quoted*" else quoted
+        }
     }
 
     private fun split(query: String): List<String> {

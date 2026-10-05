@@ -61,7 +61,7 @@ class NotesModel(private val session: StoreSession) {
                 val notes = if (current.query.isBlank()) {
                     store.list(ListOptions(limit = PAGE, tags = selected)).items.map { it.toItem(null) }
                 } else {
-                    store.find(current.query, FindOptions(limit = PAGE, tags = selected)).items.map { it.document.toItem(it.snippet) }
+                    store.find(current.query, FindOptions(limit = PAGE, tags = selected, prefixLastTerm = true)).items.map { it.document.toItem(it.snippet) }
                 }
                 notes to store.tagCounts(TAG_CHIPS)
             }

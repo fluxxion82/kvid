@@ -84,6 +84,8 @@ class NotesModelTest {
         assertEquals(listOf("Buy a new stove fuel canister.", "Trip"), state.notes.map { it.title }, "newest first; untitled notes use their first line")
         assertEquals(listOf("errands", "outdoor", "travel"), state.tags.map { it.tag }, "tags are parsed and lowercased")
 
+        model.search("sto")
+        assertEquals(2, model.state.value.notes.size, "the last word being typed matches as a prefix")
         model.search("stove")
         assertEquals(2, model.state.value.notes.size)
         assertTrue(model.state.value.notes.all { it.preview.contains("[stove]") }, "search results show snippets")

@@ -242,6 +242,34 @@ class SearchTest {
         store.close()
     }
 
+    @Test fun prefixLastTermIsOptInAndAppliesOnlyToTheFinalPiece() = storeTest { dir ->
+        val store = Kvid.create(dir.file("a.kvid"))
+        val plan = store.put("Budget planning for the next quarter", PutOptions(title = "Plan"))
+        val planet = store.put("Planetary notes", PutOptions(title = "Space"))
+        val cafe = store.put("Caf\u00E9 visit")
+        val hyphen = store.put("a state-of-the-art design")
+        val prefix = FindOptions(prefixLastTerm = true)
+
+        assertTrue(store.ids("pla").isEmpty(), "plain queries match whole words by default")
+        assertEquals(setOf(plan, planet), store.ids("pla", prefix).toSet())
+        assertEquals(listOf(plan), store.ids("budget pla", prefix), "earlier pieces must still match")
+        assertTrue(store.ids("bud planning", prefix).isEmpty(), "only the last piece is a prefix")
+        assertEquals(setOf(plan, planet), store.ids("zzz pla", prefix.copy(match = MatchMode.ANY)).toSet())
+        assertEquals(setOf(plan, planet), store.ids("pla ???", prefix).toSet(), "the prefix applies to the last searchable piece")
+        assertEquals(listOf(cafe), store.ids("CAF", prefix), "prefixes fold case and accents")
+        assertEquals(listOf(hyphen), store.ids("state-of-th", prefix), "a hyphenated last piece is a phrase ending in a prefix")
+        assertEquals(setOf(plan, planet), store.ids("\"pla", prefix).toSet(), "quotes in the last piece stay literal")
+        assertEquals(listOf(plan), store.ids("budget plan budget", prefix), "a repeated last piece keeps one, prefixed, occurrence")
+
+        val page = store.find("pla", FindOptions(limit = 1, prefixLastTerm = true))
+        assertNotNull(page.nextCursor)
+        assertFailsWith<KvidException.Usage>("a cursor is bound to the prefix option") {
+            store.find("pla", FindOptions(limit = 1, cursor = page.nextCursor))
+        }
+        assertEquals(1, store.find("pla", FindOptions(limit = 1, prefixLastTerm = true, cursor = page.nextCursor)).items.size)
+        store.close()
+    }
+
     @Test fun queryBoundsApply() = storeTest { dir ->
         val store = Kvid.create(dir.file("a.kvid"))
         store.put("x")
