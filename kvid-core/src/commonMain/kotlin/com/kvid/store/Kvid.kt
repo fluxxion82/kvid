@@ -48,6 +48,23 @@ import kotlin.time.ExperimentalTime
  *
  * Writes outside [transaction] commit before they return. Inside a [transaction] block, operations
  * go through the [Transaction] receiver, stage work, and commit together when the block completes.
+ *
+ * **Lifecycle.**
+ * - A process holds at most one writable handle per canonical path; a second [open] or [create] of the
+ *   same path fails with [KvidException.Locked] until the first handle is closed. Read-only handles from
+ *   [openReadOnly] may coexist with it. Another process can open the file too; SQLite then serializes
+ *   their writes and a contended write waits up to [StoreOptions.busyTimeoutMs].
+ * - Own a writable handle at a scope that outlives individual screens, such as an Android `Application`
+ *   or a `ViewModel` retained across configuration changes, or the iOS app or scene delegate, and
+ *   [close] it when that owner is destroyed. Use [use] for scoped work such as tools and tests.
+ * - Operations on one handle are serialized and safe to call from any coroutine. A [Transaction]
+ *   receiver belongs to the coroutine that started the block; it must not escape the block or be used
+ *   from another coroutine.
+ * - Process death needs no special handling for data safety: committed transactions are durable, and
+ *   SQLite rolls back an interrupted transaction on the next open, which also runs a quick integrity
+ *   check because the store was not closed cleanly.
+ * - [close] waits for running operations, cannot be cancelled once called, and is idempotent. Every
+ *   other call on a closed handle fails with [KvidException.Closed].
  */
 class Kvid private constructor(
     /** Canonical path of the store file. */
@@ -214,17 +231,23 @@ class Kvid private constructor(
         internal fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
     }
 
-    /** Serialises with running operations, waits for an active transaction, marks a clean close, and releases resources. */
+    /**
+     * Serialises with running operations, waits for an active transaction, marks a clean close, and
+     * releases resources. Not cancellable once called, so a cancelled owner cannot leave the handle open
+     * and its path reserved; idempotent.
+     */
     suspend fun close() {
         rejectInsideTransaction("close")
-        gate.withLock {
-            if (closed) return
-            withContext(NonCancellable + dispatcher) {
-                try {
-                    if (!readOnly) runCatching { conn.exec("UPDATE kvid_meta SET clean_close = 1") }
-                } finally {
-                    closed = true
-                    try { conn.close() } finally { if (!readOnly) OpenRegistry.release(path) }
+        withContext(NonCancellable) {
+            gate.withLock {
+                if (closed) return@withLock
+                withContext(dispatcher) {
+                    try {
+                        if (!readOnly) runCatching { conn.exec("UPDATE kvid_meta SET clean_close = 1") }
+                    } finally {
+                        closed = true
+                        try { conn.close() } finally { if (!readOnly) OpenRegistry.release(path) }
+                    }
                 }
             }
         }
@@ -241,6 +264,8 @@ class Kvid private constructor(
     suspend fun history(id: DocumentId): List<Version> = read { Ops.history(conn, limits, id) }
     suspend fun list(options: ListOptions = ListOptions()): Page<Document> = read { Ops.list(conn, limits, options) }
     suspend fun find(query: String, options: FindOptions = FindOptions()): Page<Hit> = read { Ops.find(conn, limits, query, options) }
+    /** Tags of live current versions, most used first, ties by tag; at most [limit], capped by [Limits.pageSize]. */
+    suspend fun tagCounts(limit: Int = 100): List<TagCount> = read { Ops.tagCounts(conn, limits, limit) }
     suspend fun stats(): StoreStats = read { Ops.stats(conn, meta) }
 
     private val limits get() = options.limits
@@ -345,6 +370,7 @@ class Kvid private constructor(
         override suspend fun history(id: DocumentId): List<Version> = run { Ops.history(store.conn, store.limits, id) }
         override suspend fun list(options: ListOptions): Page<Document> = run { Ops.list(store.conn, store.limits, options) }
         override suspend fun find(query: String, options: FindOptions): Page<Hit> = run { Ops.find(store.conn, store.limits, query, options) }
+        override suspend fun tagCounts(limit: Int): List<TagCount> = run { Ops.tagCounts(store.conn, store.limits, limit) }
 
         override suspend fun <T> transaction(block: suspend Transaction.() -> T): T {
             if (ended) throw KvidException.Closed("transaction session has ended")
@@ -551,6 +577,18 @@ class Kvid private constructor(
     }
 }
 
+/**
+ * Runs [block] with this store and closes it afterwards, including when [block] throws or the calling
+ * coroutine is cancelled.
+ */
+suspend inline fun <T> Kvid.use(block: (Kvid) -> T): T {
+    try {
+        return block(this)
+    } finally {
+        close()
+    }
+}
+
 /** Operations available inside a [Kvid.transaction] block. Reads see the block's staged writes. */
 interface Transaction {
     suspend fun put(text: String, options: PutOptions = PutOptions()): DocumentId
@@ -560,6 +598,7 @@ interface Transaction {
     suspend fun history(id: DocumentId): List<Version>
     suspend fun list(options: ListOptions = ListOptions()): Page<Document>
     suspend fun find(query: String, options: FindOptions = FindOptions()): Page<Hit>
+    suspend fun tagCounts(limit: Int = 100): List<TagCount>
     /** Nested scope backed by a savepoint: its failure rolls back only its own work. */
     suspend fun <T> transaction(block: suspend Transaction.() -> T): T
 }
@@ -696,13 +735,13 @@ internal object Ops {
             ) { readVersion(this) }
         } ?: return null
         if (version.tombstone) return null
-        return Document(id, withTags(conn, version))
+        return Document(id, attachTags(conn, listOf(version)).single())
     }
 
     fun history(conn: SQLiteConnection, limits: Limits, id: DocumentId): List<Version> = conn.query(
         "SELECT $VERSION_COLUMNS FROM versions v WHERE v.doc_id = ? ORDER BY v.seq, v.version_id",
         { bindLong(1, Limits.MAX_BODY_BYTES.toLong()); bindLong(2, Limits.MAX_METADATA_BYTES.toLong()); bindText(3, id) }
-    ) { readVersion(this) }.map { withTags(conn, it) }
+    ) { readVersion(this) }.let { versions -> attachTags(conn, versions) }
 
     fun forEachVersion(conn: SQLiteConnection, limits: Limits, action: (Version) -> Unit) {
         val ids = conn.query("SELECT version_id FROM versions ORDER BY seq, version_id") { getLong(0) }
@@ -711,7 +750,7 @@ internal object Ops {
                 "SELECT $VERSION_COLUMNS FROM versions v WHERE v.version_id = ?",
                 { bindLong(1, Limits.MAX_BODY_BYTES.toLong()); bindLong(2, Limits.MAX_METADATA_BYTES.toLong()); bindLong(3, vid) }
             ) { readVersion(this) } ?: continue
-            action(withTags(conn, v))
+            action(attachTags(conn, listOf(v)).single())
         }
     }
 
@@ -772,7 +811,7 @@ internal object Ops {
             cursor?.let { bindLong(i++, it.key1); bindLong(i++, it.key1); bindLong(i++, it.key2) }
             bindLong(i, (limit + 1).toLong())
         }) { getLong(0) to getText(1) }
-        val page = rows.take(limit).map { (vid, docId) -> Document(docId, loadVersion(conn, vid)) }
+        val page = loadVersions(conn, rows.take(limit).map { it.first }).map { Document(it.documentId, it) }
         val next = if (rows.size > limit) {
             val last = page.last().version
             Cursor(conn, fingerprint, last.eventTimeMs, last.versionId).encode()
@@ -786,7 +825,7 @@ internal object Ops {
         val limit = options.limit.coerceIn(1, limits.pageSize)
         val filters = Filters(limits, options.sinceEventTimeMs, options.untilEventTimeMs, options.tags, options.uriPrefix)
         val expression = when (options.syntax) {
-            QuerySyntax.PLAIN -> PlainQuery.compile(query, options.match) ?: return Page(emptyList(), null)
+            QuerySyntax.PLAIN -> PlainQuery.compile(query, options.match, options.prefixLastTerm) ?: return Page(emptyList(), null)
             QuerySyntax.FTS5 -> {
                 if (query.isBlank()) throw KvidException.InvalidQuery("empty FTS5 query")
                 query
@@ -817,12 +856,21 @@ internal object Ops {
             }
             throw e
         }
-        val page = rows.take(limit).map { (vid, rank, snippet) ->
-            val v = loadVersion(conn, vid)
-            Hit(Document(v.documentId, v), -rank, snippet)
-        }
+        val hits = rows.take(limit)
+        val page = loadVersions(conn, hits.map { it.first }).zip(hits) { v, (_, rank, snippet) -> Hit(Document(v.documentId, v), -rank, snippet) }
         val next = if (rows.size > limit) Cursor(conn, fingerprint, offset + limit, 0).encode() else null
         return Page(page, next)
+    }
+
+    fun tagCounts(conn: SQLiteConnection, limits: Limits, limit: Int): List<TagCount> = conn.query(
+        """SELECT CASE WHEN length(t.tag) <= ${Limits.MAX_TAG_CODE_POINTS} AND octet_length(t.tag) <= ${4 * Limits.MAX_TAG_CODE_POINTS} THEN t.tag END,
+                  length(t.tag), octet_length(t.tag), count(*)
+           FROM current c JOIN version_tags t ON t.version_id = c.version_id
+           GROUP BY t.tag ORDER BY count(*) DESC, t.tag LIMIT ?""",
+        { bindLong(1, limit.coerceIn(1, limits.pageSize).toLong()) }
+    ) {
+        if (getLong(1) > Limits.MAX_TAG_CODE_POINTS || getLong(2) > 4 * Limits.MAX_TAG_CODE_POINTS) throw KvidException.Corrupt("stored tag exceeds hard cap")
+        TagCount(getText(0), getLong(3))
     }
 
     fun stats(conn: SQLiteConnection, meta: Kvid.Meta): StoreStats = StoreStats(
@@ -836,13 +884,51 @@ internal object Ops {
         formatMinor = meta.formatMinor
     )
 
-    private fun loadVersion(conn: SQLiteConnection, versionId: Long): Version {
-        val v = conn.queryOne(
-            "SELECT $VERSION_COLUMNS FROM versions v WHERE v.version_id = ?",
-            { bindLong(1, Limits.MAX_BODY_BYTES.toLong()); bindLong(2, Limits.MAX_METADATA_BYTES.toLong()); bindLong(3, versionId) }
-        ) { readVersion(this) } ?: throw KvidException.Corrupt("current projection references missing version $versionId")
-        return withTags(conn, v)
+    /**
+     * Loads the versions of one result page with one version query and one tag query, in the order of
+     * [versionIds]. Pages are bounded by [Limits.MAX_PAGE_SIZE], well below SQLite's parameter limit.
+     */
+    private fun loadVersions(conn: SQLiteConnection, versionIds: List<Long>): List<Version> {
+        if (versionIds.isEmpty()) return emptyList()
+        val byId = HashMap<Long, Version>(versionIds.size * 2)
+        conn.query(
+            "SELECT $VERSION_COLUMNS FROM versions v WHERE v.version_id IN (${versionIds.joinToString(",") { "?" }})",
+            {
+                bindLong(1, Limits.MAX_BODY_BYTES.toLong()); bindLong(2, Limits.MAX_METADATA_BYTES.toLong())
+                versionIds.forEachIndexed { i, id -> bindLong(3 + i, id) }
+            }
+        ) { readVersion(this) }.forEach { byId[it.versionId] = it }
+        val versions = versionIds.map { id -> byId[id] ?: throw KvidException.Corrupt("current projection references missing version $id") }
+        return attachTags(conn, versions)
     }
+
+    /**
+     * Attaches tags to [versions] with one query. Each version materializes at most one tag beyond the
+     * hard cap, so a damaged store with an enormous tag set is reported instead of loaded.
+     */
+    private fun attachTags(conn: SQLiteConnection, versions: List<Version>): List<Version> {
+        if (versions.isEmpty()) return versions
+        val ids = versions.map { it.versionId }.distinct()
+        val tags = HashMap<Long, MutableList<String>>()
+        ids.chunked(MAX_IDS_PER_STATEMENT).forEach { chunk ->
+            conn.query(
+                """SELECT version_id, CASE WHEN length(tag) <= ${Limits.MAX_TAG_CODE_POINTS} AND octet_length(tag) <= ${4 * Limits.MAX_TAG_CODE_POINTS} THEN tag END,
+                          length(tag), octet_length(tag), rn
+                   FROM (SELECT version_id, tag, row_number() OVER (PARTITION BY version_id ORDER BY tag) AS rn
+                         FROM version_tags WHERE version_id IN (${chunk.joinToString(",") { "?" }}))
+                   WHERE rn <= ${Limits.MAX_TAGS + 1} ORDER BY version_id, tag""",
+                { chunk.forEachIndexed { i, id -> bindLong(1 + i, id) } }
+            ) {
+                if (getLong(4) > Limits.MAX_TAGS) throw KvidException.Corrupt("stored tags exceed hard cap")
+                if (getLong(2) > Limits.MAX_TAG_CODE_POINTS || getLong(3) > 4 * Limits.MAX_TAG_CODE_POINTS) throw KvidException.Corrupt("stored tag exceeds hard cap")
+                getLong(0) to getText(1)
+            }.forEach { (id, tag) -> tags.getOrPut(id) { ArrayList() }.add(tag) }
+        }
+        return versions.map { v -> tags[v.versionId]?.let { v.copy(tags = it) } ?: v }
+    }
+
+    /** Bound on bound parameters per statement for unbounded id lists such as a long history. */
+    private const val MAX_IDS_PER_STATEMENT = 10_000
 
     private fun readVersion(st: androidx.sqlite.SQLiteStatement): Version {
         if (st.getLong(13) > Limits.MAX_TITLE_BYTES || st.getLong(14) > Limits.MAX_URI_BYTES) {
@@ -863,18 +949,6 @@ internal object Ops {
             body = st.textOrNull(6) ?: "", metadata = metadata, uri = st.textOrNull(10),
             tags = emptyList(), tombstone = st.getLong(11) == 1L, supersedesVersionId = st.longOrNull(12)
         )
-    }
-
-    private fun withTags(conn: SQLiteConnection, v: Version): Version {
-        val tags = conn.query(
-            "SELECT CASE WHEN length(tag) <= ${Limits.MAX_TAG_CODE_POINTS} AND octet_length(tag) <= ${4 * Limits.MAX_TAG_CODE_POINTS} THEN tag END, length(tag), octet_length(tag) FROM version_tags WHERE version_id = ? ORDER BY tag LIMIT ${Limits.MAX_TAGS + 1}",
-            { bindLong(1, v.versionId) }
-        ) {
-            if (getLong(1) > Limits.MAX_TAG_CODE_POINTS || getLong(2) > 4 * Limits.MAX_TAG_CODE_POINTS) throw KvidException.Corrupt("stored tag exceeds hard cap")
-            getText(0)
-        }
-        if (tags.size > Limits.MAX_TAGS) throw KvidException.Corrupt("stored tags exceed hard cap")
-        return if (tags.isEmpty()) v else v.copy(tags = tags)
     }
 
     // ---- derived state and verification

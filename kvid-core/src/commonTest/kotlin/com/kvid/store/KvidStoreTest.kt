@@ -2,6 +2,8 @@ package com.kvid.store
 
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -233,6 +235,36 @@ class KvidStoreTest {
     }
 
     // ---------------------------------------------------------------- lifecycle and portability
+
+    @Test fun useClosesTheStoreWhenTheBlockFailsOrIsCancelled() = storeTest { dir ->
+        val path = dir.file("notes.kvid")
+        assertFailsWith<IllegalStateException> { Kvid.create(path).use { it.put("first"); error("boom") } }
+        Kvid.open(path).use { assertEquals(1L, it.stats().liveDocuments, "the failed block's handle was closed") }
+        val started = CompletableDeferred<Unit>()
+        val job = launch { Kvid.open(path).use { store -> store.put("second"); started.complete(Unit); awaitCancellation() } }
+        started.await()
+        job.cancelAndJoin()
+        Kvid.open(path).use { assertEquals(2L, it.stats().liveDocuments, "the cancelled block's handle was closed") }
+    }
+
+    @Test fun closeCompletesWhenItsCallerIsCancelledWhileWaiting() = storeTest { dir ->
+        val path = dir.file("notes.kvid")
+        val store = Kvid.create(path)
+        val inTransaction = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val writer = launch { store.transaction { put("held"); inTransaction.complete(Unit); release.await() } }
+        inTransaction.await()
+        // Runs until close() suspends on the lock the open transaction holds.
+        val closer = launch(start = CoroutineStart.UNDISPATCHED) { store.close() }
+        closer.cancel()
+        release.complete(Unit)
+        writer.join()
+        closer.join()
+        assertFailsWith<KvidException.Closed> { store.get("any") }
+        Kvid.open(path).use { reopened ->
+            assertEquals(listOf("held"), reopened.list().items.map { it.body }, "the transaction committed before the close")
+        }
+    }
 
     @Test fun createPutCloseReopenRoundTrip() = storeTest { dir ->
         val path = dir.file("notes.kvid")
