@@ -4,8 +4,10 @@
 name: KvidNotes
 options:
   bundleIdPrefix: com.kvid
+  # Compose Multiplatform 1.12 links ICU data built for iOS 18.5. Raise the sample's minimum to match
+  # until an older runtime is validated; the kvid-core library keeps its own, lower target.
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "18.5"
 targets:
   KvidNotes:
     type: application

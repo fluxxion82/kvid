@@ -8,7 +8,7 @@ It started as a Kotlin port of [memvid](https://github.com/memvid/memvid). memvi
 
 - Durable writes: every write commits atomically and survives process death; scoped `transaction { }` blocks group writes.
 - Versioned documents: updates and deletes keep history; `get(id, asOfSeq)` reads a document as it was.
-- Offline full-text search with BM25 ranking, snippets, Unicode case and accent folding, and plain-text queries by default.
+- Offline full-text search with BM25 ranking, snippets, Unicode case and accent folding, and plain-text queries by default. `FindOptions(prefixLastTerm = true)` lets the last word match as a prefix for search while typing.
 - Filters shared by listing and search: event-time range, tags (all required) and uri prefix; tag counts for filter UIs.
 - Portable files: `snapshot()` publishes a consistent, verified copy; `verify()` checks the whole store; JSON Lines export and import.
 - Typed failures (`KvidException` with stable codes) and enforced size bounds.
@@ -37,7 +37,7 @@ Open an existing file with `Kvid.open(path)`, or `Kvid.openReadOnly(path)` along
 
 ## Notes sample
 
-`kvid-sample` is a Compose Multiplatform notes app built on the store: list, search while typing (whole words), tag chips, edit, delete and version history. It closes the store whenever the app leaves the foreground.
+`kvid-sample` is a Compose Multiplatform notes app built on the store: list, search while typing, tag chips, edit, delete, version history and backup. It closes the store whenever the app leaves the foreground.
 
 ```bash
 ./gradlew :kvid-sample:shared:run                  # desktop
@@ -53,7 +53,7 @@ CI runs the store tests on the JVM, on an Android API 35 emulator and on the iOS
 |---|---|---|
 | JVM | Java 17 | |
 | Android | API 23 | Runtime checked on API 35 only |
-| iOS | arm64 device and arm64 simulator | Intel simulators are not supported by the bundled SQLite |
+| iOS | arm64 device and arm64 simulator | Intel simulators are not supported by the bundled SQLite. The notes sample requires iOS 18.5 |
 
 The store format (0.1, schema 2) is pre-release: files from unreleased schema 1 builds are refused, and the format may still change before the first release.
 
@@ -76,18 +76,18 @@ kvid is not on Maven Central yet. The build stages unsigned Maven artifacts and 
 **Kotlin.** `kvid-core` publishes one Kotlin Multiplatform module with JVM, Android, iOS arm64 and iOS simulator arm64 variants:
 
 ```bash
-./gradlew :kvid-core:publishToMavenLocal                         # then depend on com.kvid:kvid-core:0.1.0
+./gradlew :kvid-core:publishToMavenLocal                         # then depend on com.sterlingalbury:kvid-core:0.1.0
 ./gradlew :kvid-core:publishAllPublicationsToStagingRepository   # release bundle in kvid-core/build/staging-repo
 ```
 
 ```kotlin
 // build.gradle.kts of a Kotlin Multiplatform or Android project, with mavenLocal() in its repositories
-commonMain.dependencies { implementation("com.kvid:kvid-core:0.1.0") }
+commonMain.dependencies { implementation("com.sterlingalbury:kvid-core:0.1.0") }
 ```
 
 **Swift.** `./gradlew :kvid-core:assembleKvidCoreReleaseXCFramework` writes `kvid-core/build/XCFrameworks/release/KvidCore.xcframework` with device and simulator slices. Add it to an Xcode target and `import KvidCore`. The Swift API is Kotlin's Objective-C export, so suspend functions become `async` methods.
 
-Before a Maven Central release, the group ID must move to a namespace the publisher can verify, and publications must be signed.
+The Maven group is `com.sterlingalbury`; the Kotlin packages stay `com.kvid.*`. Before a Maven Central release, the namespace must be verified through Central's DNS TXT record for `sterlingalbury.com`, and publications must be signed.
 
 ## Experimental APIs and migration
 

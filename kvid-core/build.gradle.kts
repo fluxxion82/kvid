@@ -38,7 +38,7 @@ kotlin {
     ).forEach {
         it.binaries.framework {
             baseName = "KvidCore"
-            binaryOption("bundleId", "com.kvid.core")
+            binaryOption("bundleId", "com.sterlingalbury.kvid.core")
             isStatic = true
             xcFramework.add(this)
         }

@@ -153,8 +153,9 @@ jobs:
           ./gradlew :kvid-core:publishAllPublicationsToStagingRepository :kvid-core:assembleKvidCoreReleaseXCFramework --no-daemon --stacktrace
           echo "Staged publications:"
           find kvid-core/build/staging-repo -name "*.pom" | sed 's|kvid-core/build/staging-repo/||' | sort
+          GROUP_PATH=$(awk -F= '$1 == "group" { print $2 }' gradle.properties | tr . /)
           for target in jvm android iosarm64 iossimulatorarm64; do
-            ls kvid-core/build/staging-repo/com/kvid/kvid-core-$target/*/*.pom > /dev/null || { echo "::error::missing $target publication"; exit 1; }
+            ls kvid-core/build/staging-repo/$GROUP_PATH/kvid-core-$target/*/*.pom > /dev/null || { echo "::error::missing $target publication"; exit 1; }
           done
           bash kvid-core/scripts/check-publication.sh
           echo "XCFramework slices:"
