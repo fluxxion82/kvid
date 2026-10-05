@@ -10,7 +10,20 @@ ACTIVITY="$PKG/com.kvid.sample.android.MainActivity"
 WORK=$(mktemp -d)
 CHECK="$(dirname "$0")/../check_store.py"
 
-pull_store() { adb exec-out run-as "$PKG" cat files/notes.kvid > "$WORK/notes.kvid"; }
+# Copies the store off the device. A copy can come back empty while the app is changing state, so
+# retry until the file starts with the SQLite header, and log every failed attempt.
+pull_store() {
+  for attempt in 1 2 3 4 5; do
+    if adb exec-out run-as "$PKG" cat files/notes.kvid > "$WORK/notes.kvid" 2> "$WORK/pull.err" \
+        && [ "$(head -c 15 "$WORK/notes.kvid")" = "SQLite format 3" ]; then
+      return 0
+    fi
+    echo "store copy attempt $attempt is not a SQLite file ($(wc -c < "$WORK/notes.kvid") bytes) $(cat "$WORK/pull.err")"
+    sleep 2
+  done
+  adb shell run-as "$PKG" ls -l files || true
+  echo "::error::could not copy the store from the device"; exit 1
+}
 assert_alive() {
   if ! adb shell pidof "$PKG" > /dev/null; then
     adb logcat -d -b crash || true
