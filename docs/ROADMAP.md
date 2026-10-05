@@ -185,7 +185,7 @@ Open items from the measurements:
 4. Uris and metadata are stored as given, not normalized.
 5. `find` pagination stays offset-based under an expiring cursor; snippets come from the body column only.
 
-Defer stemming, advanced query syntax, phrase/prefix queries, and adaptive score cutoffs until demonstrated needs justify their complexity.
+Defer stemming, advanced query syntax, phrase queries, and adaptive score cutoffs until demonstrated needs justify their complexity. Prefix matching of the last plain-query term was added in Phase 4 for the sample's search while typing (opt-in `prefixLastTerm`).
 
 **Exit criterion:** persisted documents are searchable offline with reliable filtering and measured performance on target platforms.
 
@@ -200,7 +200,7 @@ Defer stemming, advanced query syntax, phrase/prefix queries, and adaptive score
 - [x] Basic document history is in the sample (versions oldest to newest, deletions kept).
 - [x] Backup from a consistent committed snapshot in the sample: a Back up action writes a verified snapshot into a `backups` directory next to the store; a test opens it read-only, verifies it, and checks that the live store keeps accepting writes while the backup stays fixed.
 - [x] Packaging for Kotlin and Swift consumers, documented in the README and checked by the macOS CI job: `maven-publish` with POM metadata and javadoc jars stages the root module and its JVM, Android, iOS arm64 and iOS simulator arm64 publications; the release `KvidCore.xcframework` has device and simulator slices. All three platforms meet the CI acceptance checks.
-- [ ] Publish to Maven Central: needs a group ID in a verifiable namespace (`com.kvid` likely is not; `io.github.fluxxion82` would be), signing keys, and a Central Portal account. This is the owner's release decision.
+- [ ] Publish to Maven Central under `com.sterlingalbury` (owner decision, October 5). Remaining owner steps: verify the namespace through Central's DNS TXT record for `sterlingalbury.com`, create Portal credentials, and configure signing keys as release secrets with offline backups. The build already stages under the new group.
 - [x] Migration statement for the experimental APIs and stored artifacts in the README: the QR/video classes are experimental and planned for `kvid-video`; their `.bin` indexes and MP4/QR artifacts are not compatible with `.kvid` stores and do not migrate automatically; data moves by re-adding text or importing JSON Lines. The README now leads with the store and the sample.
 
 **Codex review corrections (`028f348`, final CI pending).** A deterministic regression reproduced an obsolete search response replacing the list after the user typed a new query. Refreshes are now serialized and publish results or failures only while their query and selected tags are still current; separate regressions reproduce both obsolete responses. The staged publication's external consumer also failed to compile public `JsonObject` metadata because serialization was an implementation dependency; it is now an API dependency. CI compiles an isolated consumer against the root Maven coordinates. Packaging documentation now explicitly says artifacts are unsigned and a Central release still requires signing configuration.
@@ -208,6 +208,8 @@ Defer stemming, advanced query syntax, phrase/prefix queries, and adaptive score
 Local review verification: 63 JVM store tests, 62 iOS simulator store tests, 10 desktop sample tests and 10 iOS sample tests; zero failures and zero skips. The external consumer compiles after the dependency correction, and the Android debug sample APK builds. Merge and release are separate decisions; neither is performed by this review.
 
 Recommended decisions, awaiting the owner: verify `sterlingalbury.com` through Central's DNS TXT challenge and use `com.sterlingalbury`; add an opt-in final-term prefix mode for plain queries and enable it in the sample; use iOS 18.5 as the sample minimum until an older runtime is validated, without changing the library minimum. No namespace, query API or iOS target change is made by these review corrections. Signing keys and Portal credentials belong in release secrets, with offline backups; no credentials are required for local staging checks.
+
+**Owner decisions applied (Claude, October 5).** All three recommendations were accepted and implemented on the branch: `ea12eab` hardens the Android smoke test, whose store copy came back empty after backgrounding in CI run 37245413199 (the app had created and seeded the store; the copy now retries until it has the SQLite header); `487413a` adds opt-in `FindOptions.prefixLastTerm` for plain queries with tests and enables it in the sample; `3cdd69a` publishes under `com.sterlingalbury` (Kotlin packages stay `com.kvid.*`) and raises the iOS sample minimum to 18.5. Claude reviewed `028f348` with no objections: refresh serialization with obsolete-response filtering, the `api` serialization dependency, and the external consumer check are all correct. CI run 37250580229 is green at `3cdd69a`: JVM and Android host tests; Android emulator with 63 device tests and the full app smoke sequence (no copy retries needed); iOS simulator tests, the optimized measurement, sample tests, the iOS 18.5 app build without the ICU linker warning and its smoke run; publications staged under `com/sterlingalbury` with the external consumer compiling against them, and the XCFramework. The prefix option is a new public API, so the branch goes back to Codex for review before merge.
 
 Library changes in this phase:
 
@@ -224,8 +226,8 @@ Measurements at `e3c017a` (same synthetic 5,000-note corpus as Milestone 3, medi
 
 Open items:
 
-- [ ] The iOS app links Compose's ICU data object built for iOS 18.5 while the sample targets iOS 16.0 (linker warning). Run the sample on the minimum iOS version, or raise the sample's deployment target.
-- [ ] Search while typing matches whole words only; a prefix option for the last plain-query term is a demonstrated need from the sample. Decide whether to add it to `QuerySyntax.PLAIN`.
+- [x] The iOS app linked Compose's ICU data object built for iOS 18.5 while the sample targeted iOS 16.0. Owner decision: the sample's minimum is iOS 18.5 until an older runtime is validated; `kvid-core` keeps its own target.
+- [x] Search while typing matched whole words only. Owner decision: opt-in `FindOptions.prefixLastTerm` for plain queries, enabled in the sample; exact words stay the library default.
 - [ ] Compose 1.12 requires the sample to compile against Android API 37; `kvid-core` stays on 36.
 - [ ] Android runtime evidence is API 35 only; API 23 and physical devices remain (Milestone 2).
 - [ ] Peak memory is still unmeasured.
