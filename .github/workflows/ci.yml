@@ -43,7 +43,9 @@ jobs:
         # The kvid-embed-onnx parity test is required wherever this fixture is produced.
         run: |
           python -m pip install --quiet "tokenizers==0.23.3"
-          python -I kvid-embed-onnx/scripts/make_tokenizer_fixture.py "$RUNNER_TEMP/tokenizer-fixture" --model BAAI/bge-small-en-v1.5 --revision main
+          python -I kvid-embed-onnx/scripts/make_tokenizer_fixture.py "$RUNNER_TEMP/tokenizer-fixture" --model BAAI/bge-small-en-v1.5 \
+            --revision 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a \
+            --sha256 d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66 07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3
           echo "KVID_TOKENIZER_FIXTURE_DIR=$RUNNER_TEMP/tokenizer-fixture" >> "$GITHUB_ENV"
           echo "KVID_REQUIRE_TOKENIZER_FIXTURE=true" >> "$GITHUB_ENV"
       - uses: gradle/actions/setup-gradle@v4
@@ -154,7 +156,9 @@ jobs:
         # The kvid-embed-onnx parity test is required wherever this fixture is produced.
         run: |
           python -m pip install --quiet "tokenizers==0.23.3"
-          python -I kvid-embed-onnx/scripts/make_tokenizer_fixture.py "$RUNNER_TEMP/tokenizer-fixture" --model BAAI/bge-small-en-v1.5 --revision main
+          python -I kvid-embed-onnx/scripts/make_tokenizer_fixture.py "$RUNNER_TEMP/tokenizer-fixture" --model BAAI/bge-small-en-v1.5 \
+            --revision 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a \
+            --sha256 d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66 07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3
           echo "KVID_TOKENIZER_FIXTURE_DIR=$RUNNER_TEMP/tokenizer-fixture" >> "$GITHUB_ENV"
           echo "KVID_REQUIRE_TOKENIZER_FIXTURE=true" >> "$GITHUB_ENV"
       - name: Tokenizer tests and parity
