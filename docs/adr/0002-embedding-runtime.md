@@ -1,6 +1,6 @@
 # ADR 0002: Runtime for kvid's first real embedding model
 
-_Status: **Proposed** (October 5, 2026) for owner and Codex review. The store-side vector layer it builds on is implemented on `phase-5-semantic-search` and does not depend on this decision._
+_Status: **Accepted** by the owner (October 23, 2026; proposed October 5). Implementation starts with the tokenizer. The store-side vector layer it builds on is implemented on `phase-5-semantic-search` and does not depend on this decision._
 
 ## Context
 
