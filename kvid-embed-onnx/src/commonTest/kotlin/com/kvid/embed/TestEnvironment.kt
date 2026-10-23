@@ -1,4 +1,4 @@
 package com.kvid.embed
 
-/** An environment variable of the test process. */
+/** A setting of the test run: an environment variable, or an instrumentation argument on Android devices. */
 internal expect fun testEnvironment(name: String): String?

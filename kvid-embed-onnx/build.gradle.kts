@@ -19,8 +19,10 @@ kotlin {
         namespace = "com.kvid.embed"
         compileSdk = libs.versions.androidCompileSdk.get().toInt()
         minSdk = libs.versions.androidMinSdk.get().toInt()
-        // Tokenizer parity runs on the JVM and the iOS simulator; Android device parity comes with the
-        // embedder, which needs model files pushed to the device anyway.
+
+        // Device-side (instrumented) tests run commonTest on an emulator or device; the fixture is pushed
+        // to the device and passed as instrumentation arguments (see the Android job in CI).
+        withDeviceTestBuilder { sourceSetTreeName = "test" }
     }
 
     iosArm64()
@@ -32,11 +34,19 @@ kotlin {
             implementation(libs.kotlinx.io.core)
             implementation(libs.kotlinx.serialization.json)
         }
+
+        getByName("androidDeviceTest").dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.androidx.test.runner)
+            implementation(libs.androidx.test.ext.junit)
+        }
     }
 }
 
 // The Hugging Face reference fixture (scripts/make_tokenizer_fixture.py) is passed by directory. CI sets
 // KVID_REQUIRE_TOKENIZER_FIXTURE=true so a missing fixture fails instead of skipping the parity test.
+// On Android devices both are instrumentation arguments:
+// -Pandroid.testInstrumentationRunnerArguments.KVID_TOKENIZER_FIXTURE_DIR=/data/local/tmp/...
 val fixtureEnvironment = listOf("KVID_TOKENIZER_FIXTURE_DIR", "KVID_REQUIRE_TOKENIZER_FIXTURE")
     .mapNotNull { name -> providers.environmentVariable(name).orNull?.let { name to it } }
 val fixtureDir = providers.environmentVariable("KVID_TOKENIZER_FIXTURE_DIR").orNull

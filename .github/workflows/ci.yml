@@ -10,6 +10,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Hugging Face reference for tokenizer parity (ADR 0002): the model revision and the SHA-256 digests of
+  # its tokenizer.json and vocab.txt, read by kvid-embed-onnx/scripts/make_tokenizer_fixture.py.
+  TOKENIZER_FIXTURE_ARGS: >-
+    --model BAAI/bge-small-en-v1.5 --revision 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+    --sha256 d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66 07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3
+
 jobs:
   main-document-policy:
     name: Main excludes planning docs
@@ -43,9 +50,7 @@ jobs:
         # The kvid-embed-onnx parity test is required wherever this fixture is produced.
         run: |
           python -m pip install --quiet "tokenizers==0.23.3"
-          python -I kvid-embed-onnx/scripts/make_tokenizer_fixture.py "$RUNNER_TEMP/tokenizer-fixture" --model BAAI/bge-small-en-v1.5 \
-            --revision 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a \
-            --sha256 d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66 07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3
+          python -I kvid-embed-onnx/scripts/make_tokenizer_fixture.py "$RUNNER_TEMP/tokenizer-fixture" $TOKENIZER_FIXTURE_ARGS
           echo "KVID_TOKENIZER_FIXTURE_DIR=$RUNNER_TEMP/tokenizer-fixture" >> "$GITHUB_ENV"
           echo "KVID_REQUIRE_TOKENIZER_FIXTURE=true" >> "$GITHUB_ENV"
       - uses: gradle/actions/setup-gradle@v4
@@ -73,6 +78,13 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Tokenizer reference fixture (Hugging Face tokenizers)
+        run: |
+          python -m pip install --quiet "tokenizers==0.23.3"
+          python -I kvid-embed-onnx/scripts/make_tokenizer_fixture.py "$RUNNER_TEMP/tokenizer-fixture" $TOKENIZER_FIXTURE_ARGS
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -84,11 +96,16 @@ jobs:
           arch: x86_64
           target: google_apis
           # The runner executes each script line separately. Device stdout goes to logcat, not Gradle,
-          # so the second line copies the search measurement line into the job log. The last two lines
-          # install the notes sample and check the store lifecycle in the running app.
+          # so the second line copies the search measurement line into the job log. The next three push
+          # the tokenizer fixture to the device, run the tokenizer tests with it as instrumentation
+          # arguments, and require the parity line, so a parity run that silently skipped fails here.
+          # The last two lines install the notes sample and check the store lifecycle in the running app.
           script: |
             ./gradlew :kvid-core:connectedAndroidDeviceTest -Pandroid.testInstrumentationRunnerArguments.package=com.kvid.store --no-daemon --stacktrace
             adb logcat -d | grep -F "[kvid-measure]" || echo "no [kvid-measure] line in logcat"
+            adb push "$RUNNER_TEMP/tokenizer-fixture" /data/local/tmp/kvid-tokenizer-fixture
+            ./gradlew :kvid-embed-onnx:connectedAndroidDeviceTest -Pandroid.testInstrumentationRunnerArguments.KVID_TOKENIZER_FIXTURE_DIR=/data/local/tmp/kvid-tokenizer-fixture -Pandroid.testInstrumentationRunnerArguments.KVID_REQUIRE_TOKENIZER_FIXTURE=true --no-daemon --stacktrace
+            adb logcat -d | grep -F "[kvid-tokenizer] cases="
             ./gradlew :kvid-sample:androidApp:installDebug --no-daemon --stacktrace
             bash kvid-sample/androidApp/smoke-test.sh
       - name: Verify device tests ran
@@ -98,29 +115,33 @@ jobs:
         run: |
           python3 - <<'EOF'
           import glob, sys, xml.etree.ElementTree as ET
-          run = failed = skipped = 0
-          for f in sorted(glob.glob("kvid-core/build/**/*.xml", recursive=True)):
-              try:
-                  root = ET.parse(f).getroot()
-              except ET.ParseError:
-                  continue
-              cases = list(root.iter("testcase"))
-              if not cases:
-                  continue
-              bad = sum(1 for c in cases if c.find("failure") is not None or c.find("error") is not None)
-              skip = sum(1 for c in cases if c.find("skipped") is not None)
-              print(f"{f}: {len(cases)} tests, {bad} failed, {skip} skipped")
-              for c in cases:
-                  problem = c.find("failure") if c.find("failure") is not None else c.find("error")
-                  if problem is not None:
-                      detail = (problem.get("message") or problem.text or "").strip().splitlines()
-                      print(f"FAILED {c.get('classname')}.{c.get('name')}: {detail[0][:300] if detail else ''}")
-              run += len(cases); failed += bad; skipped += skip
-          print(f"Device tests: {run} run, {failed} failed, {skipped} skipped")
-          if run == 0:
-              sys.exit("No device test results found under kvid-core/build; the emulator job ran zero tests")
-          if failed:
-              sys.exit(f"{failed} device test(s) failed")
+          problems = []
+          for module in ["kvid-core", "kvid-embed-onnx"]:
+              run = failed = skipped = 0
+              for f in sorted(glob.glob(f"{module}/build/**/*.xml", recursive=True)):
+                  try:
+                      root = ET.parse(f).getroot()
+                  except ET.ParseError:
+                      continue
+                  cases = list(root.iter("testcase"))
+                  if not cases:
+                      continue
+                  bad = sum(1 for c in cases if c.find("failure") is not None or c.find("error") is not None)
+                  skip = sum(1 for c in cases if c.find("skipped") is not None)
+                  print(f"{f}: {len(cases)} tests, {bad} failed, {skip} skipped")
+                  for c in cases:
+                      problem = c.find("failure") if c.find("failure") is not None else c.find("error")
+                      if problem is not None:
+                          detail = (problem.get("message") or problem.text or "").strip().splitlines()
+                          print(f"FAILED {c.get('classname')}.{c.get('name')}: {detail[0][:300] if detail else ''}")
+                  run += len(cases); failed += bad; skipped += skip
+              print(f"{module} device tests: {run} run, {failed} failed, {skipped} skipped")
+              if run == 0:
+                  problems.append(f"no device test results under {module}/build; the emulator job ran zero tests there")
+              if failed:
+                  problems.append(f"{failed} {module} device test(s) failed")
+          if problems:
+              sys.exit("; ".join(problems))
           EOF
       - uses: actions/upload-artifact@v4
         if: always()
@@ -129,6 +150,8 @@ jobs:
           path: |
             kvid-core/build/reports/androidTests
             kvid-core/build/outputs/androidTest-results
+            kvid-embed-onnx/build/reports/androidTests
+            kvid-embed-onnx/build/outputs/androidTest-results
 
   ios:
     name: iOS simulator tests
@@ -156,9 +179,7 @@ jobs:
         # The kvid-embed-onnx parity test is required wherever this fixture is produced.
         run: |
           python -m pip install --quiet "tokenizers==0.23.3"
-          python -I kvid-embed-onnx/scripts/make_tokenizer_fixture.py "$RUNNER_TEMP/tokenizer-fixture" --model BAAI/bge-small-en-v1.5 \
-            --revision 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a \
-            --sha256 d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66 07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3
+          python -I kvid-embed-onnx/scripts/make_tokenizer_fixture.py "$RUNNER_TEMP/tokenizer-fixture" $TOKENIZER_FIXTURE_ARGS
           echo "KVID_TOKENIZER_FIXTURE_DIR=$RUNNER_TEMP/tokenizer-fixture" >> "$GITHUB_ENV"
           echo "KVID_REQUIRE_TOKENIZER_FIXTURE=true" >> "$GITHUB_ENV"
       - name: Tokenizer tests and parity
