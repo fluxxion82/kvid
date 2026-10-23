@@ -9,12 +9,15 @@ import platform.Foundation.NSFileManager
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
 import platform.Foundation.NSUserDomainMask
+import platform.UIKit.UIApplication
 import platform.UIKit.UIApplicationDidEnterBackgroundNotification
+import platform.UIKit.UIBackgroundTaskInvalid
 import platform.UIKit.UIViewController
 
 /**
  * The process-wide session for the iOS app. The store lives in the app's Documents directory and is
- * closed when the app enters the background, then reopened on the next use.
+ * closed when the app enters the background, then reopened on the next use. iOS suspends a background
+ * app within seconds, so the close runs inside a background task that ends once the store has closed.
  */
 object IosSample {
     private val scope = MainScope()
@@ -25,7 +28,24 @@ object IosSample {
                 name = UIApplicationDidEnterBackgroundNotification,
                 `object` = null,
                 queue = NSOperationQueue.mainQueue
-            ) { _ -> scope.launch { session.closeWhenIdle() } }
+            ) { _ -> closeInBackground(session) }
+        }
+    }
+
+    private fun closeInBackground(session: StoreSession) {
+        val application = UIApplication.sharedApplication
+        var task = UIBackgroundTaskInvalid
+        fun end() {
+            if (task != UIBackgroundTaskInvalid) application.endBackgroundTask(task)
+            task = UIBackgroundTaskInvalid
+        }
+        task = application.beginBackgroundTaskWithExpirationHandler { end() }
+        scope.launch {
+            try {
+                session.closeWhenIdle().join()
+            } finally {
+                end()
+            }
         }
     }
 

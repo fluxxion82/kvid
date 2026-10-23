@@ -30,6 +30,9 @@ STORE="$(xcrun simctl get_app_container "$UDID" "$BUNDLE" data)/Documents/notes.
 python3 "$CHECK" "$STORE" 0 6                  # open in the foreground, seeded
 
 xcrun simctl launch "$UDID" com.apple.Preferences
-sleep 8
+for _ in $(seq 30); do                         # a slow simulator can take a while to close
+  python3 "$CHECK" "$STORE" 1 6 > /dev/null 2>&1 && break
+  sleep 2
+done
 python3 "$CHECK" "$STORE" 1 6                  # closed cleanly in the background
 echo "iOS sample smoke test passed"
