@@ -1,6 +1,6 @@
 # ADR 0002: Runtime for kvid's first real embedding model
 
-_Status: **Accepted** by the owner (October 23, 2026; proposed October 5). Implementation starts with the tokenizer. The store-side vector layer it builds on is implemented on `phase-5-semantic-search` and does not depend on this decision._
+_Status: **Accepted** by the owner (October 23, 2026; proposed October 5). The tokenizer is implemented with exact parity on all three platforms (see Implementation notes); the ONNX Runtime embedder is next. The store-side vector layer it builds on is implemented on `phase-5-semantic-search` and does not depend on this decision._
 
 ## Context
 
@@ -61,6 +61,10 @@ One Kotlin implementation of the model forward pass on every platform.
 - Apps that want semantic search add `kvid-embed-onnx` and ship or download about 130 MB of fp32 model (about 35 MB int8) plus the runtime. Everyone else is unaffected.
 - The iOS cinterop and its CI are the main risk; JVM and Android can land first behind the same API.
 - Exact vector search remains the baseline; HNSW is evaluated only after these measurements (roadmap, Milestone 5).
+
+## Implementation notes
+
+- Tokenizer (October 23, `phase-5-semantic-search`): character classification and normalization use tables generated from Hugging Face `tokenizers` 0.23.3 for every Unicode scalar value instead of each platform's Unicode data, because JVM, Android and Kotlin/Native ship different Unicode versions and case mappings. Regenerating the tables is the upgrade path when the reference changes. Parity is exact on the JVM, the Android API 35 emulator and the iOS simulator: 3,048 fixture cases, 0 mismatches, against `bge-small-en-v1.5` revision `5c38ec7c405ec4b44b94cc5a9bb96e735b38267a` (`tokenizer.json` SHA-256 `d241a60d…5c66`, `vocab.txt` SHA-256 `07eced37…38a3`). The fixture is larger than the few hundred strings planned, at no noticeable CI cost.
 
 ## When to revisit
 
