@@ -35,6 +35,17 @@ jobs:
           java-version: 17
       - name: Install ffmpeg (JVM video encoder/decoder)
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Tokenizer reference fixture (Hugging Face tokenizers)
+        # Reference encodings of curated and seeded random text by bge-small-en-v1.5's own tokenizer.
+        # The kvid-embed-onnx parity test is required wherever this fixture is produced.
+        run: |
+          python -m pip install --quiet "tokenizers==0.23.3"
+          python -I kvid-embed-onnx/scripts/make_tokenizer_fixture.py "$RUNNER_TEMP/tokenizer-fixture" --model BAAI/bge-small-en-v1.5 --revision main
+          echo "KVID_TOKENIZER_FIXTURE_DIR=$RUNNER_TEMP/tokenizer-fixture" >> "$GITHUB_ENV"
+          echo "KVID_REQUIRE_TOKENIZER_FIXTURE=true" >> "$GITHUB_ENV"
       - uses: gradle/actions/setup-gradle@v4
       - name: Build and test
         run: ./gradlew build --no-daemon --stacktrace
@@ -47,6 +58,7 @@ jobs:
           path: |
             kvid-core/build/reports/tests
             kvid-sample/shared/build/reports/tests
+            kvid-embed-onnx/build/reports/tests
 
   android-store:
     name: Android store (API 35 emulator)
@@ -134,6 +146,19 @@ jobs:
         run: ./gradlew :kvid-core:iosSimulatorArm64Test --no-daemon --stacktrace
       - name: Search measurement with an optimized binary
         run: ./gradlew :kvid-core:iosSimulatorArm64ReleaseTest --tests "com.kvid.store.SearchMeasurementTest" --no-daemon --stacktrace
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Tokenizer reference fixture (Hugging Face tokenizers)
+        # Reference encodings of curated and seeded random text by bge-small-en-v1.5's own tokenizer.
+        # The kvid-embed-onnx parity test is required wherever this fixture is produced.
+        run: |
+          python -m pip install --quiet "tokenizers==0.23.3"
+          python -I kvid-embed-onnx/scripts/make_tokenizer_fixture.py "$RUNNER_TEMP/tokenizer-fixture" --model BAAI/bge-small-en-v1.5 --revision main
+          echo "KVID_TOKENIZER_FIXTURE_DIR=$RUNNER_TEMP/tokenizer-fixture" >> "$GITHUB_ENV"
+          echo "KVID_REQUIRE_TOKENIZER_FIXTURE=true" >> "$GITHUB_ENV"
+      - name: Tokenizer tests and parity
+        run: ./gradlew :kvid-embed-onnx:iosSimulatorArm64Test --no-daemon --stacktrace
       - name: Sample model tests
         run: ./gradlew :kvid-sample:shared:iosSimulatorArm64Test --no-daemon --stacktrace
       - name: Build the iOS sample app
@@ -168,3 +193,4 @@ jobs:
           path: |
             kvid-core/build/reports/tests
             kvid-sample/shared/build/reports/tests
+            kvid-embed-onnx/build/reports/tests
