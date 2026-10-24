@@ -1,6 +1,6 @@
 # Implementation plan: ONNX Runtime embedder (JVM and Android)
 
-_Written October 24, 2026 by the local implementer. Turns [onnx-embedder.md](onnx-embedder.md) into ordered tasks. Code goes on `phase-5-onnx-embedder` (from `phase-5-semantic-search` at `df02d68`); planning documents stay on this branch. Status: revised after review by Codex (`gpt-6.1-sol`, high) and Claude Opus (high); see "Review record" at the end._
+_Written October 24, 2026 by the local implementer. Turns [onnx-embedder.md](onnx-embedder.md) into ordered tasks. Code goes on `phase-5-onnx-embedder` (from `phase-5-semantic-search` at `df02d68`); planning documents stay on this branch. Status: implemented on `phase-5-onnx-embedder` (`8df1723`..`8ebdbad`), CI run 40077315508 green; results in the ROADMAP (Milestone 5). Revised before implementation after review by Codex (`gpt-6.1-sol`, high) and Claude Opus (high); see "Review record" at the end._
 
 ## Facts checked before planning
 
