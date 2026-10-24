@@ -36,6 +36,27 @@ suspend fun notes(path: String) = Kvid.create(path).use { store ->
 
 Open an existing file with `Kvid.open(path)`, or `Kvid.openReadOnly(path)` alongside a writer. A process holds one writable handle per file; own it at application scope and close it when that owner goes away. The `Kvid` class documentation describes the lifecycle on Android and iOS.
 
+## Semantic search with kvid-embed-onnx
+
+`kvid-embed-onnx` is an optional module that runs [`BAAI/bge-small-en-v1.5`](https://huggingface.co/BAAI/bge-small-en-v1.5) with ONNX Runtime 1.30.0 on the JVM and Android (iOS follows). Lexical-only apps do not depend on it. It is not published yet.
+
+```kotlin
+OnnxEmbedder.open(modelPath = "…/model.onnx", vocabPath = "…/vocab.txt").use { embedder ->
+    store.indexVectors(embedder)
+    val similar = store.findSimilar("quarterly budget", embedder)
+}
+```
+
+- The app supplies `onnx/model.onnx` (about 133 MB, fp32) and `vocab.txt` from the model repository, bundled or downloaded. The embedder records SHA-256 digests of both in the store's `EmbeddingSpec`, so different files count as a different model. `kvid-embed-onnx/scripts/model-pins.json` lists the revision and digests the tests use.
+- Inputs longer than 512 tokens are truncated.
+- Android: the module requires API 24, the minimum of `onnxruntime-android`. The ONNX Runtime AAR registers a telemetry `ContentProvider` (`ai.onnxruntime.TelemetryInitializer`) that starts at app launch; this module's manifest removes it, and `open` disables ONNX Runtime telemetry. An app that also declares `onnxruntime-android` directly should remove it in its own manifest:
+
+  ```xml
+  <provider android:name="ai.onnxruntime.TelemetryInitializer" tools:node="remove" />
+  ```
+
+  The AAR also adds the `INTERNET` and `ACCESS_NETWORK_STATE` permissions; the embedder itself never uses the network. Remove them with `tools:node="remove"` if your app does not need them.
+
 ## Notes sample
 
 `kvid-sample` is a Compose Multiplatform notes app built on the store: list, search while typing, tag chips, edit, delete, version history and backup. It closes the store whenever the app leaves the foreground.
@@ -67,6 +88,8 @@ Requires JDK 17, the Android SDK, and Xcode on macOS for iOS.
 ./gradlew :kvid-core:iosSimulatorArm64Test         # iOS simulator tests (macOS)
 ./gradlew :kvid-core:connectedAndroidDeviceTest    # store tests on a connected device or emulator
 ```
+
+`scripts/check-local.sh` runs what CI runs, as far as the machine allows: the JVM build, the tokenizer and embedding parity fixtures (it downloads the pinned model into `~/.cache/kvid/models`), the iOS simulator tests on macOS, and the Android device tests when one device is connected. It reports each part as ran, skipped or failed; run it before pushing.
 
 Toolchain: Kotlin 2.5.0-Beta1, Gradle 9.8, Android Gradle Plugin 9.4, Compose Multiplatform 1.12.1.
 
