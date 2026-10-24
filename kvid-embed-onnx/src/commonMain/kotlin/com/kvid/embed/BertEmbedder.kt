@@ -4,20 +4,21 @@ import com.kvid.store.EmbeddingSpec
 import com.kvid.store.Embedder
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
  * The runtime-independent embedding pipeline: tokenize, batch and pad, run [backend], pool and
  * normalize. Texts are processed in sub-batches of at most [maxBatchSize], each padded to its longest
- * sequence. The result has one vector per text in input order, or an exception and nothing at all.
+ * sequence; with [sortByLength], sub-batches group texts of similar token length so they pad less.
+ * The result has one vector per text in input order, or an exception and nothing at all.
  */
 internal class BertEmbedder(
     private val model: BertEmbeddingModel,
     private val tokenizer: BertTokenizer,
     private val backend: EncoderBackend,
     override val spec: EmbeddingSpec,
-    private val maxBatchSize: Int
+    private val maxBatchSize: Int,
+    private val sortByLength: Boolean = false
 ) : Embedder {
     private val padId: Int = requireNotNull(tokenizer.idOf("[PAD]")) { "the vocabulary lacks [PAD]" }
 
@@ -28,16 +29,15 @@ internal class BertEmbedder(
 
     override suspend fun embed(texts: List<String>): List<FloatArray> {
         if (texts.isEmpty()) return emptyList()
-        val vectors = ArrayList<FloatArray>(texts.size)
-        var start = 0
-        while (start < texts.size) {
+        val ids = texts.map { tokenizer.encode(it, model.maxInputTokens).ids }
+        val order = if (sortByLength) ids.indices.sortedBy { ids[it].size } else ids.indices.toList()
+        val vectors = arrayOfNulls<FloatArray>(texts.size)
+        for (rows in order.chunked(maxBatchSize)) {
             currentCoroutineContext().ensureActive()
-            val end = min(start + maxBatchSize, texts.size)
-            val ids = texts.subList(start, end).map { tokenizer.encode(it, model.maxInputTokens).ids }
-            vectors += embedBatch(padBatch(ids, padId))
-            start = end
+            val batch = embedBatch(padBatch(rows.map { ids[it] }, padId))
+            rows.forEachIndexed { i, row -> vectors[row] = batch[i] }
         }
-        return vectors
+        return vectors.map { it!! }
     }
 
     private fun embedBatch(batch: PaddedBatch): List<FloatArray> {

@@ -33,7 +33,7 @@ class OnnxEmbedderMeasurementTest {
 
         val line = embedder.use {
             val batch1 = notes.take(20).map { note -> timedMs { embedder.embed(listOf(note)) } }
-            val batch16 = notes.drop(20).take(16 * 5).chunked(16).map { batch -> timedMs { embedder.embed(batch) } / batch.size }
+            val call16 = notes.drop(20).take(16 * 5).chunked(16).map { batch -> timedMs { embedder.embed(batch) } / batch.size }
             var vectors = 0
             val notes500Ms = timedMs { vectors = embedder.embed(notes).size }
             assertEquals(notes.size, vectors)
@@ -42,7 +42,7 @@ class OnnxEmbedderMeasurementTest {
             else "pss_before_kb=$pssBefore pss_after_open_kb=$pssAfterOpen pss_after_embed_kb=$pssAfterEmbed"
             "[kvid-embedding-measure] platform=$testPlatform open_ms=${ms(openMs)} digest_ms=${ms(phases.digestMs)} " +
                 "session_ms=${ms(phases.sessionMs)} warmup_ms=${ms(phases.warmupMs)} batch1_median_ms=${ms(batch1.median())} " +
-                "batch16_per_note_median_ms=${ms(batch16.median())} notes500_ms=${ms(notes500Ms)} " +
+                "call16_per_note_median_ms=${ms(call16.median())} notes500_ms=${ms(notes500Ms)} " +
                 "notes5100_extrapolated_ms=${ms(notes500Ms * 5100 / notes.size)} $pss"
         }
         println(line)
@@ -64,7 +64,7 @@ class OnnxEmbedderMeasurementTest {
  * for tags kept so the sequence matches. Each text is what the store embeds, the title, a blank line
  * and the body.
  */
-private class SyntheticNotes : Sequence<String> {
+internal class SyntheticNotes : Sequence<String> {
     private val random = Random(20261004)
     private val syllables = listOf("ka", "to", "ri", "mo", "sen", "dal", "ve", "lu", "pra", "ni", "sho", "ter", "ba", "ex", "on", "mi", "ul", "gra", "fo", "qui")
     private val vocabulary: List<String> = (0 until 3000).map { i ->

@@ -115,6 +115,19 @@ class BertEmbedderTest {
         batched.zip(single).forEach { (a, b) -> assertContentEquals(b, a) }
     }
 
+    @Test fun sortedSubBatchesGroupSimilarLengthsAndKeepInputOrder() = runTest {
+        val texts = listOf("a b c d e", "a", "b c d e", "c", "d e")
+        val backend = FakeBackend()
+        val sorted = BertEmbedder(
+            model(), tokenizer, backend, EmbeddingSpec("test-model", "sha256:0", "test", DIMS, "cls", false),
+            maxBatchSize = 2, sortByLength = true
+        ).embed(texts)
+        // Token lengths with [CLS] and [SEP]: 7 3 6 3 4. Sorted: (3, 3), (4, 6), (7), so less padding.
+        assertEquals(listOf(3, 6, 7), backend.calls.map { it.seqLen })
+        val single = texts.map { embedder(model(), FakeBackend()).embed(listOf(it)).single() }
+        sorted.zip(single).forEach { (a, b) -> assertContentEquals(b, a) }
+    }
+
     @Test fun longTextsAreTruncatedToMaxInputTokens() = runTest {
         val backend = FakeBackend()
         embedder(model(maxInputTokens = 8), backend).embed(listOf("a ".repeat(20)))

@@ -118,7 +118,7 @@ class OnnxEmbedder private constructor(
                     metric = VectorMetric.COSINE,
                     maxInputTokens = model.maxInputTokens
                 )
-                val embedder = BertEmbedder(model, tokenizer, backend, spec, options.maxBatchSize)
+                val embedder = BertEmbedder(model, tokenizer, backend, spec, options.maxBatchSize, options.sortByLength)
                 val sessionNs = System.nanoTime() - sessionStart
                 currentCoroutineContext().ensureActive()
 
@@ -156,6 +156,8 @@ class OnnxEmbedder private constructor(
             try {
                 sessionOptions.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
                 options.intraOpThreads?.let { sessionOptions.setIntraOpNumThreads(it) }
+                sessionOptions.setCPUArenaAllocator(options.cpuMemoryArena)
+                sessionOptions.setMemoryPatternOptimization(options.memoryPattern)
                 session = try {
                     environment.createSession(path, sessionOptions)
                 } catch (e: OrtException) {
