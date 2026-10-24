@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <!--
+            onnxruntime-android registers this ContentProvider, which runs at app start, loads the native
+            library and creates a telemetry HTTP client. kvid removes it (owner decision): the library is
+            loaded when OnnxEmbedder.open is called, and open turns telemetry off. Apps that also depend on
+            onnxruntime-android directly may add the same element to their own manifest. The INTERNET and
+            ACCESS_NETWORK_STATE permissions the AAR declares are left for the app to keep or remove.
+        -->
+        <provider
+            android:name="ai.onnxruntime.TelemetryInitializer"
+            tools:node="remove" />
+    </application>
+</manifest>
