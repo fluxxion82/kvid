@@ -266,7 +266,7 @@ Store-side vector measurements at `2c32e74` (the Milestone 3 corpus, 5,100 docum
 
 At this size exact search is well within interactive latency on every target, so HNSW is not justified yet. Vectors add about 2 KB per document (1.5 KB of float32 plus page overhead).
 
-Next steps, in order (ADR 0002 accepted; the tokenizer is done): the ONNX Runtime embedder for JVM and Android with embedding parity against Python ONNX Runtime; then iOS through cinterop; then an evaluation corpus to measure semantic and hybrid retrieval and tune fusion; then semantic search in the sample.
+Next steps, in order (ADR 0002 accepted; the tokenizer is done): the ONNX Runtime embedder for JVM and Android with embedding parity against Python ONNX Runtime ([plan](plans/onnx-embedder.md), implemented by a local agent that can run the full test matrix before pushing, then reviewed by the cloud session); then iOS through cinterop; then an evaluation corpus to measure semantic and hybrid retrieval and tune fusion; then semantic search in the sample.
 
 **Exit criterion:** semantic retrieval improves a representative evaluation corpus and has explicit model compatibility and resource costs.
 
