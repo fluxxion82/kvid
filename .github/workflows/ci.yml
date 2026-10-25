@@ -287,7 +287,8 @@ jobs:
         # KVID_SKIP_IOS_QR_RENDERING_TESTS), the kvid-embed-onnx tests with both fixtures required
         # (tokenizer and embedding parity, lifecycle, store, measurement), the four telemetry-policy runs
         # (each a fresh simulator process), one tuning configuration, the optimized embedding measurement,
-        # the reopened portable store and the sample's shared tests.
+        # the reopened portable store, the leak check (200 open/embed/close cycles and failure paths) with its
+        # negative control, and the sample's shared tests.
         run: bash scripts/check-local.sh --only ios
       - name: Swift consumer of the KvidEmbed XCFramework
         # check-local.sh's ios-framework part (implementation plan, Task 8 and R13): builds the static

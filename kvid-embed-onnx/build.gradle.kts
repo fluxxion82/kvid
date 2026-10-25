@@ -130,8 +130,9 @@ kotlin {
 // KVID_EMBEDDING_MEASURE=true to print the embedding measurements; KVID_EMBEDDING_TUNE names one
 // configuration for OnnxEmbedderTuningTest. OnnxEmbedderPortabilityTest writes a store to
 // KVID_PORTABLE_STORE_OUT (a directory) or reopens the one at KVID_PORTABLE_STORE_IN, which
-// KVID_REQUIRE_PORTABLE_STORE=true requires. On Android devices all of them are instrumentation
-// arguments:
+// KVID_REQUIRE_PORTABLE_STORE=true requires; KVID_EMBEDDING_LEAK=true runs OnnxEmbedderLeakTest (iOS),
+// with KVID_EMBEDDING_LEAK_CONTROL=true as its negative control. On Android devices all of them are
+// instrumentation arguments:
 // -Pandroid.testInstrumentationRunnerArguments.KVID_TOKENIZER_FIXTURE_DIR=/data/local/tmp/...
 val fixtureVariables = listOf(
     "KVID_TOKENIZER_FIXTURE_DIR",
@@ -142,7 +143,9 @@ val fixtureVariables = listOf(
     "KVID_EMBEDDING_TUNE",
     "KVID_PORTABLE_STORE_OUT",
     "KVID_PORTABLE_STORE_IN",
-    "KVID_REQUIRE_PORTABLE_STORE"
+    "KVID_REQUIRE_PORTABLE_STORE",
+    "KVID_EMBEDDING_LEAK",
+    "KVID_EMBEDDING_LEAK_CONTROL"
 )
 val fixtureEnvironment = fixtureVariables.mapNotNull { name -> providers.environmentVariable(name).orNull?.let { name to it } }
 val fixtureDirs = listOf("tokenizerFixture" to "KVID_TOKENIZER_FIXTURE_DIR", "embeddingFixture" to "KVID_EMBEDDING_FIXTURE_DIR")
@@ -150,7 +153,7 @@ val fixtureDirs = listOf("tokenizerFixture" to "KVID_TOKENIZER_FIXTURE_DIR", "em
 // With a fixture required or measurements requested, the tests must run and print: Gradle's build cache
 // and up-to-date checks would otherwise replay an earlier result without any console output.
 val mustExecute = listOf(
-    "KVID_REQUIRE_TOKENIZER_FIXTURE", "KVID_REQUIRE_EMBEDDING_FIXTURE", "KVID_EMBEDDING_MEASURE", "KVID_REQUIRE_PORTABLE_STORE"
+    "KVID_REQUIRE_TOKENIZER_FIXTURE", "KVID_REQUIRE_EMBEDDING_FIXTURE", "KVID_EMBEDDING_MEASURE", "KVID_REQUIRE_PORTABLE_STORE", "KVID_EMBEDDING_LEAK"
 ).any { providers.environmentVariable(it).orNull == "true" } ||
     listOf("KVID_EMBEDDING_TUNE", "KVID_PORTABLE_STORE_OUT").any { providers.environmentVariable(it).isPresent }
 tasks.withType<AbstractTestTask>().configureEach {

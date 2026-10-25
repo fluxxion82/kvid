@@ -47,8 +47,9 @@
 # [kvid-portable] wrote line); android the first three and TelemetryProviderTest (Android only), then
 # OnnxEmbedderMeasurementTest in its own run; ios the jvm list (OnnxEmbedderPortabilityTest with its
 # [kvid-portable] reopened line for the JVM's store) plus TelemetryPolicyTest (iOS only), then
-# TelemetryPolicyTest once per environment case in its own simulator process, and OnnxEmbedderTuningTest
-# with KVID_EMBEDDING_TUNE=corpus=mixed+batch=4+sort=on.
+# TelemetryPolicyTest once per environment case in its own simulator process, OnnxEmbedderTuningTest
+# with KVID_EMBEDDING_TUNE=corpus=mixed+batch=4+sort=on, and OnnxEmbedderLeakTest twice with
+# KVID_EMBEDDING_LEAK=true (the check, then its negative control), each in its own run.
 # BertTokenizerParityTest is required everywhere. Gradle runs one invocation at a time; extra Gradle arguments
 # come from KVID_GRADLE_ARGS (default --stacktrace), the Python for the venv from KVID_PYTHON.
 set -uo pipefail
@@ -280,6 +281,27 @@ part_ios() {
       --since "$since" --require "kvid-embed-onnx:$class.OnnxEmbedderTuningTest"
     grep -o '\[kvid-embedding-tune\][^<]*' "$results/TEST-$class.OnnxEmbedderTuningTest.xml" \
       || { echo "OnnxEmbedderTuningTest passed without printing its [kvid-embedding-tune] line"; exit 1; }
+
+    # The leak check (implementation plan, Task 6 and R11): `leaks` cannot attach to simulator processes, so
+    # OnnxEmbedderLeakTest loops 200 open/embed/close cycles and failure paths, requiring the native object
+    # counters back at baseline and no malloc or footprint growth above its tolerances. Then its negative
+    # control, a deliberate 256 KiB leak per cycle, which the check must detect. Each its own run, gated on
+    # its fresh XML and its [kvid-embedding-leak] line.
+    local mode verdict
+    for mode in check control; do
+      if [ "$mode" = check ]; then verdict="result: no growth detected"; else verdict="result: growth detected"; fi
+      since="$(date +%s)"
+      rm -rf "$results"
+      (
+        export KVID_EMBEDDING_FIXTURE_DIR="$EMBEDDING_FIXTURE" KVID_REQUIRE_EMBEDDING_FIXTURE=true KVID_EMBEDDING_LEAK=true
+        if [ "$mode" = control ]; then export KVID_EMBEDDING_LEAK_CONTROL=true; fi
+        gradle :kvid-embed-onnx:iosSimulatorArm64Test --tests com.kvid.embed.OnnxEmbedderLeakTest
+      )
+      "$PY" -I scripts/verify_device_tests.py --module kvid-embed-onnx --glob '{module}/build/test-results/iosSimulatorArm64Test/*.xml' \
+        --since "$since" --require "kvid-embed-onnx:$class.OnnxEmbedderLeakTest"
+      grep -o "\[kvid-embedding-leak\] mode=$mode [^<]*$verdict" "$results/TEST-$class.OnnxEmbedderLeakTest.xml" \
+        || { echo "OnnxEmbedderLeakTest ($mode) passed without printing its [kvid-embedding-leak] line ending in '$verdict'"; exit 1; }
+    done
 
     # The measurement again with the optimized test binary, gated on its own fresh results: a debug
     # measurement never satisfies this gate (implementation plan, R9).
