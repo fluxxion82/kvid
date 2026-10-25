@@ -38,7 +38,7 @@ Open an existing file with `Kvid.open(path)`, or `Kvid.openReadOnly(path)` along
 
 ## Semantic search with kvid-embed-onnx
 
-`kvid-embed-onnx` is an optional module that runs [`BAAI/bge-small-en-v1.5`](https://huggingface.co/BAAI/bge-small-en-v1.5) with ONNX Runtime 1.30.0 on the JVM and Android (iOS follows). Lexical-only apps do not depend on it. It is not published yet.
+`kvid-embed-onnx` is an optional module that runs [`BAAI/bge-small-en-v1.5`](https://huggingface.co/BAAI/bge-small-en-v1.5) with ONNX Runtime 1.30.0 on the JVM, Android and iOS (arm64 device and arm64 simulator). `OnnxEmbedder` is declared in common code, so shared code opens it on every platform. Lexical-only apps do not depend on it. It is not published yet.
 
 ```kotlin
 OnnxEmbedder.open(modelPath = "…/model.onnx", vocabPath = "…/vocab.txt").use { embedder ->
@@ -57,6 +57,7 @@ OnnxEmbedder.open(modelPath = "…/model.onnx", vocabPath = "…/vocab.txt").use
   ```
 
   The AAR also adds the `INTERNET` and `ACCESS_NETWORK_STATE` permissions; the embedder itself never uses the network. Remove them with `tools:node="remove"` if your app does not need them.
+- iOS: the module requires iOS 15.1, the minimum of ONNX Runtime's iOS build. The build downloads Microsoft's prebuilt `onnxruntime-c` 1.30.0 archive at a pinned URL and SHA-256 (`kvid-embed-onnx/scripts/runtime-pins.json`) into `~/.cache/kvid/runtime` and links it statically into every Kotlin/Native binary of the module; nothing comes from CocoaPods. ONNX Runtime's iOS build contains Microsoft's telemetry client. Before kvid first calls ONNX Runtime in a process, it sets the environment variable `ORT_DISABLE_TELEMETRY=1` when the app has not set it, and it disables telemetry events through the C API. The variable affects the whole process. If the app has set it to another value, kvid keeps that value, and telemetry is then the app's choice. Another component that initializes ONNX Runtime earlier in the same process is not covered; set `ORT_DISABLE_TELEMETRY=1` at launch to cover it. How a Swift app links the embedder (one static framework that contains ONNX Runtime) is being finished on `phase-5-ios-embedder`.
 
 ## Notes sample
 

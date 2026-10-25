@@ -73,7 +73,13 @@ kotlin {
     // TelemetryPolicyTest checks the once-only telemetry policy (implementation plan, R2), which needs a
     // fresh process per environment case: one test run per case, each its own simulator process that runs
     // only that class with KVID_TELEMETRY_CASE set. Tasks iosSimulatorArm64Telemetry{Unset,Truthy,Falsy,Empty}Test.
+    // Debug Kotlin/Native test binaries are unoptimized, so their timings overstate app costs (Milestone 3:
+    // 10 to 40 times). This adds an optimized test binary and iosSimulatorArm64ReleaseTest for measurements.
     iosSimulatorArm64 {
+        binaries.test(listOf(NativeBuildType.RELEASE))
+        testRuns.create("release") {
+            setExecutionSourceFrom(binaries.getTest(NativeBuildType.RELEASE))
+        }
         telemetryCases.forEach { case ->
             testRuns.create("telemetry" + case.replaceFirstChar { it.uppercase() }) {
                 setExecutionSourceFrom(binaries.getTest(NativeBuildType.DEBUG))

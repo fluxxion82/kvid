@@ -138,7 +138,8 @@ part_jvm() {
   local excludes=()
   if [ "$(uname)" = Darwin ]; then
     excludes=(-x :kvid-core:iosSimulatorArm64Test -x :kvid-core:iosSimulatorArm64ReleaseTest
-              -x :kvid-embed-onnx:iosSimulatorArm64Test -x :kvid-sample:shared:iosSimulatorArm64Test)
+              -x :kvid-embed-onnx:iosSimulatorArm64Test -x :kvid-embed-onnx:iosSimulatorArm64ReleaseTest
+              -x :kvid-sample:shared:iosSimulatorArm64Test)
     for tcase in $TELEMETRY_CASES; do excludes+=(-x ":kvid-embed-onnx:$(telemetry_task "$tcase")"); done
   fi
   local results=kvid-embed-onnx/build/test-results/jvmTest
@@ -227,6 +228,21 @@ part_ios() {
       --since "$since" --require "kvid-embed-onnx:$class.OnnxEmbedderTuningTest"
     grep -o '\[kvid-embedding-tune\][^<]*' "$results/TEST-$class.OnnxEmbedderTuningTest.xml" \
       || { echo "OnnxEmbedderTuningTest passed without printing its [kvid-embedding-tune] line"; exit 1; }
+
+    # The measurement again with the optimized test binary, gated on its own fresh results: a debug
+    # measurement never satisfies this gate (implementation plan, R9).
+    local release=kvid-embed-onnx/build/test-results/iosSimulatorArm64ReleaseTest
+    local release_class=iosSimulatorArm64ReleaseTest.com.kvid.embed
+    since="$(date +%s)"
+    rm -rf "$release"
+    (
+      export KVID_EMBEDDING_FIXTURE_DIR="$EMBEDDING_FIXTURE" KVID_REQUIRE_EMBEDDING_FIXTURE=true KVID_EMBEDDING_MEASURE=true
+      gradle :kvid-embed-onnx:iosSimulatorArm64ReleaseTest --tests com.kvid.embed.OnnxEmbedderMeasurementTest
+    )
+    "$PY" -I scripts/verify_device_tests.py --module kvid-embed-onnx --glob '{module}/build/test-results/iosSimulatorArm64ReleaseTest/*.xml' \
+      --since "$since" --require "kvid-embed-onnx:$release_class.OnnxEmbedderMeasurementTest"
+    grep -o '\[kvid-embedding-measure\][^<]*' "$release/TEST-$release_class.OnnxEmbedderMeasurementTest.xml" \
+      || { echo "the optimized OnnxEmbedderMeasurementTest passed without printing its measurement line"; exit 1; }
   fi
 
   gradle :kvid-sample:shared:iosSimulatorArm64Test
