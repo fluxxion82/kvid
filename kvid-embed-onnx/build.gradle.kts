@@ -84,8 +84,10 @@ kotlin {
 // and KVID_EMBEDDING_FIXTURE_DIR (scripts/make_embedding_fixture.py, with model.onnx and vocab.txt). CI sets
 // KVID_REQUIRE_*_FIXTURE=true so a missing fixture fails instead of skipping the parity tests, and
 // KVID_EMBEDDING_MEASURE=true to print the embedding measurements; KVID_EMBEDDING_TUNE names one
-// configuration for OnnxEmbedderTuningTest. On Android devices all of them are
-// instrumentation arguments:
+// configuration for OnnxEmbedderTuningTest. The mobile indexing study adds KVID_MODEL_VARIANTS_DIR
+// (scripts/build_variants.py) and, for RetrievalEvalTest on the JVM, KVID_RETRIEVAL_EVAL,
+// KVID_RETRIEVAL_EVAL_DIR (scripts/prepare_retrieval_eval.py) and KVID_RETRIEVAL_EVAL_OUT. On Android
+// devices the variables are instrumentation arguments:
 // -Pandroid.testInstrumentationRunnerArguments.KVID_TOKENIZER_FIXTURE_DIR=/data/local/tmp/...
 val fixtureVariables = listOf(
     "KVID_TOKENIZER_FIXTURE_DIR",
@@ -93,7 +95,11 @@ val fixtureVariables = listOf(
     "KVID_EMBEDDING_FIXTURE_DIR",
     "KVID_REQUIRE_EMBEDDING_FIXTURE",
     "KVID_EMBEDDING_MEASURE",
-    "KVID_EMBEDDING_TUNE"
+    "KVID_EMBEDDING_TUNE",
+    "KVID_MODEL_VARIANTS_DIR",
+    "KVID_RETRIEVAL_EVAL",
+    "KVID_RETRIEVAL_EVAL_DIR",
+    "KVID_RETRIEVAL_EVAL_OUT"
 )
 val fixtureEnvironment = fixtureVariables.mapNotNull { name -> providers.environmentVariable(name).orNull?.let { name to it } }
 val fixtureDirs = listOf("tokenizerFixture" to "KVID_TOKENIZER_FIXTURE_DIR", "embeddingFixture" to "KVID_EMBEDDING_FIXTURE_DIR")
@@ -101,7 +107,8 @@ val fixtureDirs = listOf("tokenizerFixture" to "KVID_TOKENIZER_FIXTURE_DIR", "em
 // With a fixture required or measurements requested, the tests must run and print: Gradle's build cache
 // and up-to-date checks would otherwise replay an earlier result without any console output.
 val mustExecute = listOf("KVID_REQUIRE_TOKENIZER_FIXTURE", "KVID_REQUIRE_EMBEDDING_FIXTURE", "KVID_EMBEDDING_MEASURE")
-    .any { providers.environmentVariable(it).orNull == "true" } || providers.environmentVariable("KVID_EMBEDDING_TUNE").isPresent
+    .any { providers.environmentVariable(it).orNull == "true" } ||
+    listOf("KVID_EMBEDDING_TUNE", "KVID_RETRIEVAL_EVAL").any { providers.environmentVariable(it).isPresent }
 tasks.withType<AbstractTestTask>().configureEach {
     fixtureVariables.filter { !it.endsWith("_DIR") }.forEach { name ->
         inputs.property(name, providers.environmentVariable(name).orElse("false"))

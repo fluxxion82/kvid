@@ -1,0 +1,5 @@
+# Extra Python packages for the mobile indexing study (build_variants.py, prepare_retrieval_eval.py), on top of
+# requirements.txt. Not used by CI.
+-r requirements.txt
+onnx==1.23.2
+pyarrow==26.0.0

@@ -60,16 +60,21 @@ class OnnxEmbedder private constructor(
             options: OnnxOptions = OnnxOptions()
         ): OnnxEmbedder = open(modelPath, vocabPath, model, options, timings = null)
 
+        /**
+         * [open] for measurements: [timings] receives the phase durations, and [configureSession] adjusts
+         * the session options after [options] are applied (for example to add an execution provider).
+         */
         internal suspend fun open(
             modelPath: String,
             vocabPath: String,
             model: BertEmbeddingModel,
             options: OnnxOptions,
-            timings: ((OpenTimings) -> Unit)?
+            timings: ((OpenTimings) -> Unit)?,
+            configureSession: ((OrtSession.SessionOptions) -> Unit)? = null
         ): OnnxEmbedder {
             var opened: OnnxEmbedder? = null
             try {
-                withContext(Dispatchers.IO) { opened = openBlocking(modelPath, vocabPath, model, options, timings) }
+                withContext(Dispatchers.IO) { opened = openBlocking(modelPath, vocabPath, model, options, timings, configureSession) }
                 return opened!!
             } catch (e: Throwable) {
                 // withContext can throw after its block completed (cancelled while returning).
@@ -83,7 +88,8 @@ class OnnxEmbedder private constructor(
             vocabPath: String,
             model: BertEmbeddingModel,
             options: OnnxOptions,
-            timings: ((OpenTimings) -> Unit)?
+            timings: ((OpenTimings) -> Unit)?,
+            configureSession: ((OrtSession.SessionOptions) -> Unit)?
         ): OnnxEmbedder {
             val modelFile = readableFile(modelPath, "model")
             val vocabFile = readableFile(vocabPath, "vocabulary")
@@ -106,7 +112,7 @@ class OnnxEmbedder private constructor(
             } catch (_: OrtException) {
                 // Builds without telemetry support report an error here; there is nothing to turn off.
             }
-            val backend = createBackend(environment, modelFile, model, options)
+            val backend = createBackend(environment, modelFile, model, options, configureSession)
             try {
                 val spec = EmbeddingSpec(
                     model = model.name,
@@ -149,7 +155,13 @@ class OnnxEmbedder private constructor(
         }
 
         /** A session for [modelFile] whose inputs and output match [model]; nothing stays open on failure. */
-        private fun createBackend(environment: OrtEnvironment, modelFile: File, model: BertEmbeddingModel, options: OnnxOptions): OrtEncoderBackend {
+        private fun createBackend(
+            environment: OrtEnvironment,
+            modelFile: File,
+            model: BertEmbeddingModel,
+            options: OnnxOptions,
+            configureSession: ((OrtSession.SessionOptions) -> Unit)?
+        ): OrtEncoderBackend {
             val path = modelFile.path
             val sessionOptions = OrtSession.SessionOptions()
             var session: OrtSession? = null
@@ -158,6 +170,7 @@ class OnnxEmbedder private constructor(
                 options.intraOpThreads?.let { sessionOptions.setIntraOpNumThreads(it) }
                 sessionOptions.setCPUArenaAllocator(options.cpuMemoryArena)
                 sessionOptions.setMemoryPatternOptimization(options.memoryPattern)
+                configureSession?.invoke(sessionOptions)
                 session = try {
                     environment.createSession(path, sessionOptions)
                 } catch (e: OrtException) {

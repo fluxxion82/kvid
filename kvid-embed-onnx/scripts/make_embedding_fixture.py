@@ -2,6 +2,7 @@
 
 Usage:
   python -I make_embedding_fixture.py OUT_DIR --model-dir DIR [--pins PATH] [--random N]
+      [--pooling cls|mean] [--max-tokens N] [--dimensions N]
 
 DIR is a directory written by download_model.py (model.onnx, vocab.txt, tokenizer.json and
 provenance.json). Its digests are verified against provenance.json and the pins before use.
@@ -9,9 +10,10 @@ OUT_DIR receives embeddings.jsonl (one {"text", "ids", "vector"} object per line
 (provenance, library versions, provider, optimization level, case count) and hard links to model.onnx
 and vocab.txt (copies when a hard link is impossible; never symlinks, which adb may push as links).
 
-Each case is tokenized by Hugging Face tokenizers (truncation to 512, no padding), run through
-onnxruntime one text at a time (so padding cannot influence the reference), CLS-pooled and
-L2-normalized in numpy float32. Cases are a curated list plus seeded random strings from
+Each case is tokenized by Hugging Face tokenizers (truncation to --max-tokens, 512 by default, no
+padding), run through onnxruntime one text at a time (so padding cannot influence the reference),
+pooled (--pooling: CLS, the default for bge-small-en-v1.5, or the mean of all tokens, accumulated in
+float64, for all-MiniLM-L6-v2) and L2-normalized in numpy float32. Cases are a curated list plus seeded random strings from
 make_tokenizer_fixture.py's generator. Requires the packages in requirements.txt.
 """
 import argparse
@@ -30,7 +32,7 @@ import tokenizers
 from tokenizers import Tokenizer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MAX_TOKENS = 512
+MAX_TOKENS = 512  # defaults for bge-small-en-v1.5; other models pass --max-tokens and --pooling
 DIMENSIONS = 384
 OUTPUT_NAME = "last_hidden_state"
 SEED = 20261024
@@ -157,7 +159,11 @@ def main():
     ap.add_argument("--model-dir", required=True)
     ap.add_argument("--pins", default=os.path.join(HERE, "model-pins.json"))
     ap.add_argument("--random", type=int, default=100, help="number of seeded random texts")
+    ap.add_argument("--pooling", choices=["cls", "mean"], default="cls")
+    ap.add_argument("--max-tokens", type=int, default=MAX_TOKENS)
+    ap.add_argument("--dimensions", type=int, default=DIMENSIONS)
     args = ap.parse_args()
+    max_tokens, dimensions = args.max_tokens, args.dimensions
 
     provenance = verify_model_dir(args.model_dir, args.pins)
     model_path = os.path.join(args.model_dir, "model.onnx")
@@ -165,19 +171,19 @@ def main():
 
     rng = random.Random(SEED)
     long_words = " ".join(rng.choice(fixture.WORDS) for _ in range(700))
-    texts = list(CURATED) + ["", LONG_PARAGRAPH * 40, long_words]  # the last two exceed 512 tokens
+    texts = list(CURATED) + ["", LONG_PARAGRAPH * 40, long_words]  # the last two exceed 512 tokens, so any limit
     curated_count = len(texts)
     texts += [fixture.random_text(rng) for _ in range(args.random)]
 
     tok = Tokenizer.from_file(os.path.join(args.model_dir, "tokenizer.json"))
     tok.no_padding()
-    tok.enable_truncation(max_length=MAX_TOKENS)
+    tok.enable_truncation(max_length=max_tokens)
     full = Tokenizer.from_file(os.path.join(args.model_dir, "tokenizer.json"))
     full.no_padding()
     full.no_truncation()
-    truncated = sum(1 for t in texts if len(full.encode(t).ids) > MAX_TOKENS)
+    truncated = sum(1 for t in texts if len(full.encode(t).ids) > max_tokens)
     if truncated < 2:
-        sys.exit(f"expected at least two texts over {MAX_TOKENS} tokens, found {truncated}")
+        sys.exit(f"expected at least two texts over {max_tokens} tokens, found {truncated}")
 
     options = ort.SessionOptions()
     options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -203,9 +209,12 @@ def main():
             }
             feed = {name: value for name, value in feed.items() if name in input_names}
             hidden = session.run([OUTPUT_NAME], feed)[0]
-            if hidden.shape != (1, len(ids), DIMENSIONS):
+            if hidden.shape != (1, len(ids), dimensions):
                 sys.exit(f"unexpected output shape {hidden.shape} for {len(ids)} tokens")
-            vector = hidden[0, 0, :].astype(np.float32)  # CLS pooling
+            if args.pooling == "cls":
+                vector = hidden[0, 0, :].astype(np.float32)
+            else:  # mean over every token: one text, so no padding
+                vector = hidden[0].astype(np.float64).mean(axis=0).astype(np.float32)
             norm = np.linalg.norm(vector)
             if not np.isfinite(vector).all() or not np.isfinite(norm) or norm == 0:
                 sys.exit(f"non-finite or zero vector for text {text[:60]!r}")
@@ -226,8 +235,8 @@ def main():
         "onnxruntime": ort.__version__, "numpy": np.__version__, "tokenizers": tokenizers.__version__,
         "python": platform.python_version(), "provider": "CPUExecutionProvider",
         "graph_optimization_level": "ORT_ENABLE_ALL",
-        "input_names": input_names, "output_name": OUTPUT_NAME, "pooling": "cls", "normalize": True,
-        "dimensions": DIMENSIONS, "max_tokens": MAX_TOKENS, "seed": SEED,
+        "input_names": input_names, "output_name": OUTPUT_NAME, "pooling": args.pooling, "normalize": True,
+        "dimensions": dimensions, "max_tokens": max_tokens, "seed": SEED,
         "curated_cases": curated_count, "random_cases": args.random, "cases_over_max_tokens": truncated,
         "unit_norm_range": [min_norm, max_norm], "files": modes, "cases": count,
     }
