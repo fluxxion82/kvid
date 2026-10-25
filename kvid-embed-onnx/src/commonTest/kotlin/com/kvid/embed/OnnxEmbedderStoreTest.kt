@@ -18,24 +18,8 @@ import kotlin.time.Duration.Companion.minutes
  * parity test's skip-or-fail rule.
  */
 class OnnxEmbedderStoreTest {
-    private val notes = listOf(
-        "Quarterly budget" to "Expenses rose twelve percent; travel and software licences account for most of the increase.",
-        "Sourdough" to "Feed the starter the night before, mix flour and water, fold every half hour, bake at 250 °C.",
-        "Dentist" to "Cleaning appointment on Tuesday at 9:30; bring the insurance card.",
-        "Marathon training" to "Long run of 28 km on Sunday, easy pace, two gels and plenty of water.",
-        "Flight to Lisbon" to "Boarding pass is in the wallet app; terminal 2, gate closes 40 minutes before departure.",
-        "Garden" to "Plant tomatoes after the last frost and water the seedlings every morning."
-    )
-
-    /** Each query and the title of the note it means. */
-    private val queries = listOf(
-        "money we spent last quarter" to "Quarterly budget",
-        "baking bread in my kitchen" to "Sourdough",
-        "teeth checkup" to "Dentist",
-        "getting ready for a race" to "Marathon training",
-        "airport plane trip" to "Flight to Lisbon",
-        "growing vegetables" to "Garden"
-    )
+    private val notes = NotesCorpus.notes
+    private val queries = NotesCorpus.queries
 
     @Test fun semanticSearchFindsNotesWithoutSharedWordsAndSurvivesAReopen() = runTest(timeout = 10.minutes) {
         val fixture = EmbeddingFixture.loadOrSkip("embedder store test") ?: return@runTest
@@ -94,4 +78,29 @@ class OnnxEmbedderStoreTest {
             assertEquals(title, hits.first().document.title, "semantic search for '$query': ${hits.map { it.document.title to it.score }}")
         }
     }
+}
+
+/**
+ * Six notes and six queries that share no word with the note they mean, so only vectors connect them.
+ * Used by [OnnxEmbedderStoreTest] and [OnnxEmbedderPortabilityTest].
+ */
+internal object NotesCorpus {
+    val notes = listOf(
+        "Quarterly budget" to "Expenses rose twelve percent; travel and software licences account for most of the increase.",
+        "Sourdough" to "Feed the starter the night before, mix flour and water, fold every half hour, bake at 250 °C.",
+        "Dentist" to "Cleaning appointment on Tuesday at 9:30; bring the insurance card.",
+        "Marathon training" to "Long run of 28 km on Sunday, easy pace, two gels and plenty of water.",
+        "Flight to Lisbon" to "Boarding pass is in the wallet app; terminal 2, gate closes 40 minutes before departure.",
+        "Garden" to "Plant tomatoes after the last frost and water the seedlings every morning."
+    )
+
+    /** Each query and the title of the note it means. */
+    val queries = listOf(
+        "money we spent last quarter" to "Quarterly budget",
+        "baking bread in my kitchen" to "Sourdough",
+        "teeth checkup" to "Dentist",
+        "getting ready for a race" to "Marathon training",
+        "airport plane trip" to "Flight to Lisbon",
+        "growing vegetables" to "Garden"
+    )
 }

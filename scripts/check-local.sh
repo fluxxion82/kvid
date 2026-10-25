@@ -9,12 +9,17 @@
 #   fixtures        model download and digest check (kvid-embed-onnx/scripts/download_model.py) into
 #                   ${KVID_MODEL_CACHE:-$HOME/.cache/kvid/models}, then the tokenizer fixture and the
 #                   embedding fixture, written to build/check-local/{tokenizer,embedding}-fixture
-#   jvm             ./gradlew build (iOS test tasks and the KvidEmbed framework excluded) and :kvid-examples:compileKotlin with the
-#                   fixtures required; then the JUnit XML of :kvid-embed-onnx:jvmTest must show the
-#                   parity classes passed, not skipped
+#   jvm             ./gradlew build (iOS test tasks and the KvidEmbed framework excluded) and
+#                   :kvid-examples:compileKotlin with the fixtures required; then the JUnit XML of
+#                   :kvid-embed-onnx:jvmTest must show the parity classes passed, not skipped. It also writes
+#                   the portable store build/check-local/portable-store (OnnxEmbedderPortabilityTest) that
+#                   the ios part reopens on the simulator
+#   portable-store  (only with --only; for CI's iOS job, which has no jvm part) the JVM test that writes
+#                   the portable store, alone, with the jvm part's gate for it
 #   ios             (macOS with xcrun simctl) the iosSimulatorArm64 tasks CI runs; kvid-embed-onnx's with
 #                   the fixtures required and the measurement on, then scripts/verify_device_tests.py on
-#                   its fresh simulator XML and a check for the parity and measurement lines
+#                   its fresh simulator XML and a check for the parity and measurement lines. It reopens
+#                   the portable store written on the JVM (run the jvm or portable-store part first)
 #   ios-framework   (macOS with xcrun simctl) the KvidEmbed XCFramework (kvid-embed-onnx-ios-framework, static,
 #                   ONNX Runtime inside) and a Swift consumer linked against a copy of it for the simulator and
 #                   the device, run on a simulator and compared with Python ONNX Runtime
@@ -38,10 +43,12 @@
 # KVID_REQUIRE_EMBEDDING_FIXTURE, KVID_EMBEDDING_MEASURE; the required classes, listed per part; the
 # measurement runs) switch on when kvid-embed-onnx/src/commonTest/kotlin/com/kvid/embed/OnnxEmbedderParityTest.kt
 # exists. The fixture itself is always built. Required classes: jvm OnnxEmbedderParityTest,
-# OnnxEmbedderTest, OnnxEmbedderStoreTest, OnnxEmbedderMeasurementTest; android the first three and
-# TelemetryProviderTest (Android only), then OnnxEmbedderMeasurementTest in its own run; ios the jvm
-# list plus TelemetryPolicyTest (iOS only), then TelemetryPolicyTest once per environment case in its own
-# simulator process, and OnnxEmbedderTuningTest with KVID_EMBEDDING_TUNE=corpus=mixed+batch=4+sort=on.
+# OnnxEmbedderTest, OnnxEmbedderStoreTest, OnnxEmbedderMeasurementTest, OnnxEmbedderPortabilityTest (its
+# [kvid-portable] wrote line); android the first three and TelemetryProviderTest (Android only), then
+# OnnxEmbedderMeasurementTest in its own run; ios the jvm list (OnnxEmbedderPortabilityTest with its
+# [kvid-portable] reopened line for the JVM's store) plus TelemetryPolicyTest (iOS only), then
+# TelemetryPolicyTest once per environment case in its own simulator process, and OnnxEmbedderTuningTest
+# with KVID_EMBEDDING_TUNE=corpus=mixed+batch=4+sort=on.
 # BertTokenizerParityTest is required everywhere. Gradle runs one invocation at a time; extra Gradle arguments
 # come from KVID_GRADLE_ARGS (default --stacktrace), the Python for the venv from KVID_PYTHON.
 set -uo pipefail
@@ -55,11 +62,13 @@ VENV="$OUT/venv"
 PY="$VENV/bin/python"
 TOKENIZER_FIXTURE="$OUT/tokenizer-fixture"
 EMBEDDING_FIXTURE="$OUT/embedding-fixture"
+# A store indexed on the JVM and reopened on the iOS simulator (OnnxEmbedderPortabilityTest; plan, R12).
+PORTABLE_STORE="$OUT/portable-store"
 MODEL_CACHE="${KVID_MODEL_CACHE:-$HOME/.cache/kvid/models}"
 DEVICE_TOKENIZER_DIR=/data/local/tmp/kvid-tokenizer-fixture
 DEVICE_EMBEDDING_DIR=/data/local/tmp/kvid-embedding-fixture
 GRADLE_ARGS="${KVID_GRADLE_ARGS---stacktrace}"
-PARTS="python fixtures jvm ios ios-framework android sample-ios sample-android"
+PARTS="python fixtures jvm portable-store ios ios-framework android sample-ios sample-android"
 PROPS=-Pandroid.testInstrumentationRunnerArguments
 
 # The Core Image simulator defect is quarantined the same way in CI.
@@ -136,8 +145,11 @@ part_jvm() {
   if have_embedding_tests; then
     export KVID_EMBEDDING_FIXTURE_DIR="$EMBEDDING_FIXTURE" KVID_REQUIRE_EMBEDDING_FIXTURE=true
     export KVID_EMBEDDING_MEASURE=true  # measurements are part of a full run, as in CI
+    export KVID_PORTABLE_STORE_OUT="$PORTABLE_STORE"
+    rm -rf "$PORTABLE_STORE"
     required+=(--require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderParityTest --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderTest
-               --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderStoreTest --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderMeasurementTest)
+               --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderStoreTest --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderMeasurementTest
+               --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderPortabilityTest)
   fi
   # On macOS `build` also runs the iOS simulator tests (check depends on allTests); the ios part runs them.
   local excludes=()
@@ -164,7 +176,31 @@ part_jvm() {
       || { echo "OnnxEmbedderParityTest passed without printing its parity line (skipped?)"; exit 1; }
     grep -qF '[kvid-embedding-measure]' "$results"/TEST-com.kvid.embed.OnnxEmbedderMeasurementTest.xml \
       || { echo "OnnxEmbedderMeasurementTest passed without printing its measurement line (skipped?)"; exit 1; }
+    check_portable_store_written "$results/TEST-com.kvid.embed.OnnxEmbedderPortabilityTest.xml"
   fi
+}
+
+# The writer half of OnnxEmbedderPortabilityTest ran in this run: its line, and the store and its
+# expected results, both newer than the run's start (the directory was removed before it).
+check_portable_store_written() {
+  grep -o '\[kvid-portable\] wrote [^<]*' "$1" \
+    || { echo "OnnxEmbedderPortabilityTest passed without writing the portable store (skipped?)"; exit 1; }
+  [ -f "$PORTABLE_STORE/notes.kvid" ] && [ -f "$PORTABLE_STORE/expected.json" ] \
+    || { echo "no notes.kvid and expected.json in $PORTABLE_STORE"; exit 1; }
+  echo "portable store: $(ls -l "$PORTABLE_STORE" | awk 'NR > 1 { print $NF, $5 " bytes" }' | tr '\n' ' ')"
+}
+
+part_portable_store() {
+  require_fixtures
+  have_embedding_tests || skip "no embedding tests ($EMBEDDING_TESTS_MARKER)"
+  local results=kvid-embed-onnx/build/test-results/jvmTest since
+  rm -rf "$results" "$PORTABLE_STORE"
+  since="$(date +%s)"
+  KVID_EMBEDDING_FIXTURE_DIR="$EMBEDDING_FIXTURE" KVID_REQUIRE_EMBEDDING_FIXTURE=true KVID_PORTABLE_STORE_OUT="$PORTABLE_STORE" \
+    gradle :kvid-embed-onnx:jvmTest --tests com.kvid.embed.OnnxEmbedderPortabilityTest
+  "$PY" -I scripts/verify_device_tests.py --glob '{module}/build/test-results/jvmTest/*.xml' --module kvid-embed-onnx --since "$since" \
+    --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderPortabilityTest
+  check_portable_store_written "$results/TEST-com.kvid.embed.OnnxEmbedderPortabilityTest.xml"
 }
 
 part_ios() {
@@ -180,11 +216,18 @@ part_ios() {
   local class=iosSimulatorArm64Test.com.kvid.embed
   local required=(--require "kvid-embed-onnx:$class.BertTokenizerParityTest")
   local since
+  if have_embedding_tests; then
+    [ -f "$PORTABLE_STORE/notes.kvid" ] && [ -f "$PORTABLE_STORE/expected.json" ] \
+      || { echo "no portable store in $PORTABLE_STORE; run the jvm part (or --only portable-store) first"; exit 1; }
+    grep -q '"writer": *"jvm/' "$PORTABLE_STORE/expected.json" \
+      || { echo "$PORTABLE_STORE/expected.json was not written on the JVM"; exit 1; }
+  fi
   since="$(date +%s)"
   (
     export KVID_TOKENIZER_FIXTURE_DIR="$TOKENIZER_FIXTURE" KVID_REQUIRE_TOKENIZER_FIXTURE=true
     if have_embedding_tests; then
       export KVID_EMBEDDING_FIXTURE_DIR="$EMBEDDING_FIXTURE" KVID_REQUIRE_EMBEDDING_FIXTURE=true KVID_EMBEDDING_MEASURE=true
+      export KVID_PORTABLE_STORE_IN="$PORTABLE_STORE" KVID_REQUIRE_PORTABLE_STORE=true
     fi
     rm -rf "$results"
     gradle :kvid-embed-onnx:iosSimulatorArm64Test
@@ -192,7 +235,7 @@ part_ios() {
   if have_embedding_tests; then
     required+=(--require "kvid-embed-onnx:$class.OnnxEmbedderParityTest" --require "kvid-embed-onnx:$class.OnnxEmbedderTest"
                --require "kvid-embed-onnx:$class.OnnxEmbedderStoreTest" --require "kvid-embed-onnx:$class.OnnxEmbedderMeasurementTest"
-               --require "kvid-embed-onnx:$class.TelemetryPolicyTest")
+               --require "kvid-embed-onnx:$class.TelemetryPolicyTest" --require "kvid-embed-onnx:$class.OnnxEmbedderPortabilityTest")
   fi
   echo "---- [kvid-*] lines from the simulator XML (copied, not used as the gate) ----"
   grep -ho '\[kvid-[a-z-]*\][^<]*' "$results"/*.xml || echo "none"
@@ -207,6 +250,8 @@ part_ios() {
       || { echo "OnnxEmbedderParityTest passed without printing its parity line (skipped?)"; exit 1; }
     grep -qF '[kvid-embedding-measure]' "$results/TEST-$class.OnnxEmbedderMeasurementTest.xml" \
       || { echo "OnnxEmbedderMeasurementTest passed without printing its measurement line (skipped?)"; exit 1; }
+    grep -o '\[kvid-portable\] reopened writer=jvm/[^<]*' "$results/TEST-$class.OnnxEmbedderPortabilityTest.xml" \
+      || { echo "OnnxEmbedderPortabilityTest passed without reopening the JVM's portable store"; exit 1; }
 
     # The telemetry policy per environment case, each in a fresh simulator process (its own Gradle test
     # run and result directory), gated on its own fresh XML and its [kvid-telemetry] line.
@@ -407,6 +452,7 @@ if [ "${1:-}" = __part ]; then
     python) part_python ;;
     fixtures) part_fixtures ;;
     jvm) part_jvm ;;
+    portable-store) part_portable_store ;;
     ios) part_ios ;;
     ios-framework) part_ios_framework ;;
     android) part_android ;;
@@ -474,6 +520,7 @@ selected() {
   fi
   case "$1" in
     sample-*) $WITH_SAMPLE ;;
+    portable-store) return 1 ;;  # the jvm part writes the store in a full run
     *) return 0 ;;
   esac
 }
@@ -481,7 +528,7 @@ selected() {
 dependency_of() {
   case "$1" in
     fixtures) echo python ;;
-    jvm | ios | ios-framework | android) echo fixtures ;;
+    jvm | portable-store | ios | ios-framework | android) echo fixtures ;;
   esac
 }
 

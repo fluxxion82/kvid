@@ -276,13 +276,18 @@ jobs:
         with:
           path: ~/.cache/kvid/runtime
           key: kvid-runtime-ios-${{ hashFiles('kvid-embed-onnx/scripts/runtime-pins.json') }}
+      - name: Portable store from the JVM
+        # check-local.sh's portable-store part (implementation plan, R12): OnnxEmbedderPortabilityTest on the
+        # JVM of this macOS runner indexes six notes into build/check-local/portable-store and records the
+        # spec and top hits; the next step's ios part reopens a copy of that store on the simulator.
+        run: bash scripts/check-local.sh --only portable-store
       - name: Simulator tests, parity and measurements
         # check-local.sh's ios part, gated on fresh JUnit XML per class: kvid-core's simulator tests and
         # optimized search measurement (the known Core Image QR rendering defect is quarantined there with
         # KVID_SKIP_IOS_QR_RENDERING_TESTS), the kvid-embed-onnx tests with both fixtures required
         # (tokenizer and embedding parity, lifecycle, store, measurement), the four telemetry-policy runs
         # (each a fresh simulator process), one tuning configuration, the optimized embedding measurement,
-        # and the sample's shared tests.
+        # the reopened portable store and the sample's shared tests.
         run: bash scripts/check-local.sh --only ios
       - name: Swift consumer of the KvidEmbed XCFramework
         # check-local.sh's ios-framework part (implementation plan, Task 8 and R13): builds the static
@@ -326,5 +331,6 @@ jobs:
             kvid-embed-onnx/build/reports/tests
             kvid-embed-onnx/build/test-results
             build/check-local/*.log
+            build/check-local/portable-store/expected.json
             kvid-embed-onnx-ios-framework/build/swift-check/*.log
             kvid-embed-onnx-ios-framework/build/swift-check/consumer/*.log
