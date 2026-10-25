@@ -85,6 +85,7 @@ jobs:
             --require kvid-embed-onnx:com.kvid.embed.BertTokenizerParityTest \
             --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderParityTest \
             --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderTest \
+            --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderStoreTest \
             --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderMeasurementTest
           grep -qF '[kvid-tokenizer] cases=' "$results"/TEST-com.kvid.embed.BertTokenizerParityTest.xml
           grep -qF '[kvid-embedding] cases=' "$results"/TEST-com.kvid.embed.OnnxEmbedderParityTest.xml
@@ -213,7 +214,7 @@ jobs:
             adb logcat -c
             ./gradlew :kvid-embed-onnx:connectedAndroidDeviceTest $FIXTURE_ARGS --no-daemon --stacktrace
             adb logcat -d -s System.out | grep -E "\[kvid-(tokenizer|embedding)\]" || echo "no [kvid-tokenizer]/[kvid-embedding] line in logcat"
-            python3 -I scripts/verify_device_tests.py --module kvid-embed-onnx --since "$KVID_DEVICE_TESTS_SINCE" --require kvid-embed-onnx:com.kvid.embed.BertTokenizerParityTest --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderParityTest --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderTest --require kvid-embed-onnx:com.kvid.embed.TelemetryProviderTest
+            python3 -I scripts/verify_device_tests.py --module kvid-embed-onnx --since "$KVID_DEVICE_TESTS_SINCE" --require kvid-embed-onnx:com.kvid.embed.BertTokenizerParityTest --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderParityTest --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderTest --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderStoreTest --require kvid-embed-onnx:com.kvid.embed.TelemetryProviderTest
             cp -R kvid-embed-onnx/build/outputs/androidTest-results "$RUNNER_TEMP/embed-device-results"
             adb logcat -c
             ./gradlew :kvid-embed-onnx:connectedAndroidDeviceTest $FIXTURE_ARGS $MEASURE_ARGS --no-daemon --stacktrace

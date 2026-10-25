@@ -29,7 +29,7 @@
 #
 # Embedding tests: the embedding fixture requirements (KVID_EMBEDDING_FIXTURE_DIR,
 # KVID_REQUIRE_EMBEDDING_FIXTURE, KVID_EMBEDDING_MEASURE; the required classes OnnxEmbedderParityTest,
-# OnnxEmbedderTest and TelemetryProviderTest; the measurement run) switch on by themselves when
+# OnnxEmbedderTest, OnnxEmbedderStoreTest and TelemetryProviderTest; the measurement run) switch on by themselves when
 # kvid-embed-onnx/src/jvmAndAndroidTest exists, so this script works before those tests are written.
 # The fixture itself is always built. Gradle runs one invocation at a time; extra Gradle arguments
 # come from KVID_GRADLE_ARGS (default --stacktrace), the Python for the venv from KVID_PYTHON.
@@ -118,7 +118,7 @@ part_jvm() {
     export KVID_EMBEDDING_FIXTURE_DIR="$EMBEDDING_FIXTURE" KVID_REQUIRE_EMBEDDING_FIXTURE=true
     export KVID_EMBEDDING_MEASURE=true  # measurements are part of a full run, as in CI
     required+=(--require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderParityTest --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderTest
-               --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderMeasurementTest)
+               --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderStoreTest --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderMeasurementTest)
   fi
   # On macOS `build` also runs the iOS simulator tests (check depends on allTests); the ios part runs them.
   local excludes=()
@@ -227,7 +227,7 @@ part_android() {
     push_fixture "$EMBEDDING_FIXTURE" "$DEVICE_EMBEDDING_DIR"
     args+=("$PROPS.KVID_EMBEDDING_FIXTURE_DIR=$DEVICE_EMBEDDING_DIR" "$PROPS.KVID_REQUIRE_EMBEDDING_FIXTURE=true")
     required+=(--require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderParityTest --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderTest
-               --require kvid-embed-onnx:com.kvid.embed.TelemetryProviderTest)
+               --require kvid-embed-onnx:com.kvid.embed.OnnxEmbedderStoreTest --require kvid-embed-onnx:com.kvid.embed.TelemetryProviderTest)
   fi
   adb logcat -c
   gradle :kvid-embed-onnx:connectedAndroidDeviceTest "${args[@]}"
