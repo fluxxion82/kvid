@@ -442,6 +442,37 @@ Codex found three P1 problems, nine P2 and two P3. All are accepted. Where a rev
 - **Execution providers.** CPU only: no Core ML or other EP is registered, even though the archive contains them.
 - **Portability test.** A store indexed on the JVM is copied to the iOS simulator test. There it must reopen with an equal spec, embed nothing again, and return the same top hits.
 
+### R13. Link spike result (October 25; settles D2 and R7)
+
+Run on `phase-5-ios-embedder` before any backend code. Everything below was executed, not inferred.
+
+- **Runtime and cinterop.** Task 1 and R6 hold:
+  - a cold download, then a verify without downloading;
+  - a tampered header, thinned archive and ZIP each recovered once;
+  - a second mismatch fails, naming the file;
+  - JVM-only task graphs never schedule the runtime;
+  - the configuration cache is reused.
+
+  The cinterop needs `kotlin.mpp.enableCInteropCommonization=true` in `gradle.properties`, so that `iosMain` and `iosTest` see it.
+- **Test binaries.** `OrtLinkSpikeTest` on the simulator printed `api=30 version=1.30.0`, created an environment, disabled telemetry events, and opened a session over the real model (3 inputs, 1 output). It then released everything. Both test executables have `minos 15.1`, which needed `-Xoverride-konan-properties=osVersionMin.ios_arm64=15.1;osVersionMin.ios_simulator_arm64=15.1`, because Kotlin/Native defaults to 15.0 and its link prints no warning. R8's check is therefore an explicit `vtool -show-build` assertion, not a warning.
+- **Static umbrella (`isStatic = true`): self-contained.** The framework archive contains the Kotlin object, `sqlite3.o` from kvid-core and one `prelinked_objects.o` holding all of ORT.
+  - `swiftc -F … -framework KvidSpikeStatic` links on the simulator and the device slice with no other flags. The link map attributes `_OrtGetApiBase` and 120,762 symbols to the framework.
+  - The Kotlin object carries autolink entries for `-lc++` and the system frameworks.
+  - With autolinking off, exactly the podspec's flags are needed.
+  - CoreML is then linked strongly instead of weakly, which is harmless at 15.1.
+- **Dynamic umbrella: also works.** It must be embedded and signed by the app; this was tested with an ad-hoc signed `.app` on the simulator.
+- **Correctness through Swift.** Both simulator apps (static and dynamic) ran one inference on `[101, 7592, 2088, 102]`. They printed `shape=[1, 4, 384] cls[0..2]=[0.14310633, -0.21255468, 0.08049059]`, identical to Python ONNX Runtime 1.30.0 on the same input.
+- **Decision: ship a static umbrella that contains ORT.**
+  - This is one framework added in Xcode with "Do Not Embed". It is the same shape as KvidCore.
+  - No CocoaPods, and **no separate `onnxruntime.xcframework`**: that part of R7's static option would put two copies of ORT in the app, which R7 forbids.
+  - The umbrella exports the kvid-core API, because it already contains a Kotlin runtime and kvid-core's SQLite, so an app links it **instead of** KvidCore, never beside it.
+  - The README lists the podspec flags for builds that disable autolinking. ORT's `LICENSE` ships with the umbrella.
+  - The dynamic umbrella stays a documented fallback.
+- **Gates adjusted.**
+  - Consumer link tasks take ORT from the cinterop klib (about 46 MB embedded), not from the runtime directory, so R6's verify dependency applies inside `kvid-embed-onnx` only, which builds that klib.
+  - Kotlin/Native result class names are `iosSimulatorArm64Test.com.kvid.embed.<Class>`; R9's `--require` patterns use them.
+  - On a Mac, `./gradlew build` (and so check-local's jvm part) now compiles the iOS cinterop and triggers the runtime download once.
+
 ## Review
 
 _October 25, 2026, Codex. Reviewed the draft above against `ios-embedder.md`, ADR 0002 and the JVM/Android implementation at `0d857813267a6a3346e9522e08b6473aa52abdb9`. Read the supplied iOS archive and headers; independently recomputed the ZIP SHA-256 (`e6f1670c14406fd9f082bb400ab197a9b0a9646058ca6366e440642e2b54a2ea`), confirmed API version 30, the slice inventory and static-archive format, and found the POSIX telemetry functions in the device slice with `nm`. Also checked the tagged upstream ORT 1.30.0 source and coroutine 1.11.0 Native source. This is a plan/source/artifact review: no Gradle, compiler/link spike, simulator or physical-device runs were performed. The static-framework packaging outcome and runtime behavior remain unverified._
