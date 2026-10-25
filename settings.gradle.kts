@@ -28,5 +28,6 @@ dependencyResolutionManagement {
 
 include(":kvid-core")
 include(":kvid-examples")
+include(":kvid-embed-onnx")
 include(":kvid-sample:shared")
 include(":kvid-sample:androidApp")

@@ -27,6 +27,10 @@ sealed class KvidException(val code: String, message: String, cause: Throwable? 
     class CursorExpired(message: String) : KvidException("KV_CURSOR_EXPIRED", message)
     /** A [QuerySyntax.FTS5] expression the full-text engine rejected. [QuerySyntax.PLAIN] queries never raise this. */
     class InvalidQuery(message: String, cause: Throwable? = null) : KvidException("KV_INVALID_QUERY", message, cause)
+    /** An embedder's spec differs from the one recorded with the store's vectors; nothing was written. */
+    class EmbeddingMismatch(message: String, val recorded: EmbeddingSpec?, val provided: EmbeddingSpec) : KvidException("KV_EMBEDDING_MISMATCH", message)
+    /** A vector has the wrong number of dimensions or a non-finite value. */
+    class InvalidVector(message: String) : KvidException("KV_INVALID_VECTOR", message)
     /** The document does not exist (or is deleted, for operations that need a live document). */
     class NotFound(message: String) : KvidException("KV_NOT_FOUND", message)
     /** A file or document that must not exist already does. */

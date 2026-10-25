@@ -1,0 +1,7 @@
+# Python packages for the reference fixtures (make_tokenizer_fixture.py, make_embedding_fixture.py).
+# Used by CI and by scripts/check-local.sh. Pinned so the reference vectors do not drift.
+tokenizers==0.23.3
+onnxruntime==1.30.0
+# 2.4.6 is the newest numpy with wheels for CPython 3.11 and 3.12 on macOS arm64 and manylinux x86_64;
+# numpy 2.5 dropped CPython 3.11.
+numpy==2.4.6

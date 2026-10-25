@@ -22,6 +22,10 @@ build/
 out/
 bin/
 
+# Python
+__pycache__/
+*.pyc
+
 # Temp files
 *.tmp
 *.bak

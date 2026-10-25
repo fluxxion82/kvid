@@ -52,6 +52,16 @@ class SearchMeasurementTest {
         val listed = (1..20).map { timed(clock) { store.list(ListOptions(limit = 50)) } }
         val commonHits = store.find(vocabulary[0], FindOptions(match = MatchMode.ANY)).items.size
         val stats = store.stats()
+
+        // Exact vector search at the dimension of bge-small-en-v1.5; vectors are pseudo-random, so this
+        // measures store costs (storage, scan, fusion), not model inference or retrieval quality.
+        val embedder = RandomEmbedder(384)
+        val indexStart = clock.markNow()
+        store.indexVectors(embedder, batchSize = 128)
+        val indexVectorsMs = indexStart.elapsedNow().inWholeMicroseconds.toMs()
+        val similar = queries.take(20).map { q -> timed(clock) { store.findSimilar(q, embedder, SimilarOptions(limit = 20)) } }
+        val hybrid = queries.take(20).map { q -> timed(clock) { store.findHybrid(q, embedder, FindOptions(limit = 20, match = MatchMode.ANY)) } }
+        val vectorStats = store.stats()
         store.close()
 
         val reopenStart = clock.markNow()
@@ -66,6 +76,11 @@ class SearchMeasurementTest {
                 "find_any_ms=${any.median()}/${any.p95()} find_any_tag_ms=${tagged.median()}/${tagged.p95()} " +
                 "list_ms=${listed.median()}/${listed.p95()} reopen_first_find_ms=$reopenMs file_bytes=${stats.fileBytes}"
         )
+        println(
+            "[kvid-measure] platform=${PlatformInfo.name} vectors=${vectorStats.liveDocuments} dims=384 index_vectors_ms=$indexVectorsMs " +
+                "find_similar_ms=${similar.median()}/${similar.p95()} find_hybrid_ms=${hybrid.median()}/${hybrid.p95()} " +
+                "file_bytes_with_vectors=${vectorStats.fileBytes}"
+        )
         assertEquals((docs + 100).toLong(), stats.liveDocuments)
         assertTrue(commonHits > 0, "the most frequent word has hits")
     }
@@ -79,4 +94,13 @@ class SearchMeasurementTest {
     private fun Long.toMs(): Double = (this / 100) / 10.0
     private fun List<Long>.median(): Double = sorted()[size / 2].toMs()
     private fun List<Long>.p95(): Double = sorted()[(size * 95 / 100).coerceAtMost(size - 1)].toMs()
+}
+
+/** Deterministic pseudo-random vectors seeded by the text, standing in for a model. */
+private class RandomEmbedder(dimensions: Int) : Embedder {
+    override val spec = EmbeddingSpec("measure-random", "seeded:1", "none", dimensions, "none", normalized = false)
+    override suspend fun embed(texts: List<String>): List<FloatArray> = texts.map { text ->
+        val random = Random(text.hashCode())
+        FloatArray(spec.dimensions) { random.nextFloat() * 2f - 1f }
+    }
 }

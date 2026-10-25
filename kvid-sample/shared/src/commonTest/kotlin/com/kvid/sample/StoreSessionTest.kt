@@ -20,7 +20,7 @@ class StoreSessionTest {
         val count = session.use { it.stats().liveDocuments }
         assertTrue(count > 0)
         assertTrue(session.isOpen())
-        session.closeWhenIdle()
+        assertTrue(session.closeWhenIdle().isCompleted, "an idle close is done when it returns")
         assertFalse(session.isOpen())
         assertEquals(count, session.use { it.stats().liveDocuments }, "reopening does not seed again")
         assertEquals(1, seeded)
@@ -41,18 +41,21 @@ class StoreSessionTest {
         val release = CompletableDeferred<Unit>()
         val worker = launch { session.use { store -> store.put("during"); inside.complete(Unit); release.await() } }
         inside.await()
-        session.closeWhenIdle()
+        val closing = session.closeWhenIdle()
         assertTrue(session.isOpen(), "a running use keeps the store open")
+        assertFalse(closing.isCompleted, "the close is scheduled, not done")
         release.complete(Unit)
         worker.join()
         assertFalse(session.isOpen(), "the deferred close ran when the last use finished")
+        assertTrue(closing.isCompleted, "the job completes with the deferred close")
 
         val second = CompletableDeferred<Unit>()
         val secondRelease = CompletableDeferred<Unit>()
         val busy = launch { session.use { second.complete(Unit); secondRelease.await() } }
         second.await()
-        session.closeWhenIdle()
+        val cancelled = session.closeWhenIdle()
         session.use { it.put("foreground again") }
+        assertTrue(cancelled.isCompleted, "a new use cancels the scheduled close and completes its job")
         secondRelease.complete(Unit)
         busy.join()
         assertTrue(session.isOpen(), "a use after the close request cancels the deferred close")
