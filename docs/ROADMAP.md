@@ -353,7 +353,7 @@ Store-side vector measurements at `2c32e74` (the Milestone 3 corpus, 5,100 docum
 
 At this size exact search is well within interactive latency on every target, so HNSW is not justified yet. Vectors add about 2 KB per document (1.5 KB of float32 plus page overhead).
 
-Next steps, in order (ADR 0002 accepted; the tokenizer and the JVM/Android embedder are done and reviewed, October 25): a decision on mobile indexing time (background indexing, int8, or MiniLM) and on merging; then iOS through cinterop; then an evaluation corpus to measure semantic and hybrid retrieval and tune fusion; then semantic search in the sample.
+Next steps (ADR 0002 accepted; the tokenizer and the JVM/Android embedder are done and reviewed, October 25). Merging `phase-5-onnx-embedder` waits for the local agent's sign-off on `0d85781` (owner, October 25). Then two tracks run in parallel. The [mobile indexing study](plans/mobile-indexing.md) is reviewed by Codex first, then the cloud session measures quality and JVM speed and the local agent measures devices. [iOS through cinterop](plans/ios-embedder.md) is planned and implemented by the local agent; then iOS through cinterop; then an evaluation corpus to measure semantic and hybrid retrieval and tune fusion; then semantic search in the sample.
 
 **Exit criterion:** semantic retrieval improves a representative evaluation corpus and has explicit model compatibility and resource costs.
 
