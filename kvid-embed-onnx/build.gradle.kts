@@ -2,11 +2,16 @@ import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
+import org.jetbrains.kotlin.gradle.tasks.CInteropProcess
+import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kotlin.multiplatform.library)
 }
+
+// prepareOnnxRuntimeIos and verifyOnnxRuntimeIos: the pinned ONNX Runtime iOS archive (scripts/runtime-pins.json).
+apply(from = "onnxruntime-ios.gradle.kts")
 
 // Optional embedding support for kvid-core (ADR 0002). Apps that use only lexical search do not depend
 // on this module. Common code holds the BERT WordPiece tokenizer and the embedding pipeline; the JVM and
@@ -37,8 +42,20 @@ kotlin {
         }
     }
 
-    iosArm64()
-    iosSimulatorArm64()
+    // ONNX Runtime for iOS through the C API (src/nativeInterop/cinterop/onnxruntime.def), linked from the
+    // pinned, verified archive that onnxruntime-ios.gradle.kts prepares. ORT's minimum is iOS 15.1, above
+    // Kotlin/Native's default of 15.0, so every binary of this module is linked for 15.1; the linker would
+    // otherwise warn that ORT's objects were built for a newer iOS than the binary.
+    val onnxRuntimeDir = layout.buildDirectory.dir("onnxruntime/ios")
+    listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
+        target.compilations.getByName("main").cinterops.create("onnxruntime") {
+            includeDirs(onnxRuntimeDir.map { it.dir("Headers") })
+            extraOpts("-libraryPath", onnxRuntimeDir.get().dir(target.name).asFile.absolutePath)
+        }
+        target.binaries.configureEach {
+            freeCompilerArgs += "-Xoverride-konan-properties=osVersionMin.ios_arm64=15.1;osVersionMin.ios_simulator_arm64=15.1"
+        }
+    }
 
     sourceSets {
         commonMain.dependencies {
@@ -133,4 +150,12 @@ tasks.withType<AbstractTestTask>().configureEach {
         showCauses = true
         showStackTraces = true
     }
+}
+
+// Every iOS cinterop and link task uses the runtime only after verifyOnnxRuntimeIos has checked it against
+// the pins (it runs on every build). macOS hosts only: elsewhere the Apple tasks are skipped, and JVM and
+// Android builds never have these tasks in their graph, so they never download the runtime.
+if (System.getProperty("os.name").startsWith("Mac")) {
+    tasks.withType<CInteropProcess>().configureEach { dependsOn("verifyOnnxRuntimeIos") }
+    tasks.withType<KotlinNativeLink>().configureEach { dependsOn("verifyOnnxRuntimeIos") }
 }

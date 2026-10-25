@@ -1,0 +1,30 @@
+{
+  "runtime": "onnxruntime-c",
+  "version": "1.30.0",
+  "license": "MIT",
+  "archive": {
+    "url": "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.30.0.zip",
+    "sha256": "e6f1670c14406fd9f082bb400ab197a9b0a9646058ca6366e440642e2b54a2ea",
+    "bytes": 63965603
+  },
+  "files": {
+    "Headers/onnxruntime_c_api.h": "e035e30c27e74c8c00e0f483e576e12b4067d17f12e9237fd6eff8b346c9b381",
+    "Headers/onnxruntime_error_code.h": "5ce3b054e798eced8d14f5b86e98692fd33470463f96194ce0700a2d53dd8721",
+    "Headers/onnxruntime_ep_c_api.h": "e6c986c9e98583f8113b2c6bc3864814883b806d501cf24da4d239c45753e235",
+    "LICENSE": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+    "onnxruntime.xcframework/ios-arm64/onnxruntime.framework/onnxruntime": "1a68904a1513ed02f4e3a7ea1162b1d341178b6df7a511a007062922765c88ec",
+    "onnxruntime.xcframework/ios-arm64_x86_64-simulator/onnxruntime.framework/onnxruntime": "030d4c27a87513217149b807e9a91fdf8f788982bed1d2c7d3ec9c89b3954509"
+  },
+  "targets": {
+    "iosArm64": {
+      "slice": "onnxruntime.xcframework/ios-arm64/onnxruntime.framework/onnxruntime",
+      "thin": null,
+      "sha256": "1a68904a1513ed02f4e3a7ea1162b1d341178b6df7a511a007062922765c88ec"
+    },
+    "iosSimulatorArm64": {
+      "slice": "onnxruntime.xcframework/ios-arm64_x86_64-simulator/onnxruntime.framework/onnxruntime",
+      "thin": "arm64",
+      "sha256": "c445f5e8a96a9ac08710312b251352ff40dce3e2e9f5419a4328ff942214a2cd"
+    }
+  }
+}
