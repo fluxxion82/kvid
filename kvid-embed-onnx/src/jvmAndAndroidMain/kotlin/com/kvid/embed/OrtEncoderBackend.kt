@@ -5,8 +5,10 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import java.nio.LongBuffer
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.decrementAndFetch
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
@@ -16,6 +18,7 @@ import kotlin.concurrent.write
  * order, once. Inference holds a read lock only for the synchronous native call, so calls from several
  * threads run concurrently, and [close] waits for running calls before releasing native memory.
  */
+@OptIn(ExperimentalAtomicApi::class)
 internal class OrtEncoderBackend(
     private val environment: OrtEnvironment,
     private val session: OrtSession,
@@ -29,12 +32,12 @@ internal class OrtEncoderBackend(
     private val outputs = setOf(outputName)
 
     init {
-        live.incrementAndGet()
+        BackendHooks.live.incrementAndFetch()
     }
 
     override fun run(inputIds: LongArray, attentionMask: LongArray, tokenTypeIds: LongArray, batch: Int, seqLen: Int): FloatArray = lock.read {
         check(!closed) { "OnnxEmbedder is closed" }
-        insideRunForTests?.invoke()
+        BackendHooks.insideRun.load()?.invoke()
         val shape = longArrayOf(batch.toLong(), seqLen.toLong())
         val tensors = ArrayList<OnnxTensor>(3)
         try {
@@ -70,7 +73,7 @@ internal class OrtEncoderBackend(
                 session.close()
             } finally {
                 sessionOptions.close()
-                live.decrementAndGet()
+                BackendHooks.live.decrementAndFetch()
             }
         }
     }
@@ -79,11 +82,5 @@ internal class OrtEncoderBackend(
         const val INPUT_IDS = "input_ids"
         const val ATTENTION_MASK = "attention_mask"
         const val TOKEN_TYPE_IDS = "token_type_ids"
-
-        /** Backends created and not yet closed in this process; tests check that failed opens leak none. */
-        val live = AtomicInteger()
-
-        /** Called inside [run] while it holds the read lock, so a test can hold an inference in flight. */
-        @Volatile var insideRunForTests: (() -> Unit)? = null
     }
 }

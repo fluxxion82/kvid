@@ -1,6 +1,8 @@
+import java.time.Duration
 import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
+import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.CInteropProcess
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
@@ -15,9 +17,20 @@ apply(from = "onnxruntime-ios.gradle.kts")
 
 // Optional embedding support for kvid-core (ADR 0002). Apps that use only lexical search do not depend
 // on this module. Common code holds the BERT WordPiece tokenizer and the embedding pipeline; the JVM and
-// Android run it with ONNX Runtime (OnnxEmbedder). iOS gets its runtime in a later step.
+// Android run it with ONNX Runtime's Java API, iOS with its C API through cinterop (OnnxEmbedder, an expect
+// class with one actual in src/jvmAndAndroidMain and one in iosMain).
+val telemetryCases = listOf("unset", "truthy", "falsy", "empty")
+fun telemetryTask(case: String) = "iosSimulatorArm64Telemetry${case.replaceFirstChar { it.uppercase() }}Test"
+
 kotlin {
     jvmToolchain(17)
+
+    // kotlin.concurrent.atomics (BackendHooks, the iOS backend and the tests) is still marked experimental.
+    compilerOptions {
+        optIn.add("kotlin.concurrent.atomics.ExperimentalAtomicApi")
+        // OnnxEmbedder is an expect class (Beta in Kotlin 2.5), with actuals for the JVM/Android and iOS.
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
 
     jvm()
 
@@ -27,7 +40,7 @@ kotlin {
         // 24, not kvid's 23: onnxruntime-android 1.30.0 declares minSdkVersion 24 (owner decision).
         minSdk = libs.versions.androidEmbedMinSdk.get().toInt()
 
-        // Device-side (instrumented) tests run commonTest and jvmAndAndroidTest on an emulator or device;
+        // Device-side (instrumented) tests run commonTest (and androidDeviceTest) on an emulator or device;
         // fixtures are pushed to the device and passed as instrumentation arguments (see the CI jobs).
         withDeviceTestBuilder { sourceSetTreeName = "test" }
 
@@ -57,6 +70,18 @@ kotlin {
         }
     }
 
+    // TelemetryPolicyTest checks the once-only telemetry policy (implementation plan, R2), which needs a
+    // fresh process per environment case: one test run per case, each its own simulator process that runs
+    // only that class with KVID_TELEMETRY_CASE set. Tasks iosSimulatorArm64Telemetry{Unset,Truthy,Falsy,Empty}Test.
+    iosSimulatorArm64 {
+        telemetryCases.forEach { case ->
+            testRuns.create("telemetry" + case.replaceFirstChar { it.uppercase() }) {
+                setExecutionSourceFrom(binaries.getTest(NativeBuildType.DEBUG))
+                filter { includeTestsMatching("com.kvid.embed.TelemetryPolicyTest") }
+            }
+        }
+    }
+
     sourceSets {
         commonMain.dependencies {
             api(project(":kvid-core"))
@@ -70,9 +95,10 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
         }
 
-        // The JVM jar and the Android AAR expose the same ai.onnxruntime Java API, so the embedder and its
-        // tests are one source directory compiled into both targets. IntelliJ reports duplicate content
-        // roots and assigns each directory to one module; compilation is unaffected.
+        // The JVM jar and the Android AAR expose the same ai.onnxruntime Java API, so the actual OnnxEmbedder
+        // is one source directory compiled into both targets (each sees exactly one actual). IntelliJ reports
+        // duplicate content roots and assigns the directory to one module; compilation is unaffected. The
+        // tests are in commonTest and run on every target.
         jvmMain {
             kotlin.srcDir("src/jvmAndAndroidMain/kotlin")
             dependencies { implementation(libs.onnxruntime.jvm) }
@@ -81,12 +107,7 @@ kotlin {
             kotlin.srcDir("src/jvmAndAndroidMain/kotlin")
             dependencies { implementation(libs.onnxruntime.android) }
         }
-        jvmTest {
-            kotlin.srcDir("src/jvmAndAndroidTest/kotlin")
-        }
-
         getByName("androidDeviceTest") {
-            kotlin.srcDir("src/jvmAndAndroidTest/kotlin")
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
@@ -142,7 +163,18 @@ tasks.withType<KotlinNativeTest>().configureEach {
     }
 }
 
+telemetryCases.forEach { case ->
+    tasks.withType<KotlinNativeTest>().matching { it.name == telemetryTask(case) }.configureEach {
+        environment("KVID_TELEMETRY_CASE", case)
+        environment("SIMCTL_CHILD_KVID_TELEMETRY_CASE", case)
+        outputs.upToDateWhen { false }
+        outputs.doNotCacheIf("each telemetry case must run in a fresh process") { true }
+    }
+}
+
 tasks.withType<AbstractTestTask>().configureEach {
+    // runTest's timeout cannot stop a native wait or inference that is stuck; this bounds the whole task.
+    timeout.set(Duration.ofMinutes(90))
     testLogging {
         events(TestLogEvent.FAILED, TestLogEvent.SKIPPED, TestLogEvent.STANDARD_OUT)
         exceptionFormat = TestExceptionFormat.FULL

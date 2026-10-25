@@ -4,11 +4,12 @@ import com.kvid.store.FindOptions
 import com.kvid.store.Kvid
 import com.kvid.store.MatchMode
 import com.kvid.store.PutOptions
-import kotlinx.coroutines.runBlocking
-import java.io.File
+import kotlinx.coroutines.test.runTest
+import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * The real model through the store: indexing records the embedder's spec, semantic search finds notes
@@ -36,10 +37,10 @@ class OnnxEmbedderStoreTest {
         "growing vegetables" to "Garden"
     )
 
-    @Test fun semanticSearchFindsNotesWithoutSharedWordsAndSurvivesAReopen() = runBlocking {
-        val fixture = EmbeddingFixture.loadOrSkip("embedder store test") ?: return@runBlocking
-        val dir = File.createTempFile("kvid-store", "").apply { delete(); mkdirs() }
-        val path = File(dir, "notes.kvid").path
+    @Test fun semanticSearchFindsNotesWithoutSharedWordsAndSurvivesAReopen() = runTest(timeout = 10.minutes) {
+        val fixture = EmbeddingFixture.loadOrSkip("embedder store test") ?: return@runTest
+        val dir = createTempDirectory("kvid-store")
+        val path = Path(dir, "notes.kvid").toString()
         try {
             val store = Kvid.create(path)
             try {

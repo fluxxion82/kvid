@@ -12,7 +12,9 @@
 #   jvm             ./gradlew build (iOS test tasks excluded) and :kvid-examples:compileKotlin with the
 #                   fixtures required; then the JUnit XML of :kvid-embed-onnx:jvmTest must show the
 #                   parity classes passed, not skipped
-#   ios             (macOS with xcrun simctl) the iosSimulatorArm64 tasks CI runs
+#   ios             (macOS with xcrun simctl) the iosSimulatorArm64 tasks CI runs; kvid-embed-onnx's with
+#                   the fixtures required and the measurement on, then scripts/verify_device_tests.py on
+#                   its fresh simulator XML and a check for the parity and measurement lines
 #   android         (one adb device) core and embed device tests with the fixtures pushed, the
 #                   measurement run, and scripts/verify_device_tests.py on the JUnit XML
 #   sample-ios      (--with-sample; macOS with xcodegen) build and smoke-test the iOS sample app
@@ -28,10 +30,14 @@
 # several devices and no ANDROID_SERIAL, or none, the android parts are SKIPPED.
 #
 # Embedding tests: the embedding fixture requirements (KVID_EMBEDDING_FIXTURE_DIR,
-# KVID_REQUIRE_EMBEDDING_FIXTURE, KVID_EMBEDDING_MEASURE; the required classes OnnxEmbedderParityTest,
-# OnnxEmbedderTest, OnnxEmbedderStoreTest and TelemetryProviderTest; the measurement run) switch on by themselves when
-# kvid-embed-onnx/src/jvmAndAndroidTest exists, so this script works before those tests are written.
-# The fixture itself is always built. Gradle runs one invocation at a time; extra Gradle arguments
+# KVID_REQUIRE_EMBEDDING_FIXTURE, KVID_EMBEDDING_MEASURE; the required classes, listed per part; the
+# measurement runs) switch on when kvid-embed-onnx/src/commonTest/kotlin/com/kvid/embed/OnnxEmbedderParityTest.kt
+# exists. The fixture itself is always built. Required classes: jvm OnnxEmbedderParityTest,
+# OnnxEmbedderTest, OnnxEmbedderStoreTest, OnnxEmbedderMeasurementTest; android the first three and
+# TelemetryProviderTest (Android only), then OnnxEmbedderMeasurementTest in its own run; ios the jvm
+# list plus TelemetryPolicyTest (iOS only), then TelemetryPolicyTest once per environment case in its own
+# simulator process, and OnnxEmbedderTuningTest with KVID_EMBEDDING_TUNE=corpus=mixed+batch=4+sort=on.
+# BertTokenizerParityTest is required everywhere. Gradle runs one invocation at a time; extra Gradle arguments
 # come from KVID_GRADLE_ARGS (default --stacktrace), the Python for the venv from KVID_PYTHON.
 set -uo pipefail
 
@@ -54,7 +60,15 @@ PROPS=-Pandroid.testInstrumentationRunnerArguments
 # The Core Image simulator defect is quarantined the same way in CI.
 export KVID_SKIP_IOS_QR_RENDERING_TESTS=true
 
-have_embedding_tests() { [ -d "$ROOT/kvid-embed-onnx/src/jvmAndAndroidTest" ]; }
+# A stable file of the embedding test suite (the tests run from commonTest on every platform).
+EMBEDDING_TESTS_MARKER=kvid-embed-onnx/src/commonTest/kotlin/com/kvid/embed/OnnxEmbedderParityTest.kt
+have_embedding_tests() { [ -f "$ROOT/$EMBEDDING_TESTS_MARKER" ]; }
+
+# kvid-embed-onnx's TelemetryPolicyTest cases, one fresh simulator process (Gradle test run) each.
+TELEMETRY_CASES="unset truthy falsy empty"
+telemetry_task() { echo "iosSimulatorArm64Telemetry$(echo "${1:0:1}" | tr '[:lower:]' '[:upper:]')${1:1}Test"; }
+# The tuning configuration the ios part runs and gates (implementation plan, R9).
+IOS_TUNE_CONFIG=corpus=mixed+batch=4+sort=on
 
 # ----------------------------------------------------------------------------------------------
 # Parts (run in child processes with -e)
@@ -125,6 +139,7 @@ part_jvm() {
   if [ "$(uname)" = Darwin ]; then
     excludes=(-x :kvid-core:iosSimulatorArm64Test -x :kvid-core:iosSimulatorArm64ReleaseTest
               -x :kvid-embed-onnx:iosSimulatorArm64Test -x :kvid-sample:shared:iosSimulatorArm64Test)
+    for tcase in $TELEMETRY_CASES; do excludes+=(-x ":kvid-embed-onnx:$(telemetry_task "$tcase")"); done
   fi
   local results=kvid-embed-onnx/build/test-results/jvmTest
   rm -rf "$results"  # results must come from this run (executed, or restored from the build cache)
@@ -150,7 +165,70 @@ part_ios() {
   require_fixtures
   gradle :kvid-core:iosSimulatorArm64Test
   gradle :kvid-core:iosSimulatorArm64ReleaseTest --tests com.kvid.store.SearchMeasurementTest
-  KVID_TOKENIZER_FIXTURE_DIR="$TOKENIZER_FIXTURE" KVID_REQUIRE_TOKENIZER_FIXTURE=true gradle :kvid-embed-onnx:iosSimulatorArm64Test
+
+  # Kotlin/Native result classes are named iosSimulatorArm64Test.<package>.<Class>, so the requirements
+  # name them in full (a com.kvid.embed.<Class> requirement would match nothing).
+  local results=kvid-embed-onnx/build/test-results/iosSimulatorArm64Test
+  local class=iosSimulatorArm64Test.com.kvid.embed
+  local required=(--require "kvid-embed-onnx:$class.BertTokenizerParityTest")
+  local since
+  since="$(date +%s)"
+  (
+    export KVID_TOKENIZER_FIXTURE_DIR="$TOKENIZER_FIXTURE" KVID_REQUIRE_TOKENIZER_FIXTURE=true
+    if have_embedding_tests; then
+      export KVID_EMBEDDING_FIXTURE_DIR="$EMBEDDING_FIXTURE" KVID_REQUIRE_EMBEDDING_FIXTURE=true KVID_EMBEDDING_MEASURE=true
+    fi
+    rm -rf "$results"
+    gradle :kvid-embed-onnx:iosSimulatorArm64Test
+  )
+  if have_embedding_tests; then
+    required+=(--require "kvid-embed-onnx:$class.OnnxEmbedderParityTest" --require "kvid-embed-onnx:$class.OnnxEmbedderTest"
+               --require "kvid-embed-onnx:$class.OnnxEmbedderStoreTest" --require "kvid-embed-onnx:$class.OnnxEmbedderMeasurementTest"
+               --require "kvid-embed-onnx:$class.TelemetryPolicyTest")
+  fi
+  echo "---- [kvid-*] lines from the simulator XML (copied, not used as the gate) ----"
+  grep -ho '\[kvid-[a-z-]*\][^<]*' "$results"/*.xml || echo "none"
+  echo "---- simulator XML gate ----"
+  # The results directory was removed before the run, and --since rejects files older than the run.
+  "$PY" -I scripts/verify_device_tests.py --module kvid-embed-onnx --glob '{module}/build/test-results/iosSimulatorArm64Test/*.xml' \
+    --since "$since" "${required[@]}"
+  grep -qF '[kvid-tokenizer] cases=' "$results/TEST-$class.BertTokenizerParityTest.xml" \
+    || { echo "BertTokenizerParityTest passed without printing its parity line (skipped?)"; exit 1; }
+  if have_embedding_tests; then
+    grep -qF '[kvid-embedding] cases=' "$results/TEST-$class.OnnxEmbedderParityTest.xml" \
+      || { echo "OnnxEmbedderParityTest passed without printing its parity line (skipped?)"; exit 1; }
+    grep -qF '[kvid-embedding-measure]' "$results/TEST-$class.OnnxEmbedderMeasurementTest.xml" \
+      || { echo "OnnxEmbedderMeasurementTest passed without printing its measurement line (skipped?)"; exit 1; }
+
+    # The telemetry policy per environment case, each in a fresh simulator process (its own Gradle test
+    # run and result directory), gated on its own fresh XML and its [kvid-telemetry] line.
+    local tasks=() tcase task
+    for tcase in $TELEMETRY_CASES; do tasks+=(":kvid-embed-onnx:$(telemetry_task "$tcase")"); done
+    since="$(date +%s)"
+    for tcase in $TELEMETRY_CASES; do rm -rf "kvid-embed-onnx/build/test-results/$(telemetry_task "$tcase")"; done
+    gradle "${tasks[@]}"
+    for tcase in $TELEMETRY_CASES; do
+      task="$(telemetry_task "$tcase")"
+      "$PY" -I scripts/verify_device_tests.py --module kvid-embed-onnx --glob "{module}/build/test-results/$task/*.xml" --since "$since" \
+        --require "kvid-embed-onnx:$task.com.kvid.embed.TelemetryPolicyTest"
+      grep -F "[kvid-telemetry] case=$tcase " "kvid-embed-onnx/build/test-results/$task/TEST-$task.com.kvid.embed.TelemetryPolicyTest.xml" \
+        || { echo "TelemetryPolicyTest ($tcase) passed without printing its line for that case"; exit 1; }
+    done
+
+    # One tuning configuration, explicitly. The test task replaces its result directory, which is why
+    # the main run was verified first.
+    since="$(date +%s)"
+    rm -rf "$results"
+    (
+      export KVID_EMBEDDING_FIXTURE_DIR="$EMBEDDING_FIXTURE" KVID_REQUIRE_EMBEDDING_FIXTURE=true KVID_EMBEDDING_TUNE="$IOS_TUNE_CONFIG"
+      gradle :kvid-embed-onnx:iosSimulatorArm64Test --tests com.kvid.embed.OnnxEmbedderTuningTest
+    )
+    "$PY" -I scripts/verify_device_tests.py --module kvid-embed-onnx --glob '{module}/build/test-results/iosSimulatorArm64Test/*.xml' \
+      --since "$since" --require "kvid-embed-onnx:$class.OnnxEmbedderTuningTest"
+    grep -o '\[kvid-embedding-tune\][^<]*' "$results/TEST-$class.OnnxEmbedderTuningTest.xml" \
+      || { echo "OnnxEmbedderTuningTest passed without printing its [kvid-embedding-tune] line"; exit 1; }
+  fi
+
   gradle :kvid-sample:shared:iosSimulatorArm64Test
 }
 
@@ -360,9 +438,9 @@ dependency_of() {
 
 echo "check-local: $(git rev-parse --short HEAD 2> /dev/null || echo '?') on $(uname -sm), started $(date '+%Y-%m-%d %H:%M:%S')"
 if have_embedding_tests; then
-  echo "embedding tests present (kvid-embed-onnx/src/jvmAndAndroidTest): the embedding fixture and classes are required"
+  echo "embedding tests present ($EMBEDDING_TESTS_MARKER): the embedding fixture and classes are required"
 else
-  echo "no kvid-embed-onnx/src/jvmAndAndroidTest yet: only the tokenizer fixture and BertTokenizerParityTest are required"
+  echo "no $EMBEDDING_TESTS_MARKER: only the tokenizer fixture and BertTokenizerParityTest are required"
 fi
 
 for part in $PARTS; do

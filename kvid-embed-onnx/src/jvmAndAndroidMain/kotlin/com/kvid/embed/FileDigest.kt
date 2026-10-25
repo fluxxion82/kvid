@@ -20,3 +20,5 @@ internal fun sha256Hex(file: File): String {
         for (b in digest.digest()) append(HEX[(b.toInt() shr 4) and 0xF]).append(HEX[b.toInt() and 0xF])
     }
 }
+
+internal actual fun sha256Hex(path: String): String = sha256Hex(File(path))
