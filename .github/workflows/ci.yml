@@ -284,6 +284,13 @@ jobs:
         # (each a fresh simulator process), one tuning configuration, the optimized embedding measurement,
         # and the sample's shared tests.
         run: bash scripts/check-local.sh --only ios
+      - name: Swift consumer of the KvidEmbed XCFramework
+        # check-local.sh's ios-framework part (implementation plan, Task 8 and R13): builds the static
+        # KvidEmbed XCFramework (ONNX Runtime inside, kvid-core and kvid-embed-onnx exported, iOS 15.1) and
+        # KvidCore's, checks KvidCore has no ONNX Runtime symbols, links swift-check/main.swift against a
+        # copy of KvidEmbed for the simulator and the device (minos and link map checked), runs it on a
+        # simulator and compares its vector with Python ONNX Runtime.
+        run: bash scripts/check-local.sh --only ios-framework
       - name: Build the iOS sample app
         env:
           HOMEBREW_NO_AUTO_UPDATE: '1'
@@ -319,3 +326,5 @@ jobs:
             kvid-embed-onnx/build/reports/tests
             kvid-embed-onnx/build/test-results
             build/check-local/*.log
+            kvid-embed-onnx-ios-framework/build/swift-check/*.log
+            kvid-embed-onnx-ios-framework/build/swift-check/consumer/*.log

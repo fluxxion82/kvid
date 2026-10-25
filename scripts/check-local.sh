@@ -9,12 +9,17 @@
 #   fixtures        model download and digest check (kvid-embed-onnx/scripts/download_model.py) into
 #                   ${KVID_MODEL_CACHE:-$HOME/.cache/kvid/models}, then the tokenizer fixture and the
 #                   embedding fixture, written to build/check-local/{tokenizer,embedding}-fixture
-#   jvm             ./gradlew build (iOS test tasks excluded) and :kvid-examples:compileKotlin with the
+#   jvm             ./gradlew build (iOS test tasks and the KvidEmbed framework excluded) and :kvid-examples:compileKotlin with the
 #                   fixtures required; then the JUnit XML of :kvid-embed-onnx:jvmTest must show the
 #                   parity classes passed, not skipped
 #   ios             (macOS with xcrun simctl) the iosSimulatorArm64 tasks CI runs; kvid-embed-onnx's with
 #                   the fixtures required and the measurement on, then scripts/verify_device_tests.py on
 #                   its fresh simulator XML and a check for the parity and measurement lines
+#   ios-framework   (macOS with xcrun simctl) the KvidEmbed XCFramework (kvid-embed-onnx-ios-framework, static,
+#                   ONNX Runtime inside) and a Swift consumer linked against a copy of it for the simulator and
+#                   the device, run on a simulator and compared with Python ONNX Runtime
+#                   (kvid-embed-onnx-ios-framework/swift-check/check.sh); KvidCore's XCFramework must contain no
+#                   ONNX Runtime symbols
 #   android         (one adb device) core and embed device tests with the fixtures pushed, the
 #                   measurement run, and scripts/verify_device_tests.py on the JUnit XML
 #   sample-ios      (--with-sample; macOS with xcodegen) build and smoke-test the iOS sample app
@@ -54,7 +59,7 @@ MODEL_CACHE="${KVID_MODEL_CACHE:-$HOME/.cache/kvid/models}"
 DEVICE_TOKENIZER_DIR=/data/local/tmp/kvid-tokenizer-fixture
 DEVICE_EMBEDDING_DIR=/data/local/tmp/kvid-embedding-fixture
 GRADLE_ARGS="${KVID_GRADLE_ARGS---stacktrace}"
-PARTS="python fixtures jvm ios android sample-ios sample-android"
+PARTS="python fixtures jvm ios ios-framework android sample-ios sample-android"
 PROPS=-Pandroid.testInstrumentationRunnerArguments
 
 # The Core Image simulator defect is quarantined the same way in CI.
@@ -137,7 +142,9 @@ part_jvm() {
   # On macOS `build` also runs the iOS simulator tests (check depends on allTests); the ios part runs them.
   local excludes=()
   if [ "$(uname)" = Darwin ]; then
-    excludes=(-x :kvid-core:iosSimulatorArm64Test -x :kvid-core:iosSimulatorArm64ReleaseTest
+    # The KvidEmbed framework links are the ios-framework part's.
+    excludes=(-x :kvid-core:iosSimulatorArm64Test -x :kvid-core:iosSimulatorArm64ReleaseTest -x :kvid-embed-onnx-ios-framework:assemble
+              -x :kvid-embed-onnx-ios-framework:iosSimulatorArm64Test
               -x :kvid-embed-onnx:iosSimulatorArm64Test -x :kvid-embed-onnx:iosSimulatorArm64ReleaseTest
               -x :kvid-sample:shared:iosSimulatorArm64Test)
     for tcase in $TELEMETRY_CASES; do excludes+=(-x ":kvid-embed-onnx:$(telemetry_task "$tcase")"); done
@@ -246,6 +253,31 @@ part_ios() {
   fi
 
   gradle :kvid-sample:shared:iosSimulatorArm64Test
+}
+
+part_ios_framework() {
+  [ "$(uname)" = Darwin ] || skip "not macOS"
+  command -v xcrun > /dev/null && xcrun simctl help > /dev/null 2>&1 || skip "xcrun simctl is not available"
+  xcrun --sdk iphonesimulator --find swiftc > /dev/null 2>&1 || skip "no swiftc for the iOS simulator SDK"
+  [ -x "$PY" ] || { echo "no virtual environment at $VENV; run the python part first"; exit 1; }
+  [ -f "$EMBEDDING_FIXTURE/model.onnx" ] || { echo "no embedding fixture in $EMBEDDING_FIXTURE; run the fixtures part first"; exit 1; }
+  local release=kvid-embed-onnx-ios-framework/build/XCFrameworks/release
+  local core=kvid-core/build/XCFrameworks/release/KvidCore.xcframework
+  rm -rf "$release" "$core"  # both must come from this run
+  gradle :kvid-embed-onnx-ios-framework:assembleKvidEmbedReleaseXCFramework :kvid-core:assembleKvidCoreReleaseXCFramework
+  cmp "$release/onnxruntime-LICENSE" kvid-embed-onnx/build/onnxruntime/ios/LICENSE \
+    || { echo "no ONNX Runtime LICENSE next to KvidEmbed.xcframework"; exit 1; }
+  echo "ONNX Runtime licence: $release/onnxruntime-LICENSE"
+  # kvid-core's own (lexical-only) framework stays free of ONNX Runtime (implementation plan, R7).
+  local slice ort total
+  for slice in "$core"/ios-*/KvidCore.framework/KvidCore; do
+    total="$(nm -j "$slice" | grep -c '^_' || true)"
+    ort="$(nm -j "$slice" | grep -ciE '^_Ort|onnxruntime' || true)"
+    echo "$slice: $total symbols, $ort ONNX Runtime symbols"
+    [ "$ort" -eq 0 ] || { echo "KvidCore contains ONNX Runtime symbols"; exit 1; }
+    [ "$total" -gt 0 ] || { echo "nm found no symbols in $slice"; exit 1; }
+  done
+  bash kvid-embed-onnx-ios-framework/swift-check/check.sh "$release/KvidEmbed.xcframework" "$EMBEDDING_FIXTURE" "$PY"
 }
 
 # Sets ANDROID_SERIAL to the selected device, or skips the part. Also records the device in $OUT/android-device.txt.
@@ -376,6 +408,7 @@ if [ "${1:-}" = __part ]; then
     fixtures) part_fixtures ;;
     jvm) part_jvm ;;
     ios) part_ios ;;
+    ios-framework) part_ios_framework ;;
     android) part_android ;;
     sample-ios) part_sample_ios ;;
     sample-android) part_sample_android ;;
@@ -448,7 +481,7 @@ selected() {
 dependency_of() {
   case "$1" in
     fixtures) echo python ;;
-    jvm | ios | android) echo fixtures ;;
+    jvm | ios | ios-framework | android) echo fixtures ;;
   esac
 }
 
@@ -463,7 +496,7 @@ for part in $PARTS; do
   selected "$part" || continue
   log="$OUT/$part.log"
   case "$part" in
-    ios | sample-ios) if $SKIP_IOS; then record "$part" SKIPPED "--skip-ios" 0; continue; fi ;;
+    ios | ios-framework | sample-ios) if $SKIP_IOS; then record "$part" SKIPPED "--skip-ios" 0; continue; fi ;;
   esac
   case "$part" in
     android | sample-android) if $SKIP_ANDROID; then record "$part" SKIPPED "--skip-android" 0; continue; fi ;;
