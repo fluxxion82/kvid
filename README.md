@@ -49,6 +49,7 @@ OnnxEmbedder.open(modelPath = "…/model.onnx", vocabPath = "…/vocab.txt").use
 
 - The app supplies `onnx/model.onnx` (about 133 MB, fp32) and `vocab.txt` from the model repository, bundled or downloaded. The embedder records SHA-256 digests of both in the store's `EmbeddingSpec`, so different files count as a different model. `kvid-embed-onnx/scripts/model-pins.json` lists the revision and digests the tests use.
 - Inputs longer than 512 tokens are truncated.
+- Memory: ONNX Runtime keeps its peak working memory (about 460 MB in total on Android) while the embedder is open; close it after bulk indexing. A process that must keep it open with less memory can pass `OnnxOptions(cpuMemoryArena = false)`, which returns to about 220 MB after each call but made inference 1.6 to 1.9 times slower on a Pixel 8.
 - Android: the module requires API 24, the minimum of `onnxruntime-android`. The ONNX Runtime AAR registers a telemetry `ContentProvider` (`ai.onnxruntime.TelemetryInitializer`) that starts at app launch; this module's manifest removes it, and `open` disables ONNX Runtime telemetry. An app that also declares `onnxruntime-android` directly should remove it in its own manifest:
 
   ```xml
