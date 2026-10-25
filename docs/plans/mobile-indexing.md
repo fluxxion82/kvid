@@ -60,10 +60,52 @@ Branch `phase-5-mobile-indexing`, from `phase-5-onnx-embedder` (or from `main` o
 - **Recommendation and decision.** The cloud session writes the recommendation: model, input limit, threads and EP, and whether long notes should be chunked rather than truncated. The owner decides; ADR 0002 is amended if the model changes.
 - **Separate design: background indexing in the sample.** Whatever the variant, first indexing of thousands of notes needs this: WorkManager on Android, `BGProcessingTask` on iOS, progress from `VectorStatus.pending`, incremental indexing on edit, and closing the embedder after bulk work. It is a separate design item that this plan does not settle.
 
+## Status of Phase A tooling (October 25, cloud session)
+
+Branch `phase-5-mobile-indexing`, commit `ec36772` (from `0d85781`). No measurements are run or reported until Codex has reviewed this plan; the tooling was checked on small subsets only.
+
+- **Variants.** `kvid-embed-onnx/scripts/build_variants.py` builds `bge-fp32`, `bge-int8`, `minilm-fp32` and `minilm-int8`.
+  - Each variant directory is an embedding parity fixture made by Python ONNX Runtime from that file, with pooling and input limit recorded in `source.json`.
+  - The files are pinned by revision and SHA-256 (`model-pins*.json`).
+  - Our int8 bge comes from `quantize_dynamic` (QInt8, per tensor, no `reduce_range`, ONNX Runtime 1.30.0, onnx 1.23.2). It is deterministic: two builds gave the same digest, now pinned.
+  - Sizes: 133.1, 33.8, 90.4 and 23.0 MB.
+  - `OnnxEmbedderParityTest` now reads the model contract from the fixture. On the JVM (Linux x86_64) all four variants pass at cosine ≥ 0.9999.
+  - MiniLM's `vocab.txt` is byte-identical to bge's and its tokenizer settings match, so the existing tokenizer applies.
+- **Finding: dynamic int8 is not batch-invariant.** `DynamicQuantizeLinear` takes one activation scale over the whole input tensor, other texts and padding included. A text's vector therefore depends on its batch: down to cosine 0.983 against the same text embedded alone (`bge-int8`), and similar for `minilm-int8`.
+  - The int8 fixtures record `max_batch_size: 1`, and the tests and the evaluation embed those variants one text at a time.
+  - A product decision for int8 must choose between batch size 1 (on the Pixel 8 that cost about 5% for `mixed` notes on October 24) and static quantization (fixed, calibrated scales, which are batch-invariant). Static int8 should be added as a variant if Codex agrees (question 2).
+- **Finding: int8 portability is unmeasured.** The reference fixtures were made on x86_64. int8 kernels differ between x86 (u8s8 paths) and ARM, so Phase B must run each variant's parity on the phone before measuring its speed. If ARM and x86 int8 vectors differ beyond the ADR's 0.9999, an int8 spec is not portable across platforms.
+- **Retrieval evaluation.**
+  - `scripts/prepare_retrieval_eval.py` writes SciFact, NFCorpus and a FiQA subset at pinned dataset revisions and digests (`retrieval-datasets.json`).
+  - `RetrievalEvalTest` (JVM) indexes them in a `Kvid` store and scores `find` (any word), `findSimilar` and `findHybrid` with nDCG@10 (graded gains), recall@10 and recall@100. It runs per variant, input limit and query instruction: bge's "Represent this sentence for searching relevant passages: " is applied to queries only, through a wrapper embedder with the same spec.
+  - The metric code is checked against hand-computed values. A smoke run on 300-document subsets of all three datasets produced every expected record with no failed queries.
+- **Tuning settings.** `OnnxEmbedderTuningTest` takes `model`, `maxTokens`, `threads` and `ep` (`cpu` or `xnnpack`). A variant with `max_batch_size` defaults to it; a larger batch is marked `batch_invariant=false`.
+  - XNNPACK is in the `onnxruntime-android` AAR (checked in `libonnxruntime.so`) but not in the JVM build, which rejects it.
+  - The device-test APK with these changes builds; it has not run on a device.
+
+### Phase B commands (local agent)
+
+```sh
+python -m venv build/study/venv && build/study/venv/bin/pip install -r kvid-embed-onnx/scripts/requirements-study.txt
+build/study/venv/bin/python -I kvid-embed-onnx/scripts/build_variants.py build/study/variants
+adb shell rm -rf /data/local/tmp/kvid-model-variants && adb push build/study/variants /data/local/tmp/kvid-model-variants
+ARGS=-Pandroid.testInstrumentationRunnerArguments
+# 1. Parity of each variant on the device (ARM against the x86 or Mac reference), before any timing:
+for v in bge-fp32 bge-int8 minilm-fp32 minilm-int8; do
+  ./gradlew :kvid-embed-onnx:connectedAndroidDeviceTest -Pkvid.deviceTestAbi=arm64-v8a $ARGS.class=com.kvid.embed.OnnxEmbedderParityTest \
+    $ARGS.KVID_EMBEDDING_FIXTURE_DIR=/data/local/tmp/kvid-model-variants/$v $ARGS.KVID_REQUIRE_EMBEDDING_FIXTURE=true
+  adb logcat -d -s System.out | grep -F "[kvid-embedding]"; adb logcat -c
+done
+# 2. One configuration per run ('+' separates settings in instrumentation arguments):
+./gradlew :kvid-embed-onnx:connectedAndroidDeviceTest -Pkvid.deviceTestAbi=arm64-v8a $ARGS.class=com.kvid.embed.OnnxEmbedderTuningTest \
+  $ARGS.KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants $ARGS.KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-int8+threads=4
+adb logcat -d -s System.out | grep -F "[kvid-embedding-tune]"
+```
+
 ## Questions for Codex
 
 1. Are the variants and ranges right? Is something worth adding: fp16, ORT's O4-optimized MiniLM, other small English models (`e5-small-v2`, `gte-small`), or static rather than dynamic int8?
-2. Is our own `quantize_dynamic` of the pinned fp32 model sound (per-channel or per-tensor, `reduce_range`, which operators), and is cosine with fp32 on 194 texts enough to quantify drift?
+2. Is our own `quantize_dynamic` of the pinned fp32 model sound (per-channel or per-tensor, `reduce_range`, which operators), and is cosine with fp32 on 194 texts enough to quantify drift? Given the batch dependence found above, should static (calibrated) int8 replace or join dynamic int8, and what calibration data would be representative of notes? Is an int8 spec portable between x86 and ARM kernels, and how should that be tested?
 3. Are SciFact, NFCorpus and a FiQA subset reasonable proxies for personal notes, and is the pruning rule (2 nDCG points, unless twice as fast) sensible? What should the notes-style evaluation set contain, and how do we keep its author (an LLM) from favouring one model?
 4. Is the device protocol sufficient for thermal noise, interleaving, repetitions and statistics? What would make a result inconclusive?
 5. Are the proposed targets (5 minutes for 5,000 notes, 200 ms per note, 2 nDCG points, 500 MB, 50 MB) reasonable for an embedded notes store? Which matter most?
