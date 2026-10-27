@@ -305,6 +305,7 @@ Codex found three P1 problems, nine P2 and two P3. All are accepted. Where a rev
   - The KDoc and the README state the process-wide side effect.
   - They state that another ORT user in the same process which initializes ORT first is not covered, so a host that needs that guarantee sets `ORT_DISABLE_TELEMETRY=1` at launch, for example in the scheme's environment or before any framework loads.
 - **Owner decision, flagged.** The alternative policy is to refuse to open when the app has a false value, or to overwrite it. This plan respects the app's value. The owner can change that in review; it is one branch in `initialize()`.
+  - **Decided October 26, after the network probe:** overwrite. Any value ORT does not treat as true, including an empty one, is replaced with `1` (ROADMAP, Milestone 5).
 - **Verification** (replaces Task 4 (a) to (c)):
   - **CI test.** `TelemetryPolicyTest` runs in a **fresh process** per case: the simulator test runner with `--tests` per case, or a probe executable. It checks four cases: the variable unset, a truthy value, a falsy value, and an empty value. For each it checks the resulting environment and that `DisableTelemetryEvents` succeeded. It claims nothing about the network.
   - **Network probe, manual, recorded in the ROADMAP.** A disposable probe executable, built by the same Gradle setup, opens an embedder over synthetic text and runs three conditions, each in its own fresh process:
