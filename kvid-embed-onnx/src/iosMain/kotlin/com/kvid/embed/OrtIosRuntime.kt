@@ -56,14 +56,18 @@ internal enum class TelemetryDecision {
     SET_BY_KVID,
     /** The app had set a value ONNX Runtime treats as true; kept. */
     KEPT_APP_OPT_OUT,
-    /** The app had set another value (also empty); kept as the app's explicit choice, suppression is then the app's. */
-    KEPT_APP_CHOICE
+    /**
+     * The app had set another value (also empty), which would leave ONNX Runtime's uploader running; kvid
+     * replaced it with `1`. A network probe on the simulator (October 26) showed that with such a value
+     * `DisableTelemetryEvents` alone still lets ONNX Runtime upload its process-information event.
+     */
+    OVERRODE_APP_VALUE
 }
 
 internal fun telemetryDecision(initial: String?): TelemetryDecision = when {
     initial == null -> TelemetryDecision.SET_BY_KVID
     isOrtTelemetryOptOut(initial) -> TelemetryDecision.KEPT_APP_OPT_OUT
-    else -> TelemetryDecision.KEPT_APP_CHOICE
+    else -> TelemetryDecision.OVERRODE_APP_VALUE
 }
 
 /** The variable as kvid found it ([initial], null when unset) and what it did. */
@@ -81,10 +85,10 @@ internal class OrtRuntime(val api: OrtApi, val env: CPointer<OrtEnv>, val versio
  * before kvid's first call into ONNX Runtime, under a lock, and publishes the result only after every
  * step succeeded:
  *
- * 1. The telemetry policy, before `OrtGetApiBase` is called: `ORT_DISABLE_TELEMETRY` is set to `1` when
- *    unset (checking `setenv`), a value ONNX Runtime treats as true is kept, and any other value is kept as
- *    the app's explicit choice. Decided once per process; kvid never changes the variable afterwards. The
- *    1.30 binary's POSIX 1DS provider latches the variable when the first environment is created.
+ * 1. The telemetry policy, before `OrtGetApiBase` is called: a value ONNX Runtime treats as true is kept,
+ *    and anything else (unset, empty, or a false value) is replaced with `1`, checking `setenv`. Decided
+ *    once per process; kvid never changes the variable afterwards. The 1.30 binary's POSIX 1DS provider
+ *    latches the variable when the first environment is created.
  * 2. `GetApi(ORT_API_VERSION)` (30), which returns null when the linked runtime lacks that version, and
  *    the runtime's version string.
  * 3. One `OrtEnv` for the process, never released: ONNX Runtime supports one environment per process,
@@ -121,7 +125,7 @@ internal object OrtIosRuntime {
     private fun applyTelemetryPolicy(): TelemetryPolicy {
         val initial = getenv(ORT_DISABLE_TELEMETRY)?.toKString()
         val decision = telemetryDecision(initial)
-        if (decision == TelemetryDecision.SET_BY_KVID) {
+        if (decision != TelemetryDecision.KEPT_APP_OPT_OUT) {
             check(setenv(ORT_DISABLE_TELEMETRY, "1", 1) == 0) {
                 "could not set $ORT_DISABLE_TELEMETRY=1 before initializing ONNX Runtime: ${strerror(errno)?.toKString()}"
             }

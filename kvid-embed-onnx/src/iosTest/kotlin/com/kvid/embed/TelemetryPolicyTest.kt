@@ -33,8 +33,8 @@ class TelemetryPolicyTest {
     private val cases = listOf(
         Case("unset", null, TelemetryDecision.SET_BY_KVID),
         Case("truthy", " TRUE ", TelemetryDecision.KEPT_APP_OPT_OUT),
-        Case("falsy", "0", TelemetryDecision.KEPT_APP_CHOICE),
-        Case("empty", "", TelemetryDecision.KEPT_APP_CHOICE)
+        Case("falsy", "0", TelemetryDecision.OVERRODE_APP_VALUE),
+        Case("empty", "", TelemetryDecision.OVERRODE_APP_VALUE)
     )
 
     private fun current(): String? = getenv(ORT_DISABLE_TELEMETRY)?.toKString()
@@ -50,6 +50,7 @@ class TelemetryPolicyTest {
 
     @Test fun decisionFollowsTheInitialValue() {
         for (case in cases) assertEquals(case.decision, telemetryDecision(case.value), "case ${case.name}")
+        for (value in listOf("false", "no", "off", " 0 ", "2")) assertEquals(TelemetryDecision.OVERRODE_APP_VALUE, telemetryDecision(value), "'$value'")
     }
 
     @Test fun thisProcessFollowsThePolicy() {
@@ -68,8 +69,8 @@ class TelemetryPolicyTest {
         val final = current()
         assertEquals(telemetryDecision(policy.initial), policy.decision)
         when (policy.decision) {
-            TelemetryDecision.SET_BY_KVID -> assertEquals("1", final)
-            TelemetryDecision.KEPT_APP_OPT_OUT, TelemetryDecision.KEPT_APP_CHOICE -> assertEquals(policy.initial, final, "kvid changed the app's value")
+            TelemetryDecision.SET_BY_KVID, TelemetryDecision.OVERRODE_APP_VALUE -> assertEquals("1", final)
+            TelemetryDecision.KEPT_APP_OPT_OUT -> assertEquals(policy.initial, final, "kvid changed the app's opt-out")
         }
         if (case != null) {
             assertEquals(case.value, policy.initial)

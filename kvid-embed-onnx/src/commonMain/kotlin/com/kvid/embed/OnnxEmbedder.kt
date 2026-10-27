@@ -21,12 +21,12 @@ import com.kvid.store.Embedder
  *   turns ONNX Runtime telemetry off. The AAR's INTERNET and ACCESS_NETWORK_STATE permissions are left
  *   to the app.
  * - **iOS telemetry (a process-wide side effect).** Before kvid's first call into ONNX Runtime, once per
- *   process, the first [open] sets the environment variable `ORT_DISABLE_TELEMETRY=1` when it is unset;
- *   ONNX Runtime latches that full opt-out when it initializes. A value the app set itself is kept: a
- *   value ONNX Runtime treats as true (`1`, `true`, `yes`, `on`, `y`, ignoring case and surrounding
- *   spaces) disables telemetry as well; any other value is the app's explicit choice, and suppression
- *   is then the app's responsibility, because the C API call kvid still makes, `DisableTelemetryEvents`,
- *   does not stop ONNX Runtime's uploader. kvid never changes the variable afterwards. Another ONNX
+ *   process, the first [open] sets the environment variable `ORT_DISABLE_TELEMETRY=1`; ONNX Runtime
+ *   latches that full opt-out when it initializes. A value the app set that ONNX Runtime already treats
+ *   as true (`1`, `true`, `yes`, `on`, `y`, ignoring case and surrounding spaces) is kept; any other value,
+ *   including an empty or false one, is replaced with `1`, because the C API call kvid also makes,
+ *   `DisableTelemetryEvents`, does not stop ONNX Runtime's uploader. kvid never changes the variable
+ *   afterwards. Another ONNX
  *   Runtime user in the same process that initializes the runtime first is not covered: a host that
  *   needs that guarantee sets `ORT_DISABLE_TELEMETRY=1` at launch (in the scheme's environment, or
  *   before any framework loads).
