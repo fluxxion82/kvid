@@ -379,6 +379,11 @@ Open items:
       - A Kotlin/Native app that depends on `kvid-embed-onnx` directly, rather than through `KvidEmbed`, links the 15.1 archive into a binary whose Kotlin default minimum is 15.0. That gives linker warnings, and the binary needs 15.1 anyway, as the README says.
       - The leak loop and the network probe are local evidence only, not CI gates. That is reasonable for a simulator that `leaks` cannot attach to.
     - **Owner decision still open: `HnswVectorIndexTest.testScalability`.** It hit its 5-minute `runTest` limit on CI's iOS simulator once, with 218 s in an earlier run. It is kvid-core's experimental index and unchanged here. My recommendation is to raise its timeout, which loses no coverage. The alternatives are to run it only in the optimized iOS test task, where Kotlin/Native code is 10 to 40 times faster, or to quarantine it with the rest of the Appendix A pipeline.
+  - **Merged (November 8).**
+    - `main` is at `173a9a9`, a merge commit of `609456c` whose tree is identical to the reviewed branch.
+    - `609456c` raises `HnswVectorIndexTest.testScalability`'s `runTest` limit from 5 to 15 minutes, as the owner decided October 27; the test itself is unchanged. It passed on the JVM in 33 s locally and in CI run 42185055850 on the branch.
+    - `main` CI run 42528398584 is green on every job, including the docs policy and the iOS simulator.
+    - `phase-5-ios-embedder` is contained in `main` but still exists: the cloud session's deletion was refused by the remote. Delete it from a local clone.
   - **Still open.**
     - Measurements on the paired iPhone 13: device parity, time per note, `phys_footprint` and the app-size delta. Signing needs the owner's Apple development team.
     - The mobile indexing study, which Codex has reviewed and which now has iOS simulator numbers.
