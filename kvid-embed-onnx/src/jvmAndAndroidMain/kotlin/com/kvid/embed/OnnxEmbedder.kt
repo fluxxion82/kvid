@@ -16,51 +16,25 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * An [Embedder] that runs a BERT-style ONNX model with ONNX Runtime on the JVM and Android (ADR 0002).
- *
- * - **Files.** The app supplies `model.onnx` and `vocab.txt` (for [BertEmbeddingModel.BGE_SMALL_EN_V1_5],
- *   the files of `BAAI/bge-small-en-v1.5`); kvid never downloads a model. [open] digests both, so
- *   [spec] names exactly the files in use: `modelDigest` is `sha256:<model.onnx>` and `tokenizer` is
- *   `bert-wordpiece-uncased sha256:<vocab.txt>`. The same files give the same spec on every platform.
- * - **Threading.** [embed] runs on [Dispatchers.Default] and may be called concurrently. [close] waits
- *   for running inferences; [embed] after [close] throws [IllegalStateException]. A failure returns no
- *   vectors at all, so a store writes nothing for that batch. The shared `OrtEnvironment` is never
- *   closed.
- * - **Android.** The module needs minSdk 24 (onnxruntime-android's minimum). Its manifest removes
- *   onnxruntime-android's `TelemetryInitializer` provider, so nothing runs at app start, and [open]
- *   turns ONNX Runtime telemetry off. The AAR's INTERNET and ACCESS_NETWORK_STATE permissions are left
- *   to the app.
+ * The JVM and Android [OnnxEmbedder]: ONNX Runtime's Java API (`ai.onnxruntime`), which the JVM jar and
+ * the Android AAR both expose, so this one source directory compiles into both targets.
  */
-class OnnxEmbedder private constructor(
+actual class OnnxEmbedder private constructor(
     private val backend: OrtEncoderBackend,
     private val embedder: BertEmbedder
 ) : Embedder, AutoCloseable {
-    override val spec: EmbeddingSpec get() = embedder.spec
+    actual override val spec: EmbeddingSpec get() = embedder.spec
 
-    override suspend fun embed(texts: List<String>): List<FloatArray> =
+    actual override suspend fun embed(texts: List<String>): List<FloatArray> =
         if (texts.isEmpty()) emptyList() else withContext(Dispatchers.Default) { embedder.embed(texts) }
 
-    /** Closes the session; idempotent. Waits for inferences already running. */
-    override fun close() = backend.close()
+    actual override fun close() = backend.close()
 
-    /** Durations of the phases of one [open], in milliseconds, for measurements. */
-    internal class OpenTimings(val digestMs: Double, val sessionMs: Double, val warmupMs: Double)
+    actual companion object {
+        actual suspend fun open(modelPath: String, vocabPath: String, model: BertEmbeddingModel, options: OnnxOptions): OnnxEmbedder =
+            openOnnxEmbedder(modelPath, vocabPath, model, options, timings = null)
 
-    companion object {
-        /**
-         * Opens [modelPath] (`model.onnx`) with the vocabulary at [vocabPath] (`vocab.txt`) for [model].
-         * Blocking work runs on [Dispatchers.IO]. Throws [IllegalArgumentException] naming the file when a
-         * file is missing or unreadable, or the graph does not match [model] (inputs, output name, type
-         * or dimensions); [IllegalStateException] when the warm-up inference fails.
-         */
-        suspend fun open(
-            modelPath: String,
-            vocabPath: String,
-            model: BertEmbeddingModel = BertEmbeddingModel.BGE_SMALL_EN_V1_5,
-            options: OnnxOptions = OnnxOptions()
-        ): OnnxEmbedder = open(modelPath, vocabPath, model, options, timings = null)
-
-        internal suspend fun open(
+        internal suspend fun openTimed(
             modelPath: String,
             vocabPath: String,
             model: BertEmbeddingModel,
@@ -193,3 +167,11 @@ class OnnxEmbedder private constructor(
         }
     }
 }
+
+internal actual suspend fun openOnnxEmbedder(
+    modelPath: String,
+    vocabPath: String,
+    model: BertEmbeddingModel,
+    options: OnnxOptions,
+    timings: ((OpenTimings) -> Unit)?
+): OnnxEmbedder = OnnxEmbedder.openTimed(modelPath, vocabPath, model, options, timings)

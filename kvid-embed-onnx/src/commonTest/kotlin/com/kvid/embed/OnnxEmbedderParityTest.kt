@@ -1,6 +1,7 @@
 package com.kvid.embed
 
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
+import kotlinx.io.files.Path
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.abs
@@ -8,6 +9,7 @@ import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Compares [OnnxEmbedder] with the reference vectors of scripts/make_embedding_fixture.py (Python ONNX
@@ -17,8 +19,8 @@ import kotlin.test.assertTrue
  * unset.
  */
 class OnnxEmbedderParityTest {
-    @Test fun matchesPythonOnnxRuntimeOnTheReferenceFixture() = runBlocking {
-        val fixture = EmbeddingFixture.loadOrSkip("embedding parity") ?: return@runBlocking
+    @Test fun matchesPythonOnnxRuntimeOnTheReferenceFixture() = runTest(timeout = 30.minutes) {
+        val fixture = EmbeddingFixture.loadOrSkip("embedding parity") ?: return@runTest
         val cases = fixture.cases
         assertTrue(cases.isNotEmpty(), "the fixture has no cases")
         assertEquals(fixture.source.getValue("cases").jsonPrimitive.int, cases.size, "embeddings.jsonl and source.json disagree on the case count")
@@ -29,7 +31,7 @@ class OnnxEmbedderParityTest {
             assertTrue(abs(norm(case.vector) - 1.0) <= 1e-5, "reference vector $i has norm ${norm(case.vector)}")
         }
 
-        val tokenizer = BertTokenizer.fromVocabulary(java.io.File(fixture.vocabPath).readText())
+        val tokenizer = BertTokenizer.fromVocabulary(Path(fixture.vocabPath).readText())
         val idMismatches = cases.indices.filter { tokenizer.encode(cases[it].text, model.maxInputTokens).ids.toList() != cases[it].ids }
 
         val texts = cases.map { it.text }

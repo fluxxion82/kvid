@@ -332,8 +332,10 @@ class HnswVectorIndexTest {
         assertEquals(3, largeM.size())
     }
 
+    // The iOS simulator runs this with debug binaries: 218 s in one CI run and over the earlier 5-minute
+    // limit in another (October 26), so the limit leaves about three times that.
     @Test
-    fun testScalability() = runTest(timeout = 5.minutes) {  // 5 minutes timeout for iOS
+    fun testScalability() = runTest(timeout = 15.minutes) {
         val vectorCount = 500
         for (i in 0 until vectorCount) {
             val vector = embedding.embed("document $i")

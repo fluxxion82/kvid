@@ -7,13 +7,15 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlin.test.fail
 
 /**
  * A fixture written by scripts/make_embedding_fixture.py: reference vectors from Python ONNX Runtime
  * (`embeddings.jsonl`), its provenance (`source.json`) and the model files it used. Paths are local and
- * readable; on Android they may be copies of the pushed files ([fixtureFile]).
+ * readable; on Android they may be copies of the pushed files ([fixtureFile]), and the iOS simulator
+ * reads the host's paths.
  */
 internal class EmbeddingFixture(
     val modelPath: String,
@@ -47,7 +49,7 @@ internal class EmbeddingFixture(
                 )
             }.toList()
             val source = Json.parseToJsonElement(file("source.json").readText()).jsonObject
-            return EmbeddingFixture(file("model.onnx").path, file("vocab.txt").path, cases, source)
+            return EmbeddingFixture(file("model.onnx").toString(), file("vocab.txt").toString(), cases, source)
         }
     }
 }
@@ -66,7 +68,4 @@ internal fun cosine(a: FloatArray, b: FloatArray): Double {
 
 internal fun norm(v: FloatArray): Double = sqrt(v.sumOf { it.toDouble() * it })
 
-internal fun maxAbsDiff(a: FloatArray, b: FloatArray): Double = a.indices.maxOf { kotlin.math.abs(a[it].toDouble() - b[it]) }
-
-/** [format] with a dot as decimal separator whatever the device locale, for parseable log lines. */
-internal fun fmt(format: String, value: Double): String = String.format(java.util.Locale.ROOT, format, value)
+internal fun maxAbsDiff(a: FloatArray, b: FloatArray): Double = a.indices.maxOf { abs(a[it].toDouble() - b[it]) }

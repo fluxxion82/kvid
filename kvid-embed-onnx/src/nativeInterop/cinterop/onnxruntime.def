@@ -1,0 +1,11 @@
+# ONNX Runtime 1.30.0 C API (onnxruntime-c pod archive, scripts/runtime-pins.json). The header directory
+# and the per-target archive directory (build/onnxruntime/ios/<target>) are passed by build.gradle.kts,
+# after verifyOnnxRuntimeIos has checked them. staticLibraries embeds the archive in this cinterop klib,
+# so every binary linked from kvid-embed-onnx gets ONNX Runtime without CocoaPods. The linker options are
+# those of the onnxruntime-c podspec: libc++, the system frameworks, and Core ML weakly (not used by kvid,
+# which registers no execution provider, but referenced by the archive).
+package = com.kvid.embed.onnxruntime
+headers = onnxruntime_c_api.h
+headerFilter = onnxruntime_c_api.h
+staticLibraries = libonnxruntime.a
+linkerOpts = -lc++ -framework Foundation -framework CoreFoundation -framework Network -framework Security -framework SystemConfiguration -framework UIKit -weak_framework CoreML

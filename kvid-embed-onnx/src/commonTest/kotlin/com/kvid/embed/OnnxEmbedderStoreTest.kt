@@ -4,11 +4,12 @@ import com.kvid.store.FindOptions
 import com.kvid.store.Kvid
 import com.kvid.store.MatchMode
 import com.kvid.store.PutOptions
-import kotlinx.coroutines.runBlocking
-import java.io.File
+import kotlinx.coroutines.test.runTest
+import kotlinx.io.files.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * The real model through the store: indexing records the embedder's spec, semantic search finds notes
@@ -17,29 +18,13 @@ import kotlin.test.assertTrue
  * parity test's skip-or-fail rule.
  */
 class OnnxEmbedderStoreTest {
-    private val notes = listOf(
-        "Quarterly budget" to "Expenses rose twelve percent; travel and software licences account for most of the increase.",
-        "Sourdough" to "Feed the starter the night before, mix flour and water, fold every half hour, bake at 250 °C.",
-        "Dentist" to "Cleaning appointment on Tuesday at 9:30; bring the insurance card.",
-        "Marathon training" to "Long run of 28 km on Sunday, easy pace, two gels and plenty of water.",
-        "Flight to Lisbon" to "Boarding pass is in the wallet app; terminal 2, gate closes 40 minutes before departure.",
-        "Garden" to "Plant tomatoes after the last frost and water the seedlings every morning."
-    )
+    private val notes = NotesCorpus.notes
+    private val queries = NotesCorpus.queries
 
-    /** Each query and the title of the note it means. */
-    private val queries = listOf(
-        "money we spent last quarter" to "Quarterly budget",
-        "baking bread in my kitchen" to "Sourdough",
-        "teeth checkup" to "Dentist",
-        "getting ready for a race" to "Marathon training",
-        "airport plane trip" to "Flight to Lisbon",
-        "growing vegetables" to "Garden"
-    )
-
-    @Test fun semanticSearchFindsNotesWithoutSharedWordsAndSurvivesAReopen() = runBlocking {
-        val fixture = EmbeddingFixture.loadOrSkip("embedder store test") ?: return@runBlocking
-        val dir = File.createTempFile("kvid-store", "").apply { delete(); mkdirs() }
-        val path = File(dir, "notes.kvid").path
+    @Test fun semanticSearchFindsNotesWithoutSharedWordsAndSurvivesAReopen() = runTest(timeout = 10.minutes) {
+        val fixture = EmbeddingFixture.loadOrSkip("embedder store test") ?: return@runTest
+        val dir = createTempDirectory("kvid-store")
+        val path = Path(dir, "notes.kvid").toString()
         try {
             val store = Kvid.create(path)
             try {
@@ -93,4 +78,29 @@ class OnnxEmbedderStoreTest {
             assertEquals(title, hits.first().document.title, "semantic search for '$query': ${hits.map { it.document.title to it.score }}")
         }
     }
+}
+
+/**
+ * Six notes and six queries that share no word with the note they mean, so only vectors connect them.
+ * Used by [OnnxEmbedderStoreTest] and [OnnxEmbedderPortabilityTest].
+ */
+internal object NotesCorpus {
+    val notes = listOf(
+        "Quarterly budget" to "Expenses rose twelve percent; travel and software licences account for most of the increase.",
+        "Sourdough" to "Feed the starter the night before, mix flour and water, fold every half hour, bake at 250 °C.",
+        "Dentist" to "Cleaning appointment on Tuesday at 9:30; bring the insurance card.",
+        "Marathon training" to "Long run of 28 km on Sunday, easy pace, two gels and plenty of water.",
+        "Flight to Lisbon" to "Boarding pass is in the wallet app; terminal 2, gate closes 40 minutes before departure.",
+        "Garden" to "Plant tomatoes after the last frost and water the seedlings every morning."
+    )
+
+    /** Each query and the title of the note it means. */
+    val queries = listOf(
+        "money we spent last quarter" to "Quarterly budget",
+        "baking bread in my kitchen" to "Sourdough",
+        "teeth checkup" to "Dentist",
+        "getting ready for a race" to "Marathon training",
+        "airport plane trip" to "Flight to Lisbon",
+        "growing vegetables" to "Garden"
+    )
 }
