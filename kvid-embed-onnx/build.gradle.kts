@@ -134,7 +134,8 @@ kotlin {
 // with KVID_EMBEDDING_LEAK_CONTROL=true as its negative control. The mobile indexing study adds
 // KVID_MODEL_VARIANTS_DIR (scripts/build_variants.py) and, for RetrievalEvalTest on the JVM,
 // KVID_RETRIEVAL_EVAL, KVID_RETRIEVAL_EVAL_DIR (scripts/prepare_retrieval_eval.py) and
-// KVID_RETRIEVAL_EVAL_OUT. On Android devices all of them are instrumentation arguments:
+// KVID_RETRIEVAL_EVAL_OUT, and KVID_INDEX_MEASURE for IndexingMeasurementTest. On Android devices all of
+// them are instrumentation arguments:
 // -Pandroid.testInstrumentationRunnerArguments.KVID_TOKENIZER_FIXTURE_DIR=/data/local/tmp/...
 val fixtureVariables = listOf(
     "KVID_TOKENIZER_FIXTURE_DIR",
@@ -151,7 +152,8 @@ val fixtureVariables = listOf(
     "KVID_MODEL_VARIANTS_DIR",
     "KVID_RETRIEVAL_EVAL",
     "KVID_RETRIEVAL_EVAL_DIR",
-    "KVID_RETRIEVAL_EVAL_OUT"
+    "KVID_RETRIEVAL_EVAL_OUT",
+    "KVID_INDEX_MEASURE"
 )
 val fixtureEnvironment = fixtureVariables.mapNotNull { name -> providers.environmentVariable(name).orNull?.let { name to it } }
 val fixtureDirs = listOf("tokenizerFixture" to "KVID_TOKENIZER_FIXTURE_DIR", "embeddingFixture" to "KVID_EMBEDDING_FIXTURE_DIR")
@@ -161,7 +163,7 @@ val fixtureDirs = listOf("tokenizerFixture" to "KVID_TOKENIZER_FIXTURE_DIR", "em
 val mustExecute = listOf(
     "KVID_REQUIRE_TOKENIZER_FIXTURE", "KVID_REQUIRE_EMBEDDING_FIXTURE", "KVID_EMBEDDING_MEASURE", "KVID_REQUIRE_PORTABLE_STORE", "KVID_EMBEDDING_LEAK"
 ).any { providers.environmentVariable(it).orNull == "true" } ||
-    listOf("KVID_EMBEDDING_TUNE", "KVID_PORTABLE_STORE_OUT", "KVID_RETRIEVAL_EVAL").any { providers.environmentVariable(it).isPresent }
+    listOf("KVID_EMBEDDING_TUNE", "KVID_PORTABLE_STORE_OUT", "KVID_RETRIEVAL_EVAL", "KVID_INDEX_MEASURE").any { providers.environmentVariable(it).isPresent }
 tasks.withType<AbstractTestTask>().configureEach {
     fixtureVariables.filter { !it.endsWith("_DIR") }.forEach { name ->
         inputs.property(name, providers.environmentVariable(name).orElse("false"))

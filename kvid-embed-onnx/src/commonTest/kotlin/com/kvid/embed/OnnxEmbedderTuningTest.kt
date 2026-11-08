@@ -18,6 +18,7 @@ import kotlin.test.assertEquals
 import kotlin.test.fail
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Compares runtime settings of [OnnxEmbedder] on the Milestone 3 synthetic notes. Runs only when
@@ -37,6 +38,14 @@ import kotlin.time.Duration.Companion.minutes
  *   unset) for its own thread pool, and the session one thread without spinning, as ONNX Runtime recommends
  *   for it. Only onnxruntime-android includes XNNPACK.
  *
+ * - `warmup=<n>` (default 8): the first n notes are embedded once after open, outside every timing, so the
+ *   timed work starts warm on representative shapes rather than on open's two-token warm-up;
+ * - `latency=on`: each note is embedded alone (a new or edited note), and the line adds p50 and p95 call
+ *   latency, overall and by token length (up to 64, 128, 256 and above).
+ *
+ * Memory is also read after the embedder is closed and again after 5 s idle; the peak is the highest of
+ * the 100 ms samples (`mem_peak=sampled-100ms`), a lower bound that can miss short peaks.
+ *
  * An unknown setting, a flag other than `on`/`off` or a count that is not positive fails the test, so a
  * misspelt option cannot produce a plausible default measurement. The line repeats the resolved settings
  * and the model's digest. A variant with a `max_batch_size` (the dynamically quantized ones) defaults to it;
@@ -52,7 +61,7 @@ class OnnxEmbedderTuningTest {
     }
 
     private suspend fun measure(config: String) {
-        val settings = parseSettings(config)
+        val settings = parseSettings(config, "KVID_EMBEDDING_TUNE", TUNING_SETTINGS)
         fun flag(name: String, default: Boolean) = settings[name]?.let { it == "on" } ?: default
         fun count(name: String) = settings[name]?.toInt()
         val variant = settings["model"]
@@ -82,12 +91,16 @@ class OnnxEmbedderTuningTest {
         val order = if (options.sortByLength) lengths.indices.sortedBy { lengths[it] } else lengths.indices.toList()
         val padded = order.chunked(options.maxBatchSize).sumOf { rows -> rows.size * rows.maxOf { lengths[it] } }
 
+        val warmup = settings["warmup"]?.toInt() ?: 8
+        val latency = flag("latency", false)
         val memBefore = memoryKb()
         val openStart = kotlin.time.TimeSource.Monotonic.markNow()
         val embedder = openForTuning(fixture.modelPath, fixture.vocabPath, model, options, ep, providerThreads = threads ?: 4)
         val openMs = openStart.elapsedNow().inWholeMicroseconds / 1000.0
         val memAfterOpen = memoryKb()
+        val callMs = ArrayList<Double>()
         val line = embedder.use {
+            if (warmup > 0) embedder.embed(notes.take(warmup))
             val result = withContext(Dispatchers.Default) {
                 // The sampler is the only writer; the result is read after it has been joined.
                 val peak = AtomicLong(memAfterOpen ?: 0L)
@@ -99,7 +112,14 @@ class OnnxEmbedderTuningTest {
                 }
                 var vectors: List<FloatArray> = emptyList()
                 val totalMs = try {
-                    timedMs { vectors = embedder.embed(notes) }
+                    if (latency) {
+                        val each = ArrayList<FloatArray>(notes.size)
+                        for (note in notes) callMs += timedMs { each += embedder.embed(listOf(note)) }
+                        vectors = each
+                        callMs.sum()
+                    } else {
+                        timedMs { vectors = embedder.embed(notes) }
+                    }
                 } finally {
                     sampler.cancelAndJoin()
                 }
@@ -109,7 +129,9 @@ class OnnxEmbedderTuningTest {
             assertEquals(notes.size, count)
             val memAfter = memoryKb()
             val mem = if (memBefore == null) "mem=not-measured"
-            else "mem_kind=$memoryKind mem_before_kb=$memBefore mem_after_open_kb=$memAfterOpen mem_peak_kb=${maxOf(peak, memAfter ?: 0L)} mem_after_kb=$memAfter"
+            else "mem_kind=$memoryKind mem_peak=sampled-100ms mem_before_kb=$memBefore mem_after_open_kb=$memAfterOpen " +
+                "mem_peak_kb=${maxOf(peak, memAfter ?: 0L)} mem_after_kb=$memAfter"
+            val latencies = if (!latency) "" else " " + latencySummary(callMs, lengths)
             val resolved = "model=${model.name} variant=${variant ?: "fixture"} max_input_tokens=${model.maxInputTokens} " +
                 "batch=${options.maxBatchSize} sort=${onOff(options.sortByLength)} arena=${onOff(options.cpuMemoryArena)} " +
                 "pattern=${onOff(options.memoryPattern)} threads=${options.intraOpThreads ?: "default"} ep=$ep" +
@@ -119,35 +141,59 @@ class OnnxEmbedderTuningTest {
                 "model_digest=${embedder.spec.modelDigest} model_bytes=${SystemFileSystem.metadataOrNull(Path(fixture.modelPath))?.size} " +
                 "open_ms=${fmt("%.1f", openMs)} notes=${notes.size} tokens=${lengths.sum()} " +
                 "max_tokens=${lengths.max()} padded_tokens=$padded total_ms=${fmt("%.1f", totalMs)} " +
-                "per_note_ms=${fmt("%.1f", totalMs / notes.size)} tokens_per_s=${fmt("%.0f", lengths.sum() / (totalMs / 1000))} $mem"
+                "warmup=$warmup latency=${onOff(latency)} " +
+                "per_note_ms=${fmt("%.1f", totalMs / notes.size)} tokens_per_s=${fmt("%.0f", lengths.sum() / (totalMs / 1000))}$latencies $mem"
         }
-        println(line)
+        // After close, and after the process has been idle for a while: what an app keeps once indexing ends.
+        val memAfterClose = memoryKb()
+        delay(5.seconds)
+        val memIdle = memoryKb()
+        println(if (memBefore == null) line else "$line mem_after_close_kb=$memAfterClose mem_idle_5s_kb=$memIdle")
     }
 }
 
 private fun onOff(value: Boolean) = if (value) "on" else "off"
 
-private val FLAGS = setOf("sort", "arena", "pattern")
-private val COUNTS = setOf("notes", "batch", "maxTokens", "threads")
+/** p50 and p95 of single-note calls, overall and by token length (`p95_le128_ms` covers 65 to 128 tokens). */
+internal fun latencySummary(callMs: List<Double>, tokens: List<Int>): String {
+    fun percentile(values: List<Double>, p: Double): Double {
+        val sorted = values.sorted()
+        return sorted[minOf(sorted.size - 1, kotlin.math.ceil(p * sorted.size).toInt() - 1).coerceAtLeast(0)]
+    }
+    val parts = mutableListOf("p50_ms=${fmt("%.1f", percentile(callMs, 0.5))}", "p95_ms=${fmt("%.1f", percentile(callMs, 0.95))}")
+    var lower = 0
+    for ((upper, name) in listOf(64 to "le64", 128 to "le128", 256 to "le256", Int.MAX_VALUE to "gt256")) {
+        val bucket = callMs.indices.filter { tokens[it] in (lower + 1)..upper }.map { callMs[it] }
+        if (bucket.isNotEmpty()) parts += "n_$name=${bucket.size} p50_${name}_ms=${fmt("%.1f", percentile(bucket, 0.5))} p95_${name}_ms=${fmt("%.1f", percentile(bucket, 0.95))}"
+        lower = upper
+    }
+    return parts.joinToString(" ")
+}
+
+private val FLAGS = setOf("sort", "arena", "pattern", "latency")
+private val COUNTS = setOf("notes", "batch", "maxTokens", "threads", "outer", "chunk")
+private val NON_NEGATIVE = setOf("warmup")
 private val CHOICES = mapOf("corpus" to setOf("m3", "mixed"), "ep" to setOf("cpu", "xnnpack"))
 
+/** The settings OnnxEmbedderTuningTest accepts. */
+internal val TUNING_SETTINGS = setOf("corpus", "notes", "model", "maxTokens", "batch", "threads", "ep", "sort", "arena", "pattern", "warmup", "latency")
+
 /**
- * KVID_EMBEDDING_TUNE as settings (`,` or `+` between them). Fails on an unknown or repeated key, a flag
- * other than `on`/`off`, a count that is not a positive integer, or a value outside a setting's choices.
- * `model` names a variant directory and is checked when it is loaded.
+ * [config] (from [variable]) as settings, `,` or `+` between them. Fails on a key outside [allowed], a
+ * repeated key, a flag other than `on`/`off`, a count that is not a positive integer, or a value outside a
+ * setting's choices. `model` names a variant directory and is checked when it is loaded.
  */
-internal fun parseSettings(config: String): Map<String, String> {
+internal fun parseSettings(config: String, variable: String, allowed: Set<String>): Map<String, String> {
     val settings = LinkedHashMap<String, String>()
     for (item in config.split(',', '+').map { it.trim() }.filter { it.isNotEmpty() }) {
         val key = item.substringBefore('=').trim()
         val value = item.substringAfter('=', "").trim()
-        if (key !in FLAGS && key !in COUNTS && key !in CHOICES && key != "model") {
-            fail("unknown KVID_EMBEDDING_TUNE setting '$key'; known: ${(FLAGS + COUNTS + CHOICES.keys + "model").sorted()}")
-        }
-        if (settings.put(key, value) != null) fail("KVID_EMBEDDING_TUNE sets '$key' twice")
+        if (key !in allowed) fail("unknown $variable setting '$key'; known: ${allowed.sorted()}")
+        if (settings.put(key, value) != null) fail("$variable sets '$key' twice")
         when {
             key in FLAGS && value != "on" && value != "off" -> fail("$key must be on or off, not '$value'")
             key in COUNTS && (value.toIntOrNull() ?: 0) <= 0 -> fail("$key must be a positive integer, not '$value'")
+            key in NON_NEGATIVE && (value.toIntOrNull() ?: -1) < 0 -> fail("$key must be zero or a positive integer, not '$value'")
             key in CHOICES && value !in CHOICES.getValue(key) -> fail("$key must be one of ${CHOICES.getValue(key)}, not '$value'")
             key == "model" && value.isEmpty() -> fail("model needs a variant name")
         }

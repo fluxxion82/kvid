@@ -1,0 +1,23 @@
+{
+  "_comment": "Not downloaded: build_variants.py derives minilm-fp32-opt (opt) from model-pins-minilm.json's onnx/model.onnx and checks the result against this digest.",
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+  "recipe": "opt",
+  "settings": {
+    "method": "ORT_ENABLE_BASIC session output, then onnxruntime.transformers.optimizer.optimize_model",
+    "model_type": "bert",
+    "opt_level": 0,
+    "use_gpu": false,
+    "enable_gelu_approximation": false
+  },
+  "tools": {
+    "onnxruntime": "1.30.0",
+    "onnx": "1.23.2",
+    "sympy": "1.14.0"
+  },
+  "files": {
+    "model.onnx": {
+      "sha256": "ffd6ec712cd69231dd3176ef648de822e075fbddd04f9b0749bea4d861b5e62d"
+    }
+  }
+}
