@@ -83,7 +83,7 @@ Branch `phase-5-mobile-indexing`, commit `ec36772` (from `0d85781`). No measurem
   - XNNPACK is in the `onnxruntime-android` AAR (checked in `libonnxruntime.so`) but not in the JVM build, which rejects it.
   - The device-test APK with these changes builds; it has not run on a device.
 
-### Phase B commands (local agent)
+### Phase B commands (local agent; superseded by the November 8 block below)
 
 ```sh
 python -m venv build/study/venv && build/study/venv/bin/pip install -r kvid-embed-onnx/scripts/requirements-study.txt
@@ -207,3 +207,100 @@ The proposed numbers are reasonable **aspirational owner targets**, not establis
 `OnnxOptions` really defaults to `maxBatchSize=4`, `sortByLength=true`, `cpuMemoryArena=true`, `memoryPattern=true`, and default intra-op threads; `OnnxEmbedder` passes those flags to ORT. The tuning test uses those defaults when omitted, records actual/padded tokens and samples Android `Debug.getPss()`, with after-call PSS taken **before** `use` closes the session. Thus it measures retained memory while open, but not post-close recovery or whole-index/store cost. Keeping patterns enabled is reasonable; the one-off pattern-off comparisons do not isolate a repeatable improvement. Arena shrinkage is an optional, separately timed experiment if retaining memory remains a problem, not evidence for changing today's policy.
 
 Finally, Milestone 5's narrative mixes historical arena-off and restored arena-on measurements under “new defaults”: the 229 MB/227 ms and CI 213 MB/568 ms results are from the arena-off stage; the later arena-on results are about 445–452 MB retained. Its closing “about 600 ms” long-note estimate also describes an arena-off/warm-phone case, not a matched arena-on batch-4 measurement. Preserve those historical rows but label the configurations before reusing them in a recommendation. The plan's opening 455–600 ms range is therefore not a measured range for today's single default configuration. No roadmap/code edits were made as part of this review.
+
+## Amended protocol after Codex's review (November 8, cloud session)
+
+Every actionable point of the review is adopted. The tooling is on `phase-5-mobile-indexing` at `586cbde`, which also merges `main` (`173a9a9`, with the iOS embedder). Nothing below is a measurement result: the runs start after this section is pushed, so the rule is fixed before any score is seen.
+
+### What changed in the tooling
+
+- **[P2] Strict settings.** `OnnxEmbedderTuningTest` and the new `IndexingMeasurementTest` reject an unknown or repeated key, a flag other than `on`/`off` and a count that is not positive. Each line repeats the resolved settings and the model's digest. Token and padding counts use the selected model and input limit. The memory sampler stops in `finally`.
+  - The tuning test is now shared code (on iOS too) and gains `warmup=<n>`: representative work outside timing, default 8 notes.
+  - `latency=on` embeds notes one at a time and reports p50 and p95 per call, overall and by token length.
+  - Memory is also read after close and after 5 s idle, and the peak is labelled `sampled-100ms` (a lower bound).
+  - XNNPACK goes through a test-support hook; iOS accepts only `cpu`.
+- **[P1] Store-level timing.** `IndexingMeasurementTest` (`KVID_INDEX_MEASURE`) inserts N notes (timed separately), then runs `Kvid.indexVectors` with the store's own outer batch of 32, in timed chunks, until pending is 0. It reports open, close and total time, early against late throughput, file size and memory. The 5,000-note runs on the phone come from this test, not from multiplying a microbenchmark.
+- **Variants (answers 1 and 2).**
+
+  | Variant | Model name in the spec | Recipe | Size (MB) | Batch |
+  |---|---|---|---|---|
+  | `bge-fp32` | `BAAI/bge-small-en-v1.5` | as published | 133.1 | 4 (default) |
+  | `bge-fp32-opt` | `…#kvid-opt` | ORT basic optimizations, then the transformer optimizer's fusions (Attention, SkipLayerNormalization, BiasGelu, EmbedLayerNormalization), fp32, no GELU approximation | 132.9 | 4 |
+  | `bge-int8` | `…#kvid-int8-matmul` | Codex's conservative recipe: `quantize_dynamic`, MatMul only, constant weights only, per-channel QInt8, no `reduce_range` | 69.8 | 1 |
+  | `bge-int8-all` | `…#kvid-int8-all` | `quantize_dynamic`'s defaults (embedding table included, per tensor): the earlier recipe, renamed | 33.8 | 1 |
+  | `minilm-fp32` | `sentence-transformers/all-MiniLM-L6-v2` | as published | 90.4 | 4 |
+  | `minilm-fp32-opt` | `…#kvid-opt` | as `bge-fp32-opt` | 90.3 | 4 |
+  | `minilm-int8` | as published | upstream `model_qint8_arm64.onnx` (recipe undocumented) | 23.0 | 1 |
+
+  - Derived names say kvid made the file.
+  - Every derived digest is pinned (`model-pins-<variant>.json`), and a rebuild in a fresh cache reproduced all four. `bge-int8-all` also reproduced its October digest under Python 3.13.
+  - Each variant's `source.json` records operator counts, initializer bytes by type and opsets. As the review predicted, the conservative `bge-int8` keeps the 46.9 MB embedding table in float (48.1 MB float, 21.3 MB int8), so it cannot meet the 50 MB goal; only `bge-int8-all` or MiniLM can.
+  - The int8 variants embed one text at a time: dynamic activation scales span the batch, so their vectors depend on the batch (finding of October 25).
+  - Drift from the same model's fp32 output is recorded as percentiles and worst cases, as a diagnostic only.
+  - **Parity, JVM (Linux x86_64): all seven variants match Python ONNX Runtime on their own file** (194 cases, cosine ≥ 0.9999, batched against single ≥ 0.99999 where batching applies).
+  - Deferred as the review advises: fp16/O4, static int8 (contingency if dynamic int8 misses device targets), and `e5-small-v2`/`gte-small` (second round).
+- **Evaluation (answer 3).**
+  - `RetrievalEvalTest` writes `summary.jsonl` and `queries.jsonl` (per-query scores, top 100 and the token length of the longest relevant document).
+  - `scripts/analyze_retrieval_eval.py` recomputes every metric with its own code and with `trec_eval` (`pytrec_eval`), and fails on a difference above 1e-9 (2e-16 on the smoke run). It then applies the rule below and reports scores by document length and top-10 overlap with the fp32 reference.
+  - FiQA is screened on the frozen 20,000-document subset, labelled "FiQA subset"; finalists are repeated on the full 57,638 documents.
+
+### Frozen choices and decision rule (preregistered)
+
+- **Frozen choices.**
+  - **Store and retrieval settings:** documents are stored as title, blank line, body, in corpus order. Lexical search uses plain syntax with any word. Fusion uses RRF with k = 60 and 100 candidates; nothing is tuned on these test sets.
+  - **Queries:** a query without a relevant document is dropped at preparation. The baseline is `bge-fp32@512` with raw queries. The BGE instruction is a separate policy that changes only the dense query; BM25 always gets the raw query.
+- **Primary metric:** hybrid nDCG@10. **Guardrails:** semantic nDCG@10, hybrid recall@100, and hybrid against lexical per set.
+- **Delta:** per dataset, the mean over its queries of (candidate − baseline), paired by query. The macro delta weighs SciFact, NFCorpus and FiQA equally. 95% intervals come from 10,000 bootstraps that resample queries within each dataset (seed 20261108).
+- **Verdict:**
+  - **PASS** when the macro lower bound is at least −0.02 (absolute, on the 0–1 scale);
+  - **FAIL** when the upper bound is below −0.02;
+  - **INCONCLUSIVE** otherwise, which is not a pass.
+  - A set whose point loss exceeds 0.02 is flagged for the owner. There is no speed waiver: a faster model that fails is reported as a failed trade-off.
+- **Guardrail on lexical:** hybrid ≥ lexical per set is a point comparison, reported with its paired interval. An advantage whose interval includes zero is not evidence of improvement.
+
+### Phase A runs (fixed list)
+
+- **Datasets:** SciFact, NFCorpus and the FiQA subset.
+- **Runs:**
+  - `bge-fp32@512`, `@256`, `@128`;
+  - `bge-fp32-opt@512`, `bge-int8@512`, `bge-int8-all@512`;
+  - `minilm-fp32@256`, `@128`;
+  - `minilm-fp32-opt@256`, `minilm-int8@256`.
+- **Instruction:** each bge run is scored with the instruction off and on.
+- **Then:** the frontier (baseline, best passing variant of each size class and each uncertain one) is repeated on full FiQA. JVM times are recorded as diagnostics; device times decide.
+
+### Phase B commands (supersede the October 25 block)
+
+Run from `phase-5-mobile-indexing` at `586cbde` or later. The protocol is answer 4 of the review:
+- the Pixel 8 decides, the emulator is a harness check, and a mid-range phone is added if available;
+- start cooled, and record temperature and thermal status at the start and end of every run;
+- balanced AB/BA order across at least six paired blocks in two cooled sessions for the finalists, and three runs for screening;
+- the same APK, and a fresh process per configuration;
+- keep every log, including excluded runs.
+
+```sh
+python -m venv build/study/venv && build/study/venv/bin/pip install -r kvid-embed-onnx/scripts/requirements-study.txt
+build/study/venv/bin/python -I kvid-embed-onnx/scripts/build_variants.py build/study/variants
+adb shell rm -rf /data/local/tmp/kvid-model-variants && adb push build/study/variants /data/local/tmp/kvid-model-variants
+ARGS=-Pandroid.testInstrumentationRunnerArguments
+V=/data/local/tmp/kvid-model-variants
+run() { ./gradlew :kvid-embed-onnx:connectedAndroidDeviceTest -Pkvid.deviceTestAbi=arm64-v8a "$@"; }
+# 1. Parity of every variant on the device (ARM kernels against the x86 reference), before any timing.
+#    An int8 variant that fails here is not portable and is reported as such, not timed.
+for v in bge-fp32 bge-fp32-opt bge-int8 bge-int8-all minilm-fp32 minilm-fp32-opt minilm-int8; do
+  run $ARGS.class=com.kvid.embed.OnnxEmbedderParityTest $ARGS.KVID_EMBEDDING_FIXTURE_DIR=$V/$v $ARGS.KVID_REQUIRE_EMBEDDING_FIXTURE=true
+  adb logcat -d -s System.out | grep -F "[kvid-embedding]"; adb logcat -c
+done
+# 2. Screening, one configuration per run; then threads 1/2/4 and ep=xnnpack (its pool is ep_threads) on the best two.
+run $ARGS.class=com.kvid.embed.OnnxEmbedderTuningTest $ARGS.KVID_MODEL_VARIANTS_DIR=$V \
+  $ARGS.KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-int8
+# 3. Edit latency (p50/p95 by length), at least 100 calls per configuration:
+run $ARGS.class=com.kvid.embed.OnnxEmbedderTuningTest $ARGS.KVID_MODEL_VARIANTS_DIR=$V \
+  $ARGS.KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-int8+latency=on
+# 4. Whole-store indexing, baseline and finalists: 5,000 notes, store batch 32, until pending is 0.
+run $ARGS.class=com.kvid.embed.IndexingMeasurementTest $ARGS.KVID_MODEL_VARIANTS_DIR=$V \
+  $ARGS.KVID_INDEX_MEASURE=corpus=mixed+notes=5000+model=bge-int8
+adb logcat -d -s System.out | grep -E "\[kvid-(embedding-tune|index-measure)\]"
+```
+
+Record every raw line in `docs/measurements/` on this branch, with the commit, device, OS build and the thermal readings.
