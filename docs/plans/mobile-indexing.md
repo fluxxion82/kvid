@@ -304,3 +304,49 @@ adb logcat -d -s System.out | grep -E "\[kvid-(embedding-tune|index-measure)\]"
 ```
 
 Record every raw line in `docs/measurements/` on this branch, with the commit, device, OS build and the thermal readings.
+
+## Phase A results (November 9, cloud session)
+
+The preregistered run list was run as fixed above, at `phase-5-mobile-indexing` `586cbde`, then the frontier on full FiQA. Raw records, reports and how to reproduce them: [docs/measurements/2026-11-09-phase-a](../measurements/2026-11-09-phase-a/README.md).
+- **Metric check.** Every metric was recomputed independently and with `trec_eval`; the largest differences were 4e-16 and 2e-16.
+- **Pipeline check.** The semantic-only scores fall where the models' published retrieval scores put them:
+  - MiniLM: SciFact 0.645, NFCorpus 0.316, full FiQA 0.369;
+  - bge-small: 0.720, 0.337 and 0.385.
+  - FiQA subset scores are higher than full-corpus ones, as expected with fewer distractors. They are labelled and not compared with published numbers.
+
+### Decision analysis: SciFact, NFCorpus and full FiQA, raw queries, against `bge-fp32@512`
+
+| Variant | Hybrid nDCG@10 delta (95% CI) | Verdict | Semantic nDCG@10 delta | Hybrid recall@100 delta | Flagged sets | Top-10 overlap with fp32 | Size (MB) | JVM time per document |
+|---|---|---|---|---|---|---|---|---|
+| `bge-fp32@512` (baseline) | | | | | | | 133.1 | 1.00 |
+| `bge-fp32@256` | −0.002 (−0.006, +0.002) | PASS | −0.007 | +0.000 | – | 0.81–0.91 | 133.1 | 0.66 |
+| `bge-int8@512` (MatMul, per-channel) | −0.003 (−0.006, −0.001) | PASS | −0.000 | +0.002 | – | 0.89–0.91 | 69.8 | 0.56 |
+| `bge-int8-all@512` | −0.003 (−0.007, +0.002) | PASS | −0.017 | −0.009 | – | 0.73–0.79 | 33.8 | 0.55 |
+| `minilm-fp32@256` | −0.012 (−0.021, −0.004) | INCONCLUSIVE | −0.037 | +0.008 | SciFact | – | 90.4 | 0.36 |
+| `minilm-int8@256` | −0.012 (−0.020, −0.004) | INCONCLUSIVE | −0.040 | +0.009 | SciFact | 0.87–0.88 vs MiniLM fp32 | 23.0 | 0.26 |
+
+The top-10 overlap column comes from the screening sets, with FiQA as the subset. Also from the screening sets only:
+- **Fused graphs:** `bge-fp32-opt` and `minilm-fp32-opt` return identical rankings (overlap 1.000). On this x86 JVM their speed matches the original graphs, about 0.94× and 0.96× of their time, because the session's `ALL_OPT` already fuses at creation; ARM devices may differ.
+- **128 tokens:** inconclusive for both models. `bge-fp32@128` gives −0.014 (−0.022, −0.007), with FiQA flagged; `minilm-fp32@128` gives −0.017 (−0.026, −0.008).
+- **BGE query instruction:** gives hybrid search nothing (−0.002, −0.006 to +0.002) and semantic search +0.006. **The raw-query policy stays, and no `embedQuery` hook is needed now.**
+
+### Reading
+
+- **bge-small conservative int8.** `bge-int8` (Codex's conservative recipe) is the only variant that keeps semantic retrieval as well as hybrid. Its rankings overlap fp32's top 10 at about 0.9, and it ran in 0.56 of fp32's time on this JVM. Its costs:
+  - 70 MB, above the 50 MB soft goal;
+  - batch size 1, since dynamic scales span the batch;
+  - int8 kernels on ARM still unverified against the x86 reference.
+- **bge-small all-operators int8.** `bge-int8-all` passes the primary rule at half the size (34 MB). Its guardrails are weaker: semantic −0.017, recall@100 −0.009, and drift down to cosine 0.91 on the fixture texts. Hybrid search hides a real loss in dense retrieval, as Codex's guardrails were meant to show.
+- **256 tokens on bge.** This passes with no new artifact and takes 0.66 of the time. The loss is concentrated where relevant documents are longer than 256 tokens, which matters little for typical notes (median 123 tokens in FiQA, about 320 in SciFact and NFCorpus). It can combine with int8; that combination was not in the preregistered list and would be an exploratory run, labelled as such.
+- **MiniLM.** MiniLM is 2.8 to 3.8 times as fast on the JVM and 23 MB as int8, but inconclusive. It narrowly fails the margin, with lower bounds of −0.021 and −0.020. It loses 0.03 on SciFact, and on SciFact its hybrid advantage over lexical has an interval that touches zero (int8: −0.000 to +0.048). On full FiQA alone it is slightly better than bge. Under the rule this is not a pass, and the default cannot move to MiniLM on this evidence.
+- **The subset effect.** On the FiQA subset MiniLM passed; on full FiQA it is inconclusive. This is why Codex asked for full FiQA on finalists.
+
+### For Phase B (devices) and the owner
+
+- **Frontier for device timing:** `bge-fp32@512` (baseline), `bge-fp32-opt@512` (may help on ARM), `bge-int8@512`, `bge-int8-all@512`, `bge-fp32@256`, and `minilm-int8@256`, the uncertain fast option, kept as Codex advises.
+- **Device parity first:** every int8 variant runs its parity on the Pixel 8 before any timing. A variant whose ARM vectors miss cosine 0.9999 against the x86 reference is not portable under ADR 0002 and is reported, not timed.
+- **Owner decisions after Phase B:**
+  - whether the 50 MB file goal outranks the guardrail losses of `bge-int8-all`;
+  - whether to accept batch size 1 for int8 or try static quantization;
+  - whether 256 tokens becomes the default limit.
+- **Notes-style evaluation set:** still required before a new default ships, since these benchmarks are proxies.

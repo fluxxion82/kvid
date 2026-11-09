@@ -1,0 +1,803 @@
+{
+  "baseline": "bge-fp32@512",
+  "margin": 0.02,
+  "bootstrap": 10000,
+  "seed": 20261108,
+  "metric_cross_check_max_abs_diff": 4.440892098500626e-16,
+  "trec_eval_max_abs_diff": 2.220446049250313e-16,
+  "datasets": [
+    "fiqa",
+    "nfcorpus",
+    "scifact"
+  ],
+  "candidates": [
+    {
+      "run": "bge-fp32-opt@512",
+      "instruction": "off",
+      "verdict": "PASS",
+      "hybrid_ndcg10": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0,
+        "per_set": {
+          "fiqa": 0.0,
+          "nfcorpus": 0.0,
+          "scifact": 0.0
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0
+      },
+      "hybrid_recall100": {
+        "delta": 0.0,
+        "low": 0.0,
+        "high": 0.0
+      },
+      "flagged_sets": []
+    },
+    {
+      "run": "bge-fp32-opt@512",
+      "instruction": "on",
+      "verdict": "PASS",
+      "hybrid_ndcg10": {
+        "delta": -0.0017052579234642553,
+        "low": -0.0056132229655252155,
+        "high": 0.002294066249675555,
+        "per_set": {
+          "fiqa": -0.006098140484475691,
+          "nfcorpus": 0.0020285189282551737,
+          "scifact": -0.0010461522141722484
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": 0.0058696372766272,
+        "low": 1.1354765093670588e-05,
+        "high": 0.011776806833445631
+      },
+      "hybrid_recall100": {
+        "delta": -0.0028778857464815256,
+        "low": -0.008574731177083553,
+        "high": 0.002833387775347329
+      },
+      "flagged_sets": []
+    },
+    {
+      "run": "bge-fp32@128",
+      "instruction": "off",
+      "verdict": "INCONCLUSIVE",
+      "hybrid_ndcg10": {
+        "delta": -0.013888231275783794,
+        "low": -0.02156294036723048,
+        "high": -0.006545259931476433,
+        "per_set": {
+          "fiqa": -0.023941356498940736,
+          "nfcorpus": -0.009556973991392815,
+          "scifact": -0.00816636333701783
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": -0.034106825295379534,
+        "low": -0.04423431578081425,
+        "high": -0.024204060540304478
+      },
+      "hybrid_recall100": {
+        "delta": -0.00588598791938716,
+        "low": -0.011560015673354865,
+        "high": -6.437215724183418e-05
+      },
+      "flagged_sets": [
+        "fiqa"
+      ]
+    },
+    {
+      "run": "bge-fp32@128",
+      "instruction": "on",
+      "verdict": "INCONCLUSIVE",
+      "hybrid_ndcg10": {
+        "delta": -0.01498798785399181,
+        "low": -0.022751876645669588,
+        "high": -0.007344173620565844,
+        "per_set": {
+          "fiqa": -0.030616960161410425,
+          "nfcorpus": -0.005444978183893373,
+          "scifact": -0.008902025216671636
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": -0.025186075781709224,
+        "low": -0.0359928115109062,
+        "high": -0.01463870816564318
+      },
+      "hybrid_recall100": {
+        "delta": -0.005767688122399277,
+        "low": -0.011972165731187609,
+        "high": 0.0005659631156457283
+      },
+      "flagged_sets": [
+        "fiqa"
+      ]
+    },
+    {
+      "run": "bge-fp32@256",
+      "instruction": "off",
+      "verdict": "PASS",
+      "hybrid_ndcg10": {
+        "delta": -0.0022082147175834584,
+        "low": -0.00664413148093966,
+        "high": 0.002202692927408137,
+        "per_set": {
+          "fiqa": -0.0021579759996091,
+          "nfcorpus": -0.00374408247848664,
+          "scifact": -0.0007225856746546357
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": -0.007578052910103415,
+        "low": -0.012985142493670677,
+        "high": -0.002236915163429182
+      },
+      "hybrid_recall100": {
+        "delta": -0.000311739450419705,
+        "low": -0.003439307251187226,
+        "high": 0.0033542080988919775
+      },
+      "flagged_sets": []
+    },
+    {
+      "run": "bge-fp32@256",
+      "instruction": "on",
+      "verdict": "PASS",
+      "hybrid_ndcg10": {
+        "delta": -0.006109501090038001,
+        "low": -0.011183501754449715,
+        "high": -0.0011519944631940332,
+        "per_set": {
+          "fiqa": -0.01199357618143838,
+          "nfcorpus": -0.0036238802394742884,
+          "scifact": -0.002711046849201335
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": -6.685045208639576e-05,
+        "low": -0.007722205037803051,
+        "high": 0.0075430625499711594
+      },
+      "hybrid_recall100": {
+        "delta": -0.0012778987306334571,
+        "low": -0.007093530418328001,
+        "high": 0.004424250267709673
+      },
+      "flagged_sets": []
+    },
+    {
+      "run": "bge-fp32@512",
+      "instruction": "on",
+      "verdict": "PASS",
+      "hybrid_ndcg10": {
+        "delta": -0.0017052579234642553,
+        "low": -0.005557188462474876,
+        "high": 0.0022058638789754005,
+        "per_set": {
+          "fiqa": -0.006098140484475691,
+          "nfcorpus": 0.0020285189282551737,
+          "scifact": -0.0010461522141722484
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": 0.0058696372766272,
+        "low": 0.00028331259582563506,
+        "high": 0.011637738069114903
+      },
+      "hybrid_recall100": {
+        "delta": -0.0028778857464815256,
+        "low": -0.00870447866095757,
+        "high": 0.00288197752613979
+      },
+      "flagged_sets": []
+    },
+    {
+      "run": "bge-int8-all@512",
+      "instruction": "off",
+      "verdict": "PASS",
+      "hybrid_ndcg10": {
+        "delta": -0.004017258614904482,
+        "low": -0.008191516271935286,
+        "high": 0.00018847760409393052,
+        "per_set": {
+          "fiqa": -0.009629766148166108,
+          "nfcorpus": -0.0020133250591590096,
+          "scifact": -0.0004086846373883263
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": -0.016894868763648256,
+        "low": -0.022878650003313086,
+        "high": -0.010890593812458368
+      },
+      "hybrid_recall100": {
+        "delta": -0.005543586518297168,
+        "low": -0.010260315483967998,
+        "high": -0.0010251150825154665
+      },
+      "flagged_sets": []
+    },
+    {
+      "run": "bge-int8-all@512",
+      "instruction": "on",
+      "verdict": "PASS",
+      "hybrid_ndcg10": {
+        "delta": -0.006485898466470029,
+        "low": -0.01121539082844826,
+        "high": -0.0018815020310006068,
+        "per_set": {
+          "fiqa": -0.011086678108708847,
+          "nfcorpus": 0.0021875404317131825,
+          "scifact": -0.010558557722414423
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": -0.013567294029994098,
+        "low": -0.020472819310590567,
+        "high": -0.006649587256364715
+      },
+      "hybrid_recall100": {
+        "delta": -0.00478083061488382,
+        "low": -0.011038111069170228,
+        "high": 0.0014398433224131289
+      },
+      "flagged_sets": []
+    },
+    {
+      "run": "bge-int8@512",
+      "instruction": "off",
+      "verdict": "PASS",
+      "hybrid_ndcg10": {
+        "delta": -0.0028117629981797947,
+        "low": -0.005717031850039738,
+        "high": -7.721030034308267e-05,
+        "per_set": {
+          "fiqa": 0.00013099837537889245,
+          "nfcorpus": -0.0014759364133988082,
+          "scifact": -0.007090350956519467
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": -0.00014446714164346552,
+        "low": -0.003349813283382195,
+        "high": 0.0030328267430764087
+      },
+      "hybrid_recall100": {
+        "delta": 0.0021621948052016953,
+        "low": -0.0013322765070189842,
+        "high": 0.006051406485236857
+      },
+      "flagged_sets": []
+    },
+    {
+      "run": "bge-int8@512",
+      "instruction": "on",
+      "verdict": "PASS",
+      "hybrid_ndcg10": {
+        "delta": -0.0016070682447916595,
+        "low": -0.005995311770709698,
+        "high": 0.0026812137098968618,
+        "per_set": {
+          "fiqa": -0.00495393764009365,
+          "nfcorpus": 0.0012334111895886473,
+          "scifact": -0.001100678283869975
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": 0.00465633115182447,
+        "low": -0.0013491893650799675,
+        "high": 0.010754893799335795
+      },
+      "hybrid_recall100": {
+        "delta": 0.0018619515670961666,
+        "low": -0.0030700956457747133,
+        "high": 0.007137955926719138
+      },
+      "flagged_sets": []
+    },
+    {
+      "run": "minilm-fp32-opt@256",
+      "instruction": "off",
+      "verdict": "PASS",
+      "hybrid_ndcg10": {
+        "delta": -0.011251453945352341,
+        "low": -0.01902172475306283,
+        "high": -0.0034020150287395975,
+        "per_set": {
+          "fiqa": 0.005743156659161981,
+          "nfcorpus": -0.010278303769871006,
+          "scifact": -0.029219214725348
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": -0.032075736158137004,
+        "low": -0.04473611082645412,
+        "high": -0.019969152580780844
+      },
+      "hybrid_recall100": {
+        "delta": 0.008099214894900269,
+        "low": -0.0017259152572046208,
+        "high": 0.01789195129735467
+      },
+      "flagged_sets": [
+        "scifact"
+      ]
+    },
+    {
+      "run": "minilm-fp32@128",
+      "instruction": "off",
+      "verdict": "INCONCLUSIVE",
+      "hybrid_ndcg10": {
+        "delta": -0.01728165570128579,
+        "low": -0.026232489650622276,
+        "high": -0.008283902295662731,
+        "per_set": {
+          "fiqa": -0.003598663635836256,
+          "nfcorpus": -0.012866303833099994,
+          "scifact": -0.035379999634921125
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": -0.04466765361812508,
+        "low": -0.05830779088585181,
+        "high": -0.031228496778561307
+      },
+      "hybrid_recall100": {
+        "delta": 0.004171032477023319,
+        "low": -0.005265345008815884,
+        "high": 0.013724739765794426
+      },
+      "flagged_sets": [
+        "scifact"
+      ]
+    },
+    {
+      "run": "minilm-fp32@256",
+      "instruction": "off",
+      "verdict": "PASS",
+      "hybrid_ndcg10": {
+        "delta": -0.011251453945352341,
+        "low": -0.01928560976573963,
+        "high": -0.003171027094398541,
+        "per_set": {
+          "fiqa": 0.005743156659161981,
+          "nfcorpus": -0.010278303769871006,
+          "scifact": -0.029219214725348
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": -0.032075736158137004,
+        "low": -0.044267546240626045,
+        "high": -0.020161726966670054
+      },
+      "hybrid_recall100": {
+        "delta": 0.008099214894900269,
+        "low": -0.0013283991862755723,
+        "high": 0.017604214130282778
+      },
+      "flagged_sets": [
+        "scifact"
+      ]
+    },
+    {
+      "run": "minilm-int8@256",
+      "instruction": "off",
+      "verdict": "PASS",
+      "hybrid_ndcg10": {
+        "delta": -0.011486642788965232,
+        "low": -0.019514405095866275,
+        "high": -0.003680802772649592,
+        "per_set": {
+          "fiqa": 0.005580584684767386,
+          "nfcorpus": -0.009494456466700885,
+          "scifact": -0.0305460565849622
+        }
+      },
+      "semantic_ndcg10": {
+        "delta": -0.03379558800314101,
+        "low": -0.046624042787166343,
+        "high": -0.0212339901846544
+      },
+      "hybrid_recall100": {
+        "delta": 0.0065118195619503,
+        "low": -0.0031447354951673044,
+        "high": 0.015865581785091874
+      },
+      "flagged_sets": [
+        "scifact"
+      ]
+    }
+  ],
+  "hybrid_vs_lexical": [
+    {
+      "dataset": "fiqa",
+      "run": "bge-fp32@512",
+      "instruction": "off",
+      "delta": 0.12790802731321058,
+      "low": 0.11128724278723878,
+      "high": 0.14483457183792453
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "bge-fp32@512",
+      "instruction": "off",
+      "delta": 0.04796671533684689,
+      "low": 0.03391370741881619,
+      "high": 0.0625597395232038
+    },
+    {
+      "dataset": "scifact",
+      "run": "bge-fp32@512",
+      "instruction": "off",
+      "delta": 0.054771206202262945,
+      "low": 0.03085310516137503,
+      "high": 0.07927753016705755
+    },
+    {
+      "dataset": "fiqa",
+      "run": "bge-fp32-opt@512",
+      "instruction": "off",
+      "delta": 0.12790802731321058,
+      "low": 0.11121037848352196,
+      "high": 0.14469230367823352
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "bge-fp32-opt@512",
+      "instruction": "off",
+      "delta": 0.04796671533684689,
+      "low": 0.03353085552340341,
+      "high": 0.06302818586878177
+    },
+    {
+      "dataset": "scifact",
+      "run": "bge-fp32-opt@512",
+      "instruction": "off",
+      "delta": 0.054771206202262945,
+      "low": 0.030792051548442403,
+      "high": 0.0788471591129956
+    },
+    {
+      "dataset": "fiqa",
+      "run": "bge-fp32-opt@512",
+      "instruction": "on",
+      "delta": 0.12180988682873486,
+      "low": 0.1056748006870551,
+      "high": 0.13784269938988541
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "bge-fp32-opt@512",
+      "instruction": "on",
+      "delta": 0.04999523426510206,
+      "low": 0.03606736250212867,
+      "high": 0.06465025114351203
+    },
+    {
+      "dataset": "scifact",
+      "run": "bge-fp32-opt@512",
+      "instruction": "on",
+      "delta": 0.05372505398809069,
+      "low": 0.029583494552959822,
+      "high": 0.07783213782255735
+    },
+    {
+      "dataset": "fiqa",
+      "run": "bge-fp32@128",
+      "instruction": "off",
+      "delta": 0.10396667081426984,
+      "low": 0.08485746743471567,
+      "high": 0.1230920814063758
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "bge-fp32@128",
+      "instruction": "off",
+      "delta": 0.038409741345454065,
+      "low": 0.02408032407795815,
+      "high": 0.05372864185505141
+    },
+    {
+      "dataset": "scifact",
+      "run": "bge-fp32@128",
+      "instruction": "off",
+      "delta": 0.04660484286524511,
+      "low": 0.01970645671868977,
+      "high": 0.07366880773931006
+    },
+    {
+      "dataset": "fiqa",
+      "run": "bge-fp32@128",
+      "instruction": "on",
+      "delta": 0.09729106715180015,
+      "low": 0.07893791829678626,
+      "high": 0.11589756903013597
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "bge-fp32@128",
+      "instruction": "on",
+      "delta": 0.042521737152953515,
+      "low": 0.02830382628428695,
+      "high": 0.05751877443457546
+    },
+    {
+      "dataset": "scifact",
+      "run": "bge-fp32@128",
+      "instruction": "on",
+      "delta": 0.045869180985591305,
+      "low": 0.019585636168762306,
+      "high": 0.07208176815752826
+    },
+    {
+      "dataset": "fiqa",
+      "run": "bge-fp32@256",
+      "instruction": "off",
+      "delta": 0.12575005131360148,
+      "low": 0.10845107055370037,
+      "high": 0.14265563600181394
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "bge-fp32@256",
+      "instruction": "off",
+      "delta": 0.04422263285836024,
+      "low": 0.030111564302173783,
+      "high": 0.05886085226026869
+    },
+    {
+      "dataset": "scifact",
+      "run": "bge-fp32@256",
+      "instruction": "off",
+      "delta": 0.0540486205276083,
+      "low": 0.030397686428259803,
+      "high": 0.07759412815077295
+    },
+    {
+      "dataset": "fiqa",
+      "run": "bge-fp32@256",
+      "instruction": "on",
+      "delta": 0.11591445113177219,
+      "low": 0.10013702652764431,
+      "high": 0.13217139823031196
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "bge-fp32@256",
+      "instruction": "on",
+      "delta": 0.0443428350973726,
+      "low": 0.03109064901625681,
+      "high": 0.05889565171522033
+    },
+    {
+      "dataset": "scifact",
+      "run": "bge-fp32@256",
+      "instruction": "on",
+      "delta": 0.05206015935306161,
+      "low": 0.02891454613443563,
+      "high": 0.07565147986030865
+    },
+    {
+      "dataset": "fiqa",
+      "run": "bge-fp32@512",
+      "instruction": "on",
+      "delta": 0.12180988682873486,
+      "low": 0.10619985536625412,
+      "high": 0.13755268731526205
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "bge-fp32@512",
+      "instruction": "on",
+      "delta": 0.04999523426510206,
+      "low": 0.036315663054267304,
+      "high": 0.06483801504311613
+    },
+    {
+      "dataset": "scifact",
+      "run": "bge-fp32@512",
+      "instruction": "on",
+      "delta": 0.05372505398809069,
+      "low": 0.03006150722898197,
+      "high": 0.07809001585227866
+    },
+    {
+      "dataset": "fiqa",
+      "run": "bge-int8-all@512",
+      "instruction": "off",
+      "delta": 0.11827826116504446,
+      "low": 0.10171440194041734,
+      "high": 0.13488284589684973
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "bge-int8-all@512",
+      "instruction": "off",
+      "delta": 0.045953390277687876,
+      "low": 0.0315225157101306,
+      "high": 0.061070604138779
+    },
+    {
+      "dataset": "scifact",
+      "run": "bge-int8-all@512",
+      "instruction": "off",
+      "delta": 0.054362521564874616,
+      "low": 0.03094885960660231,
+      "high": 0.07859285544919649
+    },
+    {
+      "dataset": "fiqa",
+      "run": "bge-int8-all@512",
+      "instruction": "on",
+      "delta": 0.11682134920450173,
+      "low": 0.10109062599042037,
+      "high": 0.13336914670067035
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "bge-int8-all@512",
+      "instruction": "on",
+      "delta": 0.05015425576856007,
+      "low": 0.03640782909635349,
+      "high": 0.06495054309555727
+    },
+    {
+      "dataset": "scifact",
+      "run": "bge-int8-all@512",
+      "instruction": "on",
+      "delta": 0.044212648479848515,
+      "low": 0.019347068976274803,
+      "high": 0.06882603013101111
+    },
+    {
+      "dataset": "fiqa",
+      "run": "bge-int8@512",
+      "instruction": "off",
+      "delta": 0.12803902568858946,
+      "low": 0.1114624898493359,
+      "high": 0.1446941811043903
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "bge-int8@512",
+      "instruction": "off",
+      "delta": 0.04649077892344808,
+      "low": 0.03217420399744703,
+      "high": 0.061271220100944
+    },
+    {
+      "dataset": "scifact",
+      "run": "bge-int8@512",
+      "instruction": "off",
+      "delta": 0.04768085524574347,
+      "low": 0.024818824359841687,
+      "high": 0.07139604209898769
+    },
+    {
+      "dataset": "fiqa",
+      "run": "bge-int8@512",
+      "instruction": "on",
+      "delta": 0.12295408967311691,
+      "low": 0.10698652058931059,
+      "high": 0.13889630742015083
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "bge-int8@512",
+      "instruction": "on",
+      "delta": 0.04920012652643553,
+      "low": 0.03542540492580716,
+      "high": 0.06386165993821652
+    },
+    {
+      "dataset": "scifact",
+      "run": "bge-int8@512",
+      "instruction": "on",
+      "delta": 0.05367052791839297,
+      "low": 0.029682193915408214,
+      "high": 0.07893393039573801
+    },
+    {
+      "dataset": "fiqa",
+      "run": "minilm-fp32-opt@256",
+      "instruction": "off",
+      "delta": 0.13365118397237255,
+      "low": 0.11634963649259028,
+      "high": 0.1508556663417758
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "minilm-fp32-opt@256",
+      "instruction": "off",
+      "delta": 0.037688411566975874,
+      "low": 0.024435006084708815,
+      "high": 0.05158597914946536
+    },
+    {
+      "dataset": "scifact",
+      "run": "minilm-fp32-opt@256",
+      "instruction": "off",
+      "delta": 0.025551991476914945,
+      "low": 0.0026000095214023244,
+      "high": 0.04873469550180484
+    },
+    {
+      "dataset": "fiqa",
+      "run": "minilm-fp32@128",
+      "instruction": "off",
+      "delta": 0.12430936367737432,
+      "low": 0.10595588757262787,
+      "high": 0.14298128227824822
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "minilm-fp32@128",
+      "instruction": "off",
+      "delta": 0.035100411503746896,
+      "low": 0.021438848890575,
+      "high": 0.04951914824318374
+    },
+    {
+      "dataset": "scifact",
+      "run": "minilm-fp32@128",
+      "instruction": "off",
+      "delta": 0.019391206567341817,
+      "low": -0.00632400404192326,
+      "high": 0.04655352363125854
+    },
+    {
+      "dataset": "fiqa",
+      "run": "minilm-fp32@256",
+      "instruction": "off",
+      "delta": 0.13365118397237255,
+      "low": 0.11641088060095822,
+      "high": 0.15105213459978048
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "minilm-fp32@256",
+      "instruction": "off",
+      "delta": 0.037688411566975874,
+      "low": 0.02410272682940202,
+      "high": 0.05135238648477882
+    },
+    {
+      "dataset": "scifact",
+      "run": "minilm-fp32@256",
+      "instruction": "off",
+      "delta": 0.025551991476914945,
+      "low": 0.0026712177954770436,
+      "high": 0.04885162144499785
+    },
+    {
+      "dataset": "fiqa",
+      "run": "minilm-int8@256",
+      "instruction": "off",
+      "delta": 0.13348861199797796,
+      "low": 0.1171038311272359,
+      "high": 0.15000252423781027
+    },
+    {
+      "dataset": "nfcorpus",
+      "run": "minilm-int8@256",
+      "instruction": "off",
+      "delta": 0.038472258870146006,
+      "low": 0.02494902553453773,
+      "high": 0.05252636458449657
+    },
+    {
+      "dataset": "scifact",
+      "run": "minilm-int8@256",
+      "instruction": "off",
+      "delta": 0.024225149617300743,
+      "low": -0.00019304456636441093,
+      "high": 0.0480851037231627
+    }
+  ]
+}

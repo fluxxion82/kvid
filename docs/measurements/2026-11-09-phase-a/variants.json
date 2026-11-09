@@ -1,0 +1,483 @@
+{
+  "bge-fp32": {
+    "model": "BAAI/bge-small-en-v1.5",
+    "base_model": "BAAI/bge-small-en-v1.5",
+    "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "pooling": "cls",
+    "max_tokens": 512,
+    "model_bytes": 133093490,
+    "model_sha256": "828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35",
+    "recipe": null,
+    "max_batch_size": null,
+    "graph": {
+      "operators": {
+        "Add": 172,
+        "Cast": 1,
+        "Concat": 48,
+        "Constant": 285,
+        "Div": 49,
+        "Erf": 12,
+        "Gather": 100,
+        "MatMul": 96,
+        "Mul": 50,
+        "Pow": 25,
+        "ReduceMean": 50,
+        "Reshape": 48,
+        "Shape": 97,
+        "Slice": 1,
+        "Softmax": 12,
+        "Sqrt": 25,
+        "Sub": 26,
+        "Transpose": 48,
+        "Unsqueeze": 99
+      },
+      "initializer_bytes": {
+        "FLOAT": 132848640
+      },
+      "opsets": {
+        "ai.onnx": 11
+      }
+    }
+  },
+  "minilm-fp32": {
+    "model": "sentence-transformers/all-MiniLM-L6-v2",
+    "base_model": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "pooling": "mean",
+    "max_tokens": 256,
+    "model_bytes": 90405214,
+    "model_sha256": "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452",
+    "recipe": null,
+    "max_batch_size": null,
+    "graph": {
+      "operators": {
+        "Add": 88,
+        "Cast": 15,
+        "Concat": 25,
+        "Constant": 218,
+        "ConstantOfShape": 1,
+        "Div": 25,
+        "Equal": 1,
+        "Erf": 6,
+        "Expand": 1,
+        "Gather": 54,
+        "MatMul": 48,
+        "Mul": 38,
+        "Pow": 13,
+        "ReduceMean": 26,
+        "Reshape": 25,
+        "Shape": 58,
+        "Slice": 7,
+        "Softmax": 6,
+        "Sqrt": 31,
+        "Sub": 14,
+        "Transpose": 24,
+        "Unsqueeze": 54,
+        "Where": 2
+      },
+      "initializer_bytes": {
+        "FLOAT": 90261504
+      },
+      "opsets": {
+        "ai.onnx": 14
+      }
+    }
+  },
+  "minilm-int8": {
+    "model": "sentence-transformers/all-MiniLM-L6-v2",
+    "base_model": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "pooling": "mean",
+    "max_tokens": 256,
+    "model_bytes": 23026053,
+    "model_sha256": "4278337fd0ff3c68bfb6291042cad8ab363e1d9fbc43dcb499fe91c871902474",
+    "recipe": null,
+    "max_batch_size": 1,
+    "graph": {
+      "operators": {
+        "Add": 88,
+        "Cast": 63,
+        "Concat": 25,
+        "Constant": 218,
+        "ConstantOfShape": 1,
+        "DequantizeLinear": 3,
+        "Div": 25,
+        "DynamicQuantizeLinear": 48,
+        "Equal": 1,
+        "Erf": 6,
+        "Expand": 1,
+        "Gather": 54,
+        "MatMulInteger": 48,
+        "Mul": 134,
+        "Pow": 13,
+        "ReduceMean": 26,
+        "Reshape": 25,
+        "Shape": 58,
+        "Slice": 7,
+        "Softmax": 6,
+        "Sqrt": 31,
+        "Sub": 14,
+        "Transpose": 24,
+        "Unsqueeze": 54,
+        "Where": 2
+      },
+      "initializer_bytes": {
+        "FLOAT": 205836,
+        "INT8": 10637568,
+        "UINT8": 11917827
+      },
+      "opsets": {
+        "ai.onnx": 14
+      }
+    },
+    "drift_from": "minilm-fp32",
+    "drift": {
+      "cases": 194,
+      "min": 0.9606784066245078,
+      "p1": 0.9686709136580153,
+      "p5": 0.9744620305156841,
+      "median": 0.9880398999529475,
+      "mean": 0.9867236343464684,
+      "worst": [
+        {
+          "cosine": 0.9606784066245078,
+          "text": "\u0451\u0412\u0410\n\u0e31\u0e2a\u0e35 "
+        },
+        {
+          "cosine": 0.9639951467700792,
+          "text": "[CLS] [SEP] [PAD] [MASK] [UNK]"
+        },
+        {
+          "cosine": 0.9690228531011933,
+          "text": "you. TppodghZ4x. be, version\t\u0e2a\u0e35\u0e27\u0e27\u0e2a\u0e2a\u0e2a\n \u00a0 \u202f\u00a0\u3000\n\u0915\u0938\u094d\u093f\u094d\u0915\u0928, would be but \u0e35\u0e35\u0e2a\u0e31\u0e31\u0e2a\u0e31\u03cd\u03b0\u03b2\u0393\u03ad\u03ce\u03a3"
+        },
+        {
+          "cosine": 0.9700550966998785,
+          "text": "word word word word word word word word word word word word word word word word "
+        },
+        {
+          "cosine": 0.9718408128767083,
+          "text": "\n\u2028 who In there. \u05e9\u0628\u062d\u05e9\u0628\u0645\u05e9\u05d5\u05d5\u0645, they, as, so\twhich\nwhich \u0e2a\t\u0628\u0627\u05d5\u05d5\u05dc From\t\u0628\u05e9\u0645\u05d5\u062d\u05dc\u05d5\u0302\u0301\u0303\u0302\u0302\u0300"
+        }
+      ]
+    }
+  },
+  "bge-fp32-opt": {
+    "model": "BAAI/bge-small-en-v1.5#kvid-opt",
+    "base_model": "BAAI/bge-small-en-v1.5",
+    "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "pooling": "cls",
+    "max_tokens": 512,
+    "model_bytes": 132878223,
+    "model_sha256": "6e377cdafc9d00bded962a09f85fcd12b03acd9b8b51fc82805a292d547862e3",
+    "recipe": {
+      "name": "opt",
+      "method": "ORT_ENABLE_BASIC session output, then onnxruntime.transformers.optimizer.optimize_model",
+      "model_type": "bert",
+      "opt_level": 0,
+      "use_gpu": false,
+      "enable_gelu_approximation": false
+    },
+    "max_batch_size": null,
+    "graph": {
+      "operators": {
+        "Attention": 12,
+        "BiasGelu": 12,
+        "Cast": 3,
+        "EmbedLayerNormalization": 1,
+        "MatMul": 36,
+        "SkipLayerNormalization": 24
+      },
+      "initializer_bytes": {
+        "FLOAT": 132848640
+      },
+      "opsets": {
+        "ai.onnx": 11,
+        "ai.onnx.ml": 5,
+        "ai.onnx.training": 1,
+        "ai.onnx.preview": 1,
+        "com.microsoft": 1,
+        "ai.onnx.preview.training": 1,
+        "com.microsoft.experimental": 1,
+        "com.microsoft.nchwc": 1,
+        "org.pytorch.aten": 1
+      }
+    },
+    "drift_from": "bge-fp32",
+    "drift": {
+      "cases": 194,
+      "min": 0.9999999999994665,
+      "p1": 0.9999999999995828,
+      "p5": 0.9999999999996811,
+      "median": 0.9999999999998201,
+      "mean": 0.9999999999998078,
+      "worst": [
+        {
+          "cosine": 0.9999999999994665,
+          "text": "a"
+        },
+        {
+          "cosine": 0.9999999999995769,
+          "text": "\u0645\u0631\u062d\u0628\u0627 \u0628\u0627\u0644\u0639\u0627\u0644\u0645"
+        },
+        {
+          "cosine": 0.9999999999995832,
+          "text": "\u0e2a\u0e27\u0e31\u0e2a\u0e14\u0e35\u0e04\u0e23\u0e31\u0e1a \u0e22\u0e34\u0e19\u0e14\u0e35\u0e17\u0e35\u0e48\u0e44\u0e14\u0e49\u0e23\u0e39\u0e49\u0e08\u0e31\u0e01"
+        },
+        {
+          "cosine": 0.9999999999995863,
+          "text": "TODO"
+        },
+        {
+          "cosine": 0.999999999999605,
+          "text": "\u641c\u7d22\u7b14\u8bb0"
+        }
+      ]
+    }
+  },
+  "bge-int8": {
+    "model": "BAAI/bge-small-en-v1.5#kvid-int8-matmul",
+    "base_model": "BAAI/bge-small-en-v1.5",
+    "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "pooling": "cls",
+    "max_tokens": 512,
+    "model_bytes": 69767302,
+    "model_sha256": "4049489e54c9ecfead58f8c68c152530a7b645bb5910ff32efcb770dc95be6bd",
+    "recipe": {
+      "name": "int8-matmul",
+      "method": "onnxruntime.quantization.quantize_dynamic",
+      "weight_type": "QInt8",
+      "per_channel": true,
+      "reduce_range": false,
+      "op_types_to_quantize": [
+        "MatMul"
+      ],
+      "extra_options": {
+        "MatMulConstBOnly": true
+      }
+    },
+    "max_batch_size": 1,
+    "graph": {
+      "operators": {
+        "Add": 172,
+        "Cast": 73,
+        "Concat": 48,
+        "Constant": 285,
+        "Div": 49,
+        "DynamicQuantizeLinear": 48,
+        "Erf": 12,
+        "Gather": 100,
+        "MatMul": 24,
+        "MatMulInteger": 72,
+        "Mul": 194,
+        "Pow": 25,
+        "ReduceMean": 50,
+        "Reshape": 48,
+        "Shape": 97,
+        "Slice": 1,
+        "Softmax": 12,
+        "Sqrt": 25,
+        "Sub": 26,
+        "Transpose": 48,
+        "Unsqueeze": 99
+      },
+      "initializer_bytes": {
+        "FLOAT": 48079872,
+        "INT8": 21275136
+      },
+      "opsets": {
+        "ai.onnx": 11
+      }
+    },
+    "drift_from": "bge-fp32",
+    "drift": {
+      "cases": 194,
+      "min": 0.9871038223111986,
+      "p1": 0.9902748503369055,
+      "p5": 0.9935871613457665,
+      "median": 0.9966067811235205,
+      "mean": 0.9963607142199631,
+      "worst": [
+        {
+          "cosine": 0.9871038223111986,
+          "text": "\u05e9\u05dc\u05d5\u05dd \u05e2\u05d5\u05dc\u05dd"
+        },
+        {
+          "cosine": 0.9872927508716214,
+          "text": "\u641c\u7d22\u7b14\u8bb0"
+        },
+        {
+          "cosine": 0.990499309436443,
+          "text": "TODO"
+        },
+        {
+          "cosine": 0.9916583100474209,
+          "text": "?"
+        },
+        {
+          "cosine": 0.9918131813302001,
+          "text": "\ud835\udc00\n\uc5b4\u672c\uac00\uac01\u30ab\u30bf\u65e5 \u05dc\u0645\u05dc\u05e9\u0645\u0631\u0645\u05dd\u062d\u05d5 \u0130\u00e7\u017a\u0152\u00f3\u011f\u00fc\u0105\u00e9. who \u2728\ud83c\uddf7 \u0308\u0303\u030a\u0327\n\u200d\u200d\t\u0928\u0924\u0924\u0924\u0947\u0915\u0947\u0928. would, and "
+        }
+      ]
+    }
+  },
+  "bge-int8-all": {
+    "model": "BAAI/bge-small-en-v1.5#kvid-int8-all",
+    "base_model": "BAAI/bge-small-en-v1.5",
+    "revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+    "pooling": "cls",
+    "max_tokens": 512,
+    "model_bytes": 33807386,
+    "model_sha256": "6c09b0019d2f72058c72f39ca5b4f19e79edd65dbe944921c7395b74ddaeec43",
+    "recipe": {
+      "name": "int8-all",
+      "method": "onnxruntime.quantization.quantize_dynamic",
+      "weight_type": "QInt8",
+      "per_channel": false,
+      "reduce_range": false,
+      "op_types_to_quantize": null,
+      "extra_options": {
+        "MatMulConstBOnly": true
+      }
+    },
+    "max_batch_size": 1,
+    "graph": {
+      "operators": {
+        "Add": 172,
+        "Cast": 73,
+        "Concat": 48,
+        "Constant": 285,
+        "DequantizeLinear": 3,
+        "Div": 49,
+        "DynamicQuantizeLinear": 48,
+        "Erf": 12,
+        "Gather": 100,
+        "MatMul": 24,
+        "MatMulInteger": 72,
+        "Mul": 194,
+        "Pow": 25,
+        "ReduceMean": 50,
+        "Reshape": 48,
+        "Shape": 97,
+        "Slice": 1,
+        "Softmax": 12,
+        "Sqrt": 25,
+        "Sub": 26,
+        "Transpose": 48,
+        "Unsqueeze": 99
+      },
+      "initializer_bytes": {
+        "FLOAT": 242988,
+        "INT8": 21233736,
+        "UINT8": 11917827
+      },
+      "opsets": {
+        "ai.onnx": 11
+      }
+    },
+    "drift_from": "bge-fp32",
+    "drift": {
+      "cases": 194,
+      "min": 0.9122277735837951,
+      "p1": 0.9242220138255687,
+      "p5": 0.9462511877909736,
+      "median": 0.9716021171496008,
+      "mean": 0.9693690470491367,
+      "worst": [
+        {
+          "cosine": 0.9122277735837951,
+          "text": "supercalifragilisticexpialidocious supercalifragilisticexpialidocious supercalif"
+        },
+        {
+          "cosine": 0.9238853289042503,
+          "text": "\u0645\u0631\u062d\u0628\u0627 \u0628\u0627\u0644\u0639\u0627\u0644\u0645"
+        },
+        {
+          "cosine": 0.9242473557013668,
+          "text": "\u641c\u7d22\u7b14\u8bb0"
+        },
+        {
+          "cosine": 0.9313520910527564,
+          "text": "have, you \u0628\u05d5\u0627\u05e9\u05e9\u0631\u05d5\u062d. \u212b\ue000. \u0928\u0915\u093f\u0915\u092e\u0947 We \u21d2\u00a3\u2264\u2211\u21d2. and\t\u00a9\u2248\u21d2, but \u0007\ufffd\u007f\u0085\u001b\u001b\u200d\u0085\ufffd\u2060\n\u0947\u0924\u0947\u0928\u0928\u0928\u093f\u093f\u0924\u092e\uff11, \u05dc\u0628"
+        },
+        {
+          "cosine": 0.9338606877400545,
+          "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    }
+  },
+  "minilm-fp32-opt": {
+    "model": "sentence-transformers/all-MiniLM-L6-v2#kvid-opt",
+    "base_model": "sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "pooling": "mean",
+    "max_tokens": 256,
+    "model_bytes": 90276859,
+    "model_sha256": "ffd6ec712cd69231dd3176ef648de822e075fbddd04f9b0749bea4d861b5e62d",
+    "recipe": {
+      "name": "opt",
+      "method": "ORT_ENABLE_BASIC session output, then onnxruntime.transformers.optimizer.optimize_model",
+      "model_type": "bert",
+      "opt_level": 0,
+      "use_gpu": false,
+      "enable_gelu_approximation": false
+    },
+    "max_batch_size": null,
+    "graph": {
+      "operators": {
+        "Attention": 6,
+        "BiasGelu": 6,
+        "Cast": 3,
+        "EmbedLayerNormalization": 1,
+        "MatMul": 18,
+        "SkipLayerNormalization": 12
+      },
+      "initializer_bytes": {
+        "FLOAT": 90261504
+      },
+      "opsets": {
+        "ai.onnx": 14,
+        "ai.onnx.ml": 5,
+        "ai.onnx.training": 1,
+        "ai.onnx.preview": 1,
+        "com.microsoft": 1,
+        "ai.onnx.preview.training": 1,
+        "com.microsoft.experimental": 1,
+        "com.microsoft.nchwc": 1,
+        "org.pytorch.aten": 1
+      }
+    },
+    "drift_from": "minilm-fp32",
+    "drift": {
+      "cases": 194,
+      "min": 0.9999999999990484,
+      "p1": 0.9999999999990987,
+      "p5": 0.9999999999994493,
+      "median": 0.9999999999997471,
+      "mean": 0.9999999999997171,
+      "worst": [
+        {
+          "cosine": 0.9999999999990484,
+          "text": "\u212a\ud840\udc00\ud840\udc00\u212b\u212a\ud835\udc00\ud835\udc00\u212a\u212b\tso \u0085\u0007\u200c\u200d\u001b, \u093f\u093f\u0924\u0300\u0327\u0302\u030a\u0331\u0331\u0303\u0308\u0300, '++ \u05d5\tfor\t\r\u00a0\u2028\u3000 \u0302\u0300\u0302\u0302\u0301\u0331\u0327 \r\n\t\u00a0\u202f\u202f \u2003\tAS\n"
+        },
+        {
+          "cosine": 0.9999999999990987,
+          "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "cosine": 0.9999999999990987,
+          "text": "\ud83d\ude00"
+        },
+        {
+          "cosine": 0.9999999999992983,
+          "text": "TODO"
+        },
+        {
+          "cosine": 0.999999999999299,
+          "text": "?"
+        }
+      ]
+    }
+  }
+}
