@@ -350,3 +350,21 @@ The top-10 overlap column comes from the screening sets, with FiQA as the subset
   - whether to accept batch size 1 for int8 or try static quantization;
   - whether 256 tokens becomes the default limit.
 - **Notes-style evaluation set:** still required before a new default ships, since these benchmarks are proxies.
+
+## Codex's review of Phase A (November 9)
+
+Codex (`gpt-6.1-sol`, high effort, read-only) reviewed "Phase A results" and `docs/measurements/2026-11-09-phase-a/` against the amended protocol, recomputing from the committed summaries. **No P1 findings:** the macro arithmetic, the PASS and INCONCLUSIVE verdicts, the flags and the lexical point guardrail follow the rule. Its macro deltas from the rounded summaries match the table within 0.00004.
+
+- **[P2] Uncertain candidates were dropped.** The frozen rule repeats "each uncertain one" on full FiQA and keeps uncertain candidates for devices.
+  - `bge-fp32@128` (−0.022 to −0.007) and `minilm-fp32@128` (−0.026 to −0.008) stopped at screening.
+  - `minilm-fp32@256`, inconclusive on full FiQA, is not in the device frontier.
+  - MiniLM fp32@128 took 8 to 9 ms per document on the JVM, against 9 to 14 for the retained `minilm-int8@256`.
+  - Codex's recommendation: add those three to full FiQA and the device frontier, or amend the retention rule explicitly. A short ARM comparison of `minilm-fp32-opt@256` is justified as for `bge-fp32-opt`.
+- **[P2] The per-query records are not archived.** Without `queries.jsonl`, the paired intervals, overlaps, length buckets and the `trec_eval` cross-check cannot be audited. This matters most where `minilm-int8`'s lower bound is −0.02025, 0.00025 below the threshold. Archive the original records, compressed or externally with checksums; a rerun would be new evidence, not an audit.
+- **[P2] Per-set intervals against the baseline are missing.** `analyze_retrieval_eval.py` (lines 190 to 195 at `586cbde`) keeps only per-set point deltas. Its per-set intervals compare hybrid with lexical, which is a different question. Add candidate-against-baseline intervals per set, without changing the macro rule. MiniLM's flagged SciFact losses, −0.029 and −0.031, have no interval.
+- **[P3] Drop the inference about typical notes.** 256-token truncation affects 19% of full-FiQA documents, 71% of SciFact and 79% of NFCorpus. On full FiQA, the bucket whose relevant documents exceed 512 tokens falls from 0.382 to 0.362 (108 queries). State the measured trade-off and leave notes to the notes evaluation.
+- **Answers to the three questions.**
+  1. **Does the analysis follow the rule?** Yes for the decision itself, but compliance is incomplete because of the first and third findings.
+  2. **Is the device frontier right?** Keep the six, and add `bge-fp32@128`, `minilm-fp32@128` and `minilm-fp32@256`.
+  3. **Is an exploratory `bge-int8@256` quality run worth adding?** Yes, on all three datasets including full FiQA, labelled exploratory: neither the losses nor the speedups can be assumed to combine. It stays at 69.8 MB and batch 1.
+- **Local agent's note.** Phase B on November 9 times the six variants the owner listed. The three Codex adds are an owner decision; device parity covers all seven variants either way.
