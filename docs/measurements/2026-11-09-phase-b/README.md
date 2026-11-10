@@ -29,7 +29,7 @@ Times are UTC; the Pixel 8 runs span 23:41 on November 9 to 02:03 on November 10
 | `pixel8-session2.txt` | Raw lines of the Pixel 8's later runs: `m3` block 3 and two sweep runs. From here on each run also records whether the launcher stayed in front |
 | `pixel8-session2-gate.txt`, `pixel8-session2-thermal.txt`, `pixel8-session2-charge-wait.txt` | The gate and thermal lines of those runs, and the wait for charging to stop at 80% before them |
 | `excluded-runs.txt` | The two runs excluded because the phone was in use, with the evidence |
-| `pixel4xl/` | Pixel 4 XL: device state, parity against both references, the three failure outputs, the idle baseline and cooling rule, `screening*.txt` (first session), `session2*.txt` (sweep, edit latency, finalist blocks, 5,000 notes) and `xnnpack-crash/` (output of the two crashed runs and the crash log of a rerun) |
+| `pixel4xl/` | Pixel 4 XL: device state, parity against both references, the three failure outputs, the idle baseline and cooling rule, `screening*.txt` (first session), `session2*.txt` (sweep, edit latency, finalist blocks, 5,000 notes), `session3*.txt` (default threads against two) and `xnnpack-crash/` (output of the two crashed runs and the crash log of a rerun) |
 | `driver/` | The scripts that ran it (`queue.sh` reads a queue file such as `q-screen.txt` and calls `run.sh`; `run-parity.sh` is the earlier `run.sh` used for the Pixel 8's parity; `fg.sh` reports the app in front; `therm.sh` reads the temperatures; `p4xl-stage1.sh`, `p4xl-stage2.sh` and `p4xl-stage3.sh` are the Pixel 4 XL's three sessions, with queues `q-screen.txt`, `q-p4xl-2.txt` and `q-p4xl-3.txt`). They write `raw.log`, `gate.log` and `thermal.log`; the copies here are renamed to `.txt` because the repository ignores `*.log` |
 
 ## 1. Parity on the Pixel 8
@@ -232,9 +232,26 @@ Over all six blocks (screening blocks 1 to 3 and these): medians 139.6, 128.6 an
 - **The baseline exceeds the 500 MB limit** (509 MiB). The optimized graph peaks 91 MiB lower, the 256-token limit 210 MiB lower.
 - Per note the store run costs more than the 200-note screening (179 against 140 ms for the baseline): the 5,000 notes average 130 tokens against 124, and the phone throttles.
 
-### Third session (from 11:34): default threads against `threads=2`
+### Third session (11:34 to 12:37): default threads against `threads=2`
 
-Two paired blocks on `mixed` for all three configurations (`driver/p4xl-stage3.sh`, queue `driver/q-p4xl-3.txt`, 12 runs), same rule. In progress when this version was written.
+Two paired blocks on `mixed`, 200 notes, for all three configurations (`driver/p4xl-stage3.sh`, queue `driver/q-p4xl-3.txt`, 12 runs), same rule; within a pair the order alternates. Raw lines: `pixel4xl/session3.txt`; starts: `pixel4xl/session3-gate.txt`; before and after: `pixel4xl/session3-thermal.txt`. All 12 runs completed, started at status 0 and 30.0 to 30.5 °C, stayed at status 0 and were undisturbed. The phone still reported "not charging" (89% to 87%). The first run waited 15 minutes for the phone to cool after the 5,000-note runs.
+
+| Configuration | Pair | default (ms per note) | `threads=2` (ms per note) | Ratio |
+|---|---|---|---|---|
+| `bge-fp32@512` | sweep | 139.9 | 124.5 | 0.89 |
+| | block 1 | 139.4 | 123.4 | 0.89 |
+| | block 2 | 141.3 | 122.7 | 0.87 |
+| `bge-fp32-opt@512` | sweep | 128.5 | 116.3 | 0.91 |
+| | block 1 | 127.0 | 119.5 | 0.94 |
+| | block 2 | 129.1 | 120.7 | 0.93 |
+| `bge-fp32@256` | sweep | 102.1 | 91.3 | 0.89 |
+| | block 1 | 103.4 | 92.3 | 0.89 |
+| | block 2 | 101.6 | 91.4 | 0.90 |
+
+- **Two threads are faster than the default in nine of nine pairs on this phone.** For the plain graph the gain is 10% to 13% at both token limits, at or above the 10% practical difference in all six pairs. For the optimized graph it is 6% to 9%, below it.
+- **Peak memory does not change** (within 2% per configuration).
+- **With two threads the optimized graph's lead shrinks to 2% to 3%** (119.5 and 120.7 against 123.4 and 122.7 ms): the two gains do not add up.
+- This is the Snapdragon 855 (one prime, three large and four small cores). The Pixel 8's thread sweep has not run, so nothing here says what the default should be there. Two threads were not tried with the 5,000-note run or with edit latency.
 
 ## Not done
 
@@ -248,6 +265,7 @@ Two paired blocks on `mixed` for all three configurations (`driver/p4xl-stage3.s
 | Pixel 8: replacement for the excluded `m3` run | Not run |
 | Pixel 4 XL: `ep=xnnpack` for `bge-fp32@512` and `bge-fp32@256` | Crashed (`SIGSEGV` in ONNX Runtime); no timing |
 | Pixel 4 XL: `m3` beyond screening; 5,000-note repeats | Not planned; one 5,000-note run per configuration |
+| Pixel 4 XL: `threads=2` at 5,000 notes and for edit latency | Not run; the gain is measured on 200-note runs only |
 | Emulator harness check | Not run: the local API 35 emulator's disk is full |
 
 The model files and the test APK are still on both phones under `/data/local/tmp/kvid-model-variants` (x86 fixtures) and `/data/local/tmp/kvid-arm-ref` (the arm64 fixtures for the three int8 variants). The remaining Pixel 8 queue is `driver/q-s2c.txt`.

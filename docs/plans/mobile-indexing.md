@@ -442,7 +442,7 @@ Second session, 07:21 to 11:32 UTC, same rule, 30 runs: 28 completed, two crashe
 - **Edit latency: no configuration meets 200 ms at p95 over all notes.** Notes of up to 128 tokens do (p95 110 to 121 ms). The 256-token limit halves the tail (255 ms) but still misses.
 - **Optimized graph over six blocks:** faster in all six, by 7% to 12% (median 8%); it reaches the 10% difference in one block. At 5,000 notes it takes 0.93 of the baseline's time and 91 MiB less memory.
 - **256-token limit over six blocks:** 0.71 to 0.74 of the baseline's time; 0.68 at 5,000 notes.
-- **Threads:** four equals the default. Two were 10% to 11% faster in a single pass; two paired blocks to confirm it are the third session (started 11:34 UTC).
+- **Threads:** four equals the default. **Two are faster in nine of nine pairs** (the sweep and two paired blocks in a third session, 11:34 to 12:37 UTC, 12 runs, all clean): 10% to 13% for the plain graph at both token limits, 6% to 9% for the optimized graph, same peak memory. With two threads the optimized graph leads the plain one by only 2% to 3%. Not tried at 5,000 notes or for edit latency, and the Pixel 8 thread sweep has not run.
 - **XNNPACK is not usable:** it crashes ONNX Runtime (`SIGSEGV`) on the plain graph at both token limits, three times out of three, and is 78% slower than the CPU provider on the optimized graph.
 
 ### Still to run on the Pixel 8

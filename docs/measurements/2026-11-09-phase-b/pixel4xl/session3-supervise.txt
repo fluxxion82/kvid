@@ -1,0 +1,2 @@
+2026-11-10T11:33:27Z phone attached; starting ./p4xl-stage3.sh
+2026-11-10T12:36:47Z chain ended rc=0

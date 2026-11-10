@@ -1,0 +1,12 @@
+2026-11-10T11:48:38Z gate label=thr-mixed-b1-bge-fp32@512-default waited_s=911 gate=ok battery_c=29.8 thermal_status=0 skin_c=30.5 charge_status=4 level=89 wake=Awake
+2026-11-10T11:54:39Z gate label=thr-mixed-b1-bge-fp32@512-t2 waited_s=323 gate=ok battery_c=29.1 thermal_status=0 skin_c=30.4 charge_status=4 level=88 wake=Awake
+2026-11-10T11:58:56Z gate label=thr-mixed-b1-bge-fp32-opt@512-t2 waited_s=222 gate=ok battery_c=28.9 thermal_status=0 skin_c=30.5 charge_status=4 level=88 wake=Awake
+2026-11-10T12:04:13Z gate label=thr-mixed-b1-bge-fp32-opt@512-default waited_s=283 gate=ok battery_c=28.7 thermal_status=0 skin_c=30.5 charge_status=4 level=88 wake=Awake
+2026-11-10T12:08:51Z gate label=thr-mixed-b1-bge-fp32@256-default waited_s=243 gate=ok battery_c=28.5 thermal_status=0 skin_c=30.5 charge_status=4 level=88 wake=Awake
+2026-11-10T12:11:03Z gate label=thr-mixed-b1-bge-fp32@256-t2 waited_s=101 gate=ok battery_c=28.6 thermal_status=0 skin_c=30.3 charge_status=4 level=88 wake=Awake
+2026-11-10T12:17:36Z gate label=thr-mixed-b2-bge-fp32@256-t2 waited_s=365 gate=ok battery_c=28.5 thermal_status=0 skin_c=30.1 charge_status=4 level=88 wake=Awake
+2026-11-10T12:21:06Z gate label=thr-mixed-b2-bge-fp32@256-default waited_s=182 gate=ok battery_c=28.5 thermal_status=0 skin_c=30.5 charge_status=4 level=88 wake=Awake
+2026-11-10T12:24:18Z gate label=thr-mixed-b2-bge-fp32@512-t2 waited_s=162 gate=ok battery_c=28.5 thermal_status=0 skin_c=30.0 charge_status=4 level=87 wake=Awake
+2026-11-10T12:28:35Z gate label=thr-mixed-b2-bge-fp32@512-default waited_s=223 gate=ok battery_c=28.5 thermal_status=0 skin_c=30.5 charge_status=4 level=87 wake=Awake
+2026-11-10T12:34:17Z gate label=thr-mixed-b2-bge-fp32-opt@512-default waited_s=304 gate=ok battery_c=28.3 thermal_status=0 skin_c=30.3 charge_status=4 level=87 wake=Awake
+2026-11-10T12:36:13Z gate label=thr-mixed-b2-bge-fp32-opt@512-t2 waited_s=81 gate=ok battery_c=28.3 thermal_status=0 skin_c=30.5 charge_status=4 level=87 wake=Awake
