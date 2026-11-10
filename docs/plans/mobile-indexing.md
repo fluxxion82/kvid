@@ -426,7 +426,24 @@ Same APK, queue and protocol, November 10, 03:50 to 07:21 UTC. **Cooling rule**,
 - **256 tokens** saves about a quarter of the time on `mixed` and half on `m3`, as on the Pixel 8.
 - **Memory:** every peak is under 500 MB; the baseline on `m3` is closest (473 MiB).
 - **No configuration reaches 60 ms per note on this phone.**
-- The sweep, edit latency, finalist blocks 4 to 6 and the 5,000-note runs started at 07:21 UTC under the same rule; see the archive for their state.
+
+### Sweep, edit latency, finalists and 5,000 notes on the Pixel 4 XL
+
+Second session, 07:21 to 11:32 UTC, same rule, 30 runs: 28 completed, two crashed (XNNPACK), none disturbed. The phone reported "not charging" throughout and fell from 97% to 89% on the cable.
+
+| Configuration | Threads 1 / 2 / 4 (default 140, 129, 102) | XNNPACK | Edit latency p50, p95 | Blocks 4 to 6 | 5,000 notes | Peak PSS at 5,000 notes |
+|---|---|---|---|---|---|---|
+| `bge-fp32@512` | 248.9 / 124.5 / 138.6 ms | crash | 49.5, 578.7 ms | 138.2, 139.4, 144.6 ms | 14.9 min | 509 MiB |
+| `bge-fp32-opt@512` | 237.4 / 116.3 / 127.4 ms | 228.6 ms | 48.8, 540.2 ms | 126.9, 127.4, 127.8 ms | 13.8 min | 418 MiB |
+| `bge-fp32@256` | 179.0 / 91.3 / 101.8 ms | crash | 56.0, 254.8 ms | 102.0, 100.2, 102.5 ms | 10.1 min | 299 MiB |
+
+- **First indexing: no configuration is near 5 minutes on this phone** (10 to 15 minutes). Every 5,000-note run reached thermal status 1 after about four minutes and stayed there; none reached status 2. The goal names a Pixel 8-class phone, and this one is four chip generations older, so this bounds the old-phone case and does not decide the goal.
+- **Memory: the baseline exceeds 500 MB at 5,000 notes** (509 MiB). The optimized graph and the 256-token limit stay under it.
+- **Edit latency: no configuration meets 200 ms at p95 over all notes.** Notes of up to 128 tokens do (p95 110 to 121 ms). The 256-token limit halves the tail (255 ms) but still misses.
+- **Optimized graph over six blocks:** faster in all six, by 7% to 12% (median 8%); it reaches the 10% difference in one block. At 5,000 notes it takes 0.93 of the baseline's time and 91 MiB less memory.
+- **256-token limit over six blocks:** 0.71 to 0.74 of the baseline's time; 0.68 at 5,000 notes.
+- **Threads:** four equals the default. Two were 10% to 11% faster in a single pass; two paired blocks to confirm it are the third session (started 11:34 UTC).
+- **XNNPACK is not usable:** it crashes ONNX Runtime (`SIGSEGV`) on the plain graph at both token limits, three times out of three, and is 78% slower than the CPU provider on the optimized graph.
 
 ### Still to run on the Pixel 8
 

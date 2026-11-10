@@ -1,0 +1,28 @@
+--------- beginning of crash
+11-10 03:32:49.617 17711 17731 F libc    : Fatal signal 11 (SIGSEGV), code 2 (SEGV_ACCERR), fault addr 0x7678dfe000 in tid 17731 (DefaultDispatch), pid 17711 (kvid.embed.test)
+11-10 03:32:50.208 17735 17735 F DEBUG   : *** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+11-10 03:32:50.208 17735 17735 F DEBUG   : Build fingerprint: 'google/coral/coral:13/TP1A.221005.002.B2/9382335:user/release-keys'
+11-10 03:32:50.208 17735 17735 F DEBUG   : Revision: 'MP1.0'
+11-10 03:32:50.208 17735 17735 F DEBUG   : ABI: 'arm64'
+11-10 03:32:50.208 17735 17735 F DEBUG   : Timestamp: 2026-11-10 03:32:49.696573998-0800
+11-10 03:32:50.208 17735 17735 F DEBUG   : Process uptime: 4s
+11-10 03:32:50.208 17735 17735 F DEBUG   : Cmdline: com.kvid.embed.test
+11-10 03:32:50.208 17735 17735 F DEBUG   : pid: 17711, tid: 17731, name: DefaultDispatch  >>> com.kvid.embed.test <<<
+11-10 03:32:50.208 17735 17735 F DEBUG   : uid: 10255
+11-10 03:32:50.208 17735 17735 F DEBUG   : signal 11 (SIGSEGV), code 2 (SEGV_ACCERR), fault addr 0x0000007678dfe000
+11-10 03:32:50.208 17735 17735 F DEBUG   :     x0  fffffffffd69867c  x1  b400007678dfdfd0  x2  0000007689f25aec  x3  b4000076866d2111
+11-10 03:32:50.208 17735 17735 F DEBUG   :     x4  0000000000000000  x5  0000000033373731  x6  0000000033373731  x7  0000000031333737
+11-10 03:32:50.208 17735 17735 F DEBUG   :     x8  00000000ff800000  x9  b4000076764967c0  x10 000000768a8ec2d8  x11 00000079a81e625b
+11-10 03:32:50.209 17735 17735 F DEBUG   :     x12 0000000000000033  x13 0000007689f25a05  x14 0000000000000000  x15 000000000000000a
+11-10 03:32:50.209 17735 17735 F DEBUG   :     x16 0000000000000001  x17 00000079a8217e40  x18 0000007680dae000  x19 b4000076866d20c0
+11-10 03:32:50.209 17735 17735 F DEBUG   :     x20 fffffffffffffffc  x21 b400007676496690  x22 b400007676496790  x23 000000000000000d
+11-10 03:32:50.209 17735 17735 F DEBUG   :     x24 000000768a8c9848  x25 0000000000000001  x26 0000000080000001  x27 00000000000fc000
+11-10 03:32:50.209 17735 17735 F DEBUG   :     x28 00000000000fe000  x29 0000007689f25af0
+11-10 03:32:50.209 17735 17735 F DEBUG   :     lr  000000768a8c9898  sp  0000007689f25ae0  pc  000000768a8ec2fc  pst 00000000a0000000
+11-10 03:32:50.209 17735 17735 F DEBUG   : backtrace:
+11-10 03:32:50.209 17735 17735 F DEBUG   :       #00 pc 00000000008c42fc  /data/app/~~BvWDkOj839Tupwwi4SDShg==/com.kvid.embed.test-RJUxTS-OBYG0uI-74Kg3kA==/base.apk!libonnxruntime.so (BuildId: cde4ee2ccabaee8514cda78e3674e97ada02438e)
+11-10 03:32:50.209 17735 17735 F DEBUG   :       #01 pc 00000000008a1894  /data/app/~~BvWDkOj839Tupwwi4SDShg==/com.kvid.embed.test-RJUxTS-OBYG0uI-74Kg3kA==/base.apk!libonnxruntime.so (BuildId: cde4ee2ccabaee8514cda78e3674e97ada02438e)
+11-10 03:32:50.209 17735 17735 F DEBUG   :       #02 pc 00000000008d8d3c  /data/app/~~BvWDkOj839Tupwwi4SDShg==/com.kvid.embed.test-RJUxTS-OBYG0uI-74Kg3kA==/base.apk!libonnxruntime.so (BuildId: cde4ee2ccabaee8514cda78e3674e97ada02438e)
+11-10 03:32:50.209 17735 17735 F DEBUG   :       #03 pc 00000000008e3998  /data/app/~~BvWDkOj839Tupwwi4SDShg==/com.kvid.embed.test-RJUxTS-OBYG0uI-74Kg3kA==/base.apk!libonnxruntime.so (BuildId: cde4ee2ccabaee8514cda78e3674e97ada02438e)
+11-10 03:32:50.209 17735 17735 F DEBUG   :       #04 pc 00000000000b62b8  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 058e3ec96fa600fb840a6a6956c6b64e)
+11-10 03:32:50.209 17735 17735 F DEBUG   :       #05 pc 0000000000052fb8  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 058e3ec96fa600fb840a6a6956c6b64e)

@@ -1,0 +1,1 @@
+2026-11-10T11:33:21Z diagnostic only, not timed: reran corpus=mixed+notes=200+model=bge-fp32+ep=xnnpack at 11:32Z with logcat kept, phone still warm from the indexing runs; same crash (SIGSEGV in libonnxruntime.so 4 s after process start)
