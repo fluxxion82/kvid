@@ -1,0 +1,8 @@
+2026-11-10T01:01:07Z gate label=scr-m3-b3-bge-fp32-opt@512 waited_s=0 gate=ok battery_c=34.4 thermal_status=0 skin_c=34.9 charge_status=4 level=80 wake=1
+2026-11-10T01:03:15Z gate label=scr-m3-b3-bge-fp32@256 waited_s=42 gate=ok battery_c=34.4 thermal_status=0 skin_c=35.3 charge_status=4 level=80 wake=1
+2026-11-10T01:05:08Z gate label=scr-m3-b3-bge-fp32@512 waited_s=62 gate=ok battery_c=34.6 thermal_status=0 skin_c=35.1 charge_status=4 level=80 wake=1
+2026-11-10T01:08:21Z gate label=sweep-mixed-bge-fp32@512-default waited_s=82 gate=ok battery_c=35.1 thermal_status=0 skin_c=35.4 charge_status=4 level=80 wake=1
+2026-11-10T01:09:50Z gate label=sweep-mixed-bge-fp32@256-default waited_s=62 gate=ok battery_c=35.0 thermal_status=0 skin_c=35.3 charge_status=4 level=80 wake=1
+2026-11-10T01:15Z-01:52Z: queue idle, no runs: fg.sh was not executable, so the launcher check never passed (driver bug)
+2026-11-10T01:52:06Z gate label=idx-mixed-5000-bge-fp32@512 waited_s=1 gate=ok battery_c=29.7 thermal_status=0 skin_c=30.2 charge_status=2 level=80 wake=1
+2026-11-10T02:03:40Z Pixel 8 disconnected during idx-mixed-5000-bge-fp32@512 (started 01:52:06Z); run lost, no result line; queue stopped

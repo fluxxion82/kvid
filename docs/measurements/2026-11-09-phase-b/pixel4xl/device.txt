@@ -1,0 +1,7 @@
+google/coral/coral:13/TP1A.221005.002.B2/9382335:user/release-keys
+Pixel 4 XL
+13
+SM8150
+Mon Nov  9 18:04:01 PST 2026
+ 18:04:01 up 10 min,  0 users,  load average: 54.38, 34.08, 14.49
+battery_c=33.9 thermal_status=1 skin_c=41.0 charge_status=2 level=15 wake=Awake

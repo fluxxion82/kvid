@@ -371,7 +371,7 @@ Codex (`gpt-6.1-sol`, high effort, read-only) reviewed "Phase A results" and `do
 
 ## Phase B results (November 9, local agent; incomplete)
 
-Run at `phase-5-mobile-indexing` `586cbde` on the Pixel 8 with one arm64 test APK. Raw lines, thermal readings, the driver scripts and the full tables: [docs/measurements/2026-11-09-phase-b](../measurements/2026-11-09-phase-b/README.md). **The phone was unplugged after 15 of the 18 screening runs.** Parity is complete; timing is not.
+Run at `phase-5-mobile-indexing` `586cbde` on the Pixel 8 with one arm64 test APK. Raw lines, thermal readings, the driver scripts and the full tables: [docs/measurements/2026-11-09-phase-b](../measurements/2026-11-09-phase-b/README.md). **The Pixel 8 was attached for about 50 and 60 minutes.** Parity and screening are complete there; the sweep, edit latency, finalist blocks and 5,000-note runs are not. The same APK then ran on a Pixel 4 XL the owner offered for the night; its results are reported separately.
 
 ### Device parity: no int8 variant is portable
 
@@ -385,6 +385,7 @@ All seven variants ran `OnnxEmbedderParityTest` against the x86 fixtures (194 te
 | `minilm-int8` | 0.95446194 | **fail** |
 
 - **Not timed, by the rule above:** `bge-int8@512`, `bge-int8-all@512` and `minilm-int8@256`.
+- **The Pixel 4 XL gives the same seven results to the last printed digit** (Snapdragon 855, Android 13). Two ARM phones and macOS arm64 agree with each other and miss the x86 reference by the same amount.
 - **The cause is the CPU architecture, not the phone.** Against fixtures written by the same Python script on macOS arm64, from model files with the same digests, the phone's int8 vectors match to 6e-8.
 - **The x86 reference used here overstates the miss for two variants.** The fixtures were built in a `linux/amd64` container under Rosetta (AVX2, no VNNI). There `bge-int8` drifts from fp32 to a minimum cosine of 0.9189; Phase A's machine recorded 0.9871 and arm64 gives 0.9873. `minilm-int8` shows the same pattern (0.9561, 0.9607, 0.9640). `bge-int8-all` drifts equally everywhere (0.912) and still differs between architectures (0.9938).
 - **arm64 against Phase A's machine is not measured.** The drift statistics are close (mean 0.99635 and 0.99636 for `bge-int8`) but individual texts differ in the third decimal, and Phase A's fixture vectors were not archived.
@@ -393,25 +394,26 @@ All seven variants ran `OnnxEmbedderParityTest` against the x86 fixtures (194 te
   - Phase A's int8 quality results were measured on one x86 machine. They are not established for ARM. The drift figures suggest a similar result for `bge-int8`; that needs the evaluation repeated on arm64 to be more than a guess.
   - `build_variants.py` reproduces the pinned digests of the two `-opt` variants only on x86; a native macOS arm64 build writes different files.
 
-### Screening, session 1 (three configurations left)
+### Screening on the Pixel 8 (three configurations left)
 
 Each run: fresh process, 200 notes, defaults (batch 4, sorted, arena on, CPU). **Cooling rule**, fixed beforehand from an idle baseline: thermal status 0 and skin temperature at or below 35.5 °C at the start. Every run met it. The phone was on external power at 80%, not charging, screen on.
 
-| Configuration | `mixed`: per note, median of 3 (range) | Ratio to baseline per block | `mixed` peak PSS (KiB) | `m3`: per note, 2 blocks | `m3` peak PSS (KiB) |
+| Configuration | `mixed`: per note, median of 3 (range) | Ratio to baseline per block | `mixed` peak PSS (KiB) | `m3`: per note, blocks 1 to 3 | `m3` peak PSS (KiB) |
 |---|---|---|---|---|---|
-| `bge-fp32@512` | 72.4 ms (67.1 to 73.7) | | 437,055 to 453,940 | 376.2, 369.1 ms | 534,718 and 543,114 |
-| `bge-fp32-opt@512` | 69.8 ms (69.5 to 81.1) | 1.04, 0.96, 1.10 | 391,283 to 411,828 | 372.1, 420.3 ms | 429,130 and 444,889 |
-| `bge-fp32@256` | 52.8 ms (52.5 to 53.9) | 0.79, 0.73, 0.73 | 311,481 to 321,596 | 160.6, 187.7 ms | 398,759 and 505,880 |
+| `bge-fp32@512` | 72.4 ms (67.1 to 73.7) | | 437,055 to 453,940 | 376.2, 369.1, 458.0 ms (throttled) | 529,425 to 543,114 |
+| `bge-fp32-opt@512` | 69.8 ms (69.5 to 81.1) | 1.04, 0.96, 1.10 | 391,283 to 411,828 | 372.1, excluded, 334.5 ms | 429,130 and 445,682 |
+| `bge-fp32@256` | 52.8 ms (52.5 to 53.9) | 0.79, 0.73, 0.73 | 311,481 to 321,596 | 160.6, 187.7, 190.0 ms | 398,759 to 505,880 |
 
-- **`bge-fp32-opt` is not faster on ARM** within what three blocks can show; its peak is about 40,000 KiB lower on `mixed` and 100,000 KiB lower on `m3`.
+- **One `m3` run is excluded and one is throttled.** The owner was using the phone during `bge-fp32-opt@512` in block 2 (420.3 ms; the first version of this table counted it). The baseline in block 3 reported thermal status 1 for most of the run although it started inside the cooling rule. Clean `m3` pairs: two for 256 tokens (0.43, 0.51), one for the optimized graph (0.99). From 01:15 UTC the driver detects phone use itself.
+- **`bge-fp32-opt` is not shown to be faster on ARM** within what three blocks can show; its peak is about 40,000 KiB lower on `mixed` and 85,000 to 115,000 KiB lower on `m3`.
 - **256 tokens is faster in every block** and exceeds the predeclared 10% difference: about a quarter less time on `mixed`, half on `m3`.
-- **The baseline exceeds the 500 MB limit on `m3`** in both runs (522 and 530 MiB).
+- **The baseline exceeds the 500 MB limit on `m3`** in all three runs (517 to 530 MiB). Two of the three 256-token runs are at the limit as well (485 and 494 MiB).
 - **The 5-minute goal:** projected from 200 notes, the baseline needs 6.0 minutes per 5,000 `mixed` notes and 256 tokens 4.4. The 5,000-note store runs, which decide this, were not made.
-- **Heat:** `m3` runs end at 38.3 to 38.9 °C skin temperature, just under the first throttling threshold (39.0 °C); one crossed it for 30 s.
+- **Heat:** `m3` runs end at 38.3 to 38.9 °C skin temperature, just under the first throttling threshold (39.0 °C); one crossed it for 30 s and one for a minute.
 
-### Still to run when the phone is attached
+### Still to run on the Pixel 8
 
-`m3` block 3; threads 1, 2, 4 and XNNPACK on the best two; edit latency; the second cooled session with the remaining orders; the 5,000-note `IndexingMeasurementTest` for the baseline and finalists. Also not run: the emulator harness check (the local emulator's disk is full) and a mid-range phone.
+Threads 1, 2, 4 and XNNPACK on the best two (one of ten runs exists); edit latency; three more finalist blocks; the 5,000-note `IndexingMeasurementTest` for the baseline and finalists (the baseline run was started and lost when the phone was unplugged); a replacement for the excluded `m3` run. The queue is `driver/q-s2c.txt` in the archive. Also not run: the emulator harness check (the local emulator's disk is full).
 
 ### For the owner
 

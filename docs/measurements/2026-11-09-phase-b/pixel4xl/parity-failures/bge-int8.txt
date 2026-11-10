@@ -1,0 +1,152 @@
+INSTRUMENTATION_STATUS: class=com.kvid.embed.OnnxEmbedderParityTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+com.kvid.embed.OnnxEmbedderParityTest:
+INSTRUMENTATION_STATUS: test=matchesPythonOnnxRuntimeOnTheReferenceFixture
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=com.kvid.embed.OnnxEmbedderParityTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: 388 results are below cosine 0.9999:
+  case 0 (batched) cosine=0.9947033198303221 text=budget review
+  case 0 (single) cosine=0.9947033198303221 text=budget review
+  case 1 (batched) cosine=0.9903486709324202 text=how do I reset my password
+  case 1 (single) cosine=0.9903486709324202 text=how do I reset my password
+  case 2 (batched) cosine=0.9960558362688282 text=meeting notes from Thursday
+  case 2 (single) cosine=0.9960558362688282 text=meeting notes from Thursday
+  case 3 (batched) cosine=0.9943337163154872 text=recipe for sourdough bread
+  case 3 (single) cosine=0.9943337163154872 text=recipe for sourdough bread
+  case 4 (batched) cosine=0.9909956035763018 text=flight to Lisbon in March
+  case 4 (single) cosine=0.9909956035763018 text=flight to Lisbon in March
+	at org.junit.Assert.fail(Assert.java:89)
+	at kotlin.test.junit.JUnitAsserter.fail(JUnitSupport.kt:56)
+	at kotlin.test.Asserter.assertTrue(Assertions.kt:1558)
+	at kotlin.test.Asserter.assertTrue(Assertions.kt:1568)
+	at kotlin.test.AssertionsKt__AssertionsKt.assertTrue(Assertions.kt:44)
+	at kotlin.test.AssertionsKt.assertTrue(dex-id-4c36ef5c531aaa248c3f8e5e00ca454df0cb7aa4:1)
+	at com.kvid.embed.OnnxEmbedderParityTest$matchesPythonOnnxRuntimeOnTheReferenceFixture$1.invokeSuspend(OnnxEmbedderParityTest.kt:68)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.test.TestDispatcher.processEvent$kotlinx_coroutines_test(TestDispatcher.kt:24)
+	at kotlinx.coroutines.test.TestCoroutineScheduler.tryRunNextTaskUnless$kotlinx_coroutines_test(TestCoroutineScheduler.kt:98)
+	at kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt$runTest$2$1$workRunner$1.invokeSuspend(TestBuilders.kt:326)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)
+	at kotlinx.coroutines.BuildersKt.runBlockingImpl(dex-id-4c36ef5c531aaa248c3f8e5e00ca454df0cb7aa4:1)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)
+	at kotlinx.coroutines.BuildersKt.runBlockingK(dex-id-4c36ef5c531aaa248c3f8e5e00ca454df0cb7aa4:1)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK$default(Builders.concurrent.kt:157)
+	at kotlinx.coroutines.BuildersKt.runBlockingK$default(dex-id-4c36ef5c531aaa248c3f8e5e00ca454df0cb7aa4:1)
+	at kotlinx.coroutines.test.TestBuildersJvmKt.createTestResult(TestBuildersJvm.kt:10)
+	at kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt.runTest-8Mi8wO0(TestBuilders.kt:309)
+	at kotlinx.coroutines.test.TestBuildersKt.runTest-8Mi8wO0(TestBuilders.kt:1)
+	at kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt.runTest-8Mi8wO0(TestBuilders.kt:167)
+	at kotlinx.coroutines.test.TestBuildersKt.runTest-8Mi8wO0(TestBuilders.kt:1)
+	at kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt.runTest-8Mi8wO0$default(TestBuilders.kt:159)
+	at kotlinx.coroutines.test.TestBuildersKt.runTest-8Mi8wO0$default(TestBuilders.kt:1)
+	at com.kvid.embed.OnnxEmbedderParityTest.matchesPythonOnnxRuntimeOnTheReferenceFixture(OnnxEmbedderParityTest.kt:23)
+
+INSTRUMENTATION_STATUS: stream=
+Error in matchesPythonOnnxRuntimeOnTheReferenceFixture(com.kvid.embed.OnnxEmbedderParityTest):
+java.lang.AssertionError: 388 results are below cosine 0.9999:
+  case 0 (batched) cosine=0.9947033198303221 text=budget review
+  case 0 (single) cosine=0.9947033198303221 text=budget review
+  case 1 (batched) cosine=0.9903486709324202 text=how do I reset my password
+  case 1 (single) cosine=0.9903486709324202 text=how do I reset my password
+  case 2 (batched) cosine=0.9960558362688282 text=meeting notes from Thursday
+  case 2 (single) cosine=0.9960558362688282 text=meeting notes from Thursday
+  case 3 (batched) cosine=0.9943337163154872 text=recipe for sourdough bread
+  case 3 (single) cosine=0.9943337163154872 text=recipe for sourdough bread
+  case 4 (batched) cosine=0.9909956035763018 text=flight to Lisbon in March
+  case 4 (single) cosine=0.9909956035763018 text=flight to Lisbon in March
+	at org.junit.Assert.fail(Assert.java:89)
+	at kotlin.test.junit.JUnitAsserter.fail(JUnitSupport.kt:56)
+	at kotlin.test.Asserter.assertTrue(Assertions.kt:1558)
+	at kotlin.test.Asserter.assertTrue(Assertions.kt:1568)
+	at kotlin.test.AssertionsKt__AssertionsKt.assertTrue(Assertions.kt:44)
+	at kotlin.test.AssertionsKt.assertTrue(dex-id-4c36ef5c531aaa248c3f8e5e00ca454df0cb7aa4:1)
+	at com.kvid.embed.OnnxEmbedderParityTest$matchesPythonOnnxRuntimeOnTheReferenceFixture$1.invokeSuspend(OnnxEmbedderParityTest.kt:68)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.test.TestDispatcher.processEvent$kotlinx_coroutines_test(TestDispatcher.kt:24)
+	at kotlinx.coroutines.test.TestCoroutineScheduler.tryRunNextTaskUnless$kotlinx_coroutines_test(TestCoroutineScheduler.kt:98)
+	at kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt$runTest$2$1$workRunner$1.invokeSuspend(TestBuilders.kt:326)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)
+	at kotlinx.coroutines.BuildersKt.runBlockingImpl(dex-id-4c36ef5c531aaa248c3f8e5e00ca454df0cb7aa4:1)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)
+	at kotlinx.coroutines.BuildersKt.runBlockingK(dex-id-4c36ef5c531aaa248c3f8e5e00ca454df0cb7aa4:1)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK$default(Builders.concurrent.kt:157)
+	at kotlinx.coroutines.BuildersKt.runBlockingK$default(dex-id-4c36ef5c531aaa248c3f8e5e00ca454df0cb7aa4:1)
+	at kotlinx.coroutines.test.TestBuildersJvmKt.createTestResult(TestBuildersJvm.kt:10)
+	at kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt.runTest-8Mi8wO0(TestBuilders.kt:309)
+	at kotlinx.coroutines.test.TestBuildersKt.runTest-8Mi8wO0(TestBuilders.kt:1)
+	at kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt.runTest-8Mi8wO0(TestBuilders.kt:167)
+	at kotlinx.coroutines.test.TestBuildersKt.runTest-8Mi8wO0(TestBuilders.kt:1)
+	at kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt.runTest-8Mi8wO0$default(TestBuilders.kt:159)
+	at kotlinx.coroutines.test.TestBuildersKt.runTest-8Mi8wO0$default(TestBuilders.kt:1)
+	at com.kvid.embed.OnnxEmbedderParityTest.matchesPythonOnnxRuntimeOnTheReferenceFixture(OnnxEmbedderParityTest.kt:23)
+
+INSTRUMENTATION_STATUS: test=matchesPythonOnnxRuntimeOnTheReferenceFixture
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_RESULT: stream=
+
+Time: 19.737
+There was 1 failure:
+1) matchesPythonOnnxRuntimeOnTheReferenceFixture(com.kvid.embed.OnnxEmbedderParityTest)
+java.lang.AssertionError: 388 results are below cosine 0.9999:
+  case 0 (batched) cosine=0.9947033198303221 text=budget review
+  case 0 (single) cosine=0.9947033198303221 text=budget review
+  case 1 (batched) cosine=0.9903486709324202 text=how do I reset my password
+  case 1 (single) cosine=0.9903486709324202 text=how do I reset my password
+  case 2 (batched) cosine=0.9960558362688282 text=meeting notes from Thursday
+  case 2 (single) cosine=0.9960558362688282 text=meeting notes from Thursday
+  case 3 (batched) cosine=0.9943337163154872 text=recipe for sourdough bread
+  case 3 (single) cosine=0.9943337163154872 text=recipe for sourdough bread
+  case 4 (batched) cosine=0.9909956035763018 text=flight to Lisbon in March
+  case 4 (single) cosine=0.9909956035763018 text=flight to Lisbon in March
+	at org.junit.Assert.fail(Assert.java:89)
+	at kotlin.test.junit.JUnitAsserter.fail(JUnitSupport.kt:56)
+	at kotlin.test.Asserter.assertTrue(Assertions.kt:1558)
+	at kotlin.test.Asserter.assertTrue(Assertions.kt:1568)
+	at kotlin.test.AssertionsKt__AssertionsKt.assertTrue(Assertions.kt:44)
+	at kotlin.test.AssertionsKt.assertTrue(dex-id-4c36ef5c531aaa248c3f8e5e00ca454df0cb7aa4:1)
+	at com.kvid.embed.OnnxEmbedderParityTest$matchesPythonOnnxRuntimeOnTheReferenceFixture$1.invokeSuspend(OnnxEmbedderParityTest.kt:68)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.test.TestDispatcher.processEvent$kotlinx_coroutines_test(TestDispatcher.kt:24)
+	at kotlinx.coroutines.test.TestCoroutineScheduler.tryRunNextTaskUnless$kotlinx_coroutines_test(TestCoroutineScheduler.kt:98)
+	at kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt$runTest$2$1$workRunner$1.invokeSuspend(TestBuilders.kt:326)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)
+	at kotlinx.coroutines.BuildersKt.runBlockingImpl(dex-id-4c36ef5c531aaa248c3f8e5e00ca454df0cb7aa4:1)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)
+	at kotlinx.coroutines.BuildersKt.runBlockingK(dex-id-4c36ef5c531aaa248c3f8e5e00ca454df0cb7aa4:1)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK$default(Builders.concurrent.kt:157)
+	at kotlinx.coroutines.BuildersKt.runBlockingK$default(dex-id-4c36ef5c531aaa248c3f8e5e00ca454df0cb7aa4:1)
+	at kotlinx.coroutines.test.TestBuildersJvmKt.createTestResult(TestBuildersJvm.kt:10)
+	at kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt.runTest-8Mi8wO0(TestBuilders.kt:309)
+	at kotlinx.coroutines.test.TestBuildersKt.runTest-8Mi8wO0(TestBuilders.kt:1)
+	at kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt.runTest-8Mi8wO0(TestBuilders.kt:167)
+	at kotlinx.coroutines.test.TestBuildersKt.runTest-8Mi8wO0(TestBuilders.kt:1)
+	at kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt.runTest-8Mi8wO0$default(TestBuilders.kt:159)
+	at kotlinx.coroutines.test.TestBuildersKt.runTest-8Mi8wO0$default(TestBuilders.kt:1)
+	at com.kvid.embed.OnnxEmbedderParityTest.matchesPythonOnnxRuntimeOnTheReferenceFixture(OnnxEmbedderParityTest.kt:23)
+
+FAILURES!!!
+Tests run: 1,  Failures: 1
+
+
+INSTRUMENTATION_CODE: -1

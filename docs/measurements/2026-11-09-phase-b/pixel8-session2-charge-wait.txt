@@ -1,0 +1,5 @@
+2026-11-10T00:59:05Z charge-wait battery_c=33.4 thermal_status=0 skin_c=37.6 charge_status=2 level=78 wake=1
+2026-11-10T00:59:35Z charge-wait battery_c=33.6 thermal_status=0 skin_c=37.1 charge_status=2 level=79 wake=1
+2026-11-10T01:00:06Z charge-wait battery_c=33.8 thermal_status=0 skin_c=37.0 charge_status=2 level=79 wake=1
+2026-11-10T01:00:36Z charge-wait battery_c=33.8 thermal_status=0 skin_c=36.5 charge_status=2 level=79 wake=1
+2026-11-10T01:01:07Z charge-wait battery_c=34.4 thermal_status=0 skin_c=34.9 charge_status=4 level=80 wake=1

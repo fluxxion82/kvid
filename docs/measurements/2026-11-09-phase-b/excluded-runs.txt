@@ -1,0 +1,7 @@
+Runs excluded because another app was in front on the phone (the owner was using it); found afterwards from
+`dumpsys usagestats` foreground events (device-local PST = UTC-8). Their raw lines stay in the logs.
+session 1: scr-m3-b2-bge-fp32-opt@512  run 00:29:00Z-00:30:41Z  another app in front 00:26:52Z-00:29:12Z and 00:29:27Z-00:33:16Z  (420.3 ms per note)
+session 2: sweep-mixed-bge-fp32@256-default  run 01:09:50Z-01:10:15Z  another app in front from 01:10:04Z  (73.1 ms per note)
+All other session 1 runs (14) and the session 2 runs before 01:10Z had the launcher in front for the whole run.
+From 01:15Z the driver checks this itself (fg.sh): it waits for the launcher before a run and marks a run
+"disturbed" if another app came to the front during it.
