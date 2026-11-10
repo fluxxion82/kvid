@@ -414,7 +414,12 @@ At this size exact search is well within interactive latency on every target, so
 - **Pass:** the conservative bge-small int8 (70 MB, 0.56 of fp32's JVM time, semantic quality unchanged), the all-operators int8 (34 MB, weaker guardrails), and a 256-token limit.
 - **Inconclusive:** MiniLM, because of SciFact.
 - **No benefit:** the BGE query instruction, so queries stay raw.
-- **Next:** device timing of the frontier, with int8 parity on ARM first (local agent, Phase B commands in the plan).
+- **Next (at the time):** device timing of the frontier, with int8 parity on ARM first (local agent, Phase B commands in the plan).
+
+**Mobile indexing study, Phase B (November 9, incomplete).** Parity and the first screening session ran on the Pixel 8 ([results](plans/mobile-indexing.md#phase-b-results-november-9-local-agent-incomplete), [raw lines](measurements/2026-11-09-phase-b/README.md)).
+- **Int8 is not portable:** all three int8 variants miss cosine 0.9999 against the x86 reference on ARM (0.916, 0.994, 0.954), so none was timed. fp32 matches to 3e-7.
+- **Screening, 200 notes:** 72 ms per note for the baseline, 70 ms for the optimized graph (no gain, less memory), 53 ms at 256 tokens.
+- **Not run yet:** the phone was unplugged. Edit latency, the thread and XNNPACK sweep, the second session and the 5,000-note indexing runs remain.
 
 Next steps (ADR 0002 accepted; the tokenizer and the JVM/Android embedder are done and reviewed, October 25). Merging `phase-5-onnx-embedder` waits for the local agent's sign-off on `0d85781` (owner, October 25). Then two tracks run in parallel. The [mobile indexing study](plans/mobile-indexing.md) is reviewed by Codex first, then the cloud session measures quality and JVM speed and the local agent measures devices. [iOS through cinterop](plans/ios-embedder.md) is planned and implemented by the local agent; then iOS through cinterop; then an evaluation corpus to measure semantic and hybrid retrieval and tune fusion; then semantic search in the sample.
 

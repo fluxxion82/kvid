@@ -1,0 +1,15 @@
+23:45:22 battery_c=36.6 thermal_status=0 skin_c=37.0 charge_status=2 level=80 wake=1
+23:45:43 battery_c=36.7 thermal_status=0 skin_c=36.5 charge_status=4 level=80 wake=1
+23:46:03 battery_c=36.7 thermal_status=0 skin_c=36.3 charge_status=4 level=80 wake=1
+23:46:23 battery_c=36.7 thermal_status=0 skin_c=36.1 charge_status=4 level=80 wake=1
+23:46:44 battery_c=36.5 thermal_status=0 skin_c=35.9 charge_status=4 level=80 wake=1
+23:47:04 battery_c=36.5 thermal_status=0 skin_c=35.8 charge_status=4 level=80 wake=1
+23:47:25 battery_c=36.5 thermal_status=0 skin_c=35.7 charge_status=4 level=80 wake=1
+23:47:45 battery_c=36.2 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+23:48:06 battery_c=36.2 thermal_status=0 skin_c=35.3 charge_status=4 level=80 wake=1
+23:48:26 battery_c=36.2 thermal_status=0 skin_c=35.3 charge_status=4 level=80 wake=1
+23:48:47 battery_c=35.9 thermal_status=0 skin_c=35.2 charge_status=4 level=80 wake=1
+23:49:07 battery_c=35.9 thermal_status=0 skin_c=35.0 charge_status=4 level=80 wake=1
+23:49:28 battery_c=35.9 thermal_status=0 skin_c=35.4 charge_status=4 level=80 wake=1
+23:49:48 battery_c=35.6 thermal_status=0 skin_c=35.2 charge_status=4 level=80 wake=1
+23:50:09 battery_c=35.6 thermal_status=0 skin_c=35.1 charge_status=4 level=80 wake=1

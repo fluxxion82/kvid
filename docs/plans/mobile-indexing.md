@@ -368,3 +368,54 @@ Codex (`gpt-6.1-sol`, high effort, read-only) reviewed "Phase A results" and `do
   2. **Is the device frontier right?** Keep the six, and add `bge-fp32@128`, `minilm-fp32@128` and `minilm-fp32@256`.
   3. **Is an exploratory `bge-int8@256` quality run worth adding?** Yes, on all three datasets including full FiQA, labelled exploratory: neither the losses nor the speedups can be assumed to combine. It stays at 69.8 MB and batch 1.
 - **Local agent's note.** Phase B on November 9 times the six variants the owner listed. The three Codex adds are an owner decision; device parity covers all seven variants either way.
+
+## Phase B results (November 9, local agent; incomplete)
+
+Run at `phase-5-mobile-indexing` `586cbde` on the Pixel 8 with one arm64 test APK. Raw lines, thermal readings, the driver scripts and the full tables: [docs/measurements/2026-11-09-phase-b](../measurements/2026-11-09-phase-b/README.md). **The phone was unplugged after 15 of the 18 screening runs.** Parity is complete; timing is not.
+
+### Device parity: no int8 variant is portable
+
+All seven variants ran `OnnxEmbedderParityTest` against the x86 fixtures (194 texts, single and batched) before any timing.
+
+| Variant | Minimum cosine against the x86 reference | Verdict |
+|---|---|---|
+| `bge-fp32`, `bge-fp32-opt`, `minilm-fp32`, `minilm-fp32-opt` | 1.00000000 | pass |
+| `bge-int8` | 0.91568454 | **fail** |
+| `bge-int8-all` | 0.99379598 | **fail** |
+| `minilm-int8` | 0.95446194 | **fail** |
+
+- **Not timed, by the rule above:** `bge-int8@512`, `bge-int8-all@512` and `minilm-int8@256`.
+- **The cause is the CPU architecture, not the phone.** Against fixtures written by the same Python script on macOS arm64, from model files with the same digests, the phone's int8 vectors match to 6e-8.
+- **The x86 reference used here overstates the miss for two variants.** The fixtures were built in a `linux/amd64` container under Rosetta (AVX2, no VNNI). There `bge-int8` drifts from fp32 to a minimum cosine of 0.9189; Phase A's machine recorded 0.9871 and arm64 gives 0.9873. `minilm-int8` shows the same pattern (0.9561, 0.9607, 0.9640). `bge-int8-all` drifts equally everywhere (0.912) and still differs between architectures (0.9938).
+- **arm64 against Phase A's machine is not measured.** The drift statistics are close (mean 0.99635 and 0.99636 for `bge-int8`) but individual texts differ in the third decimal, and Phase A's fixture vectors were not archived.
+- **Consequences.**
+  - Vectors of a dynamically quantized model are not interchangeable between x86 and ARM, and on x86 not between CPUs with and without VNNI. A store indexed with int8 on one architecture and queried on another mixes two vector spaces.
+  - Phase A's int8 quality results were measured on one x86 machine. They are not established for ARM. The drift figures suggest a similar result for `bge-int8`; that needs the evaluation repeated on arm64 to be more than a guess.
+  - `build_variants.py` reproduces the pinned digests of the two `-opt` variants only on x86; a native macOS arm64 build writes different files.
+
+### Screening, session 1 (three configurations left)
+
+Each run: fresh process, 200 notes, defaults (batch 4, sorted, arena on, CPU). **Cooling rule**, fixed beforehand from an idle baseline: thermal status 0 and skin temperature at or below 35.5 °C at the start. Every run met it. The phone was on external power at 80%, not charging, screen on.
+
+| Configuration | `mixed`: per note, median of 3 (range) | Ratio to baseline per block | `mixed` peak PSS (KiB) | `m3`: per note, 2 blocks | `m3` peak PSS (KiB) |
+|---|---|---|---|---|---|
+| `bge-fp32@512` | 72.4 ms (67.1 to 73.7) | | 437,055 to 453,940 | 376.2, 369.1 ms | 534,718 and 543,114 |
+| `bge-fp32-opt@512` | 69.8 ms (69.5 to 81.1) | 1.04, 0.96, 1.10 | 391,283 to 411,828 | 372.1, 420.3 ms | 429,130 and 444,889 |
+| `bge-fp32@256` | 52.8 ms (52.5 to 53.9) | 0.79, 0.73, 0.73 | 311,481 to 321,596 | 160.6, 187.7 ms | 398,759 and 505,880 |
+
+- **`bge-fp32-opt` is not faster on ARM** within what three blocks can show; its peak is about 40,000 KiB lower on `mixed` and 100,000 KiB lower on `m3`.
+- **256 tokens is faster in every block** and exceeds the predeclared 10% difference: about a quarter less time on `mixed`, half on `m3`.
+- **The baseline exceeds the 500 MB limit on `m3`** in both runs (522 and 530 MiB).
+- **The 5-minute goal:** projected from 200 notes, the baseline needs 6.0 minutes per 5,000 `mixed` notes and 256 tokens 4.4. The 5,000-note store runs, which decide this, were not made.
+- **Heat:** `m3` runs end at 38.3 to 38.9 °C skin temperature, just under the first throttling threshold (39.0 °C); one crossed it for 30 s.
+
+### Still to run when the phone is attached
+
+`m3` block 3; threads 1, 2, 4 and XNNPACK on the best two; edit latency; the second cooled session with the remaining orders; the 5,000-note `IndexingMeasurementTest` for the baseline and finalists. Also not run: the emulator harness check (the local emulator's disk is full) and a mid-range phone.
+
+### For the owner
+
+- **The int8 question changes.** The plan asked whether to accept batch size 1 for int8 or try static quantization, and whether 50 MB outranks `bge-int8-all`'s losses. Parity now says dynamic int8 does not give portable vectors at all. Options: keep fp32 everywhere; allow int8 with the model digest *and* the CPU kernel family as part of the vector space (no cross-device stores without re-embedding); or test whether a statically quantized (QDQ) model is reproducible across architectures. ADR 0002's parity threshold would have to change for the second.
+- **Whether to time int8 anyway** as information, outside the rule.
+- **256 tokens** is the only remaining candidate that moves the device numbers; its quality trade-off is the one Phase A measured.
+- **Codex's three additions** (`bge-fp32@128`, `minilm-fp32@128`, `minilm-fp32@256`) are fp32 and would pass parity; with int8 out they are the only untested route to a smaller or faster model.

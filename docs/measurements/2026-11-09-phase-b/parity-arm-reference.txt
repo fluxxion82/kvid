@@ -1,0 +1,12 @@
+### 2026-11-09T23:43:47Z label=armref-bge-int8 class=OnnxEmbedderParityTest args=KVID_EMBEDDING_FIXTURE_DIR=/data/local/tmp/kvid-arm-ref/bge-int8 KVID_REQUIRE_EMBEDDING_FIXTURE=true status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36 thermal_status=1 skin_c=na
+[kvid-embedding] cases=194 min_cosine=1.00000000 max_abs_diff=5.960e-08 batched_min_cosine=1.00000000 model=BAAI/bge-small-en-v1.5#kvid-int8-matmul pooling=cls batch=1 platform=android-37/Pixel_8/arm64-v8a
+### thermal after: battery_c=36.2 thermal_status=1 skin_c=na
+### 2026-11-09T23:44:00Z label=armref-bge-int8-all class=OnnxEmbedderParityTest args=KVID_EMBEDDING_FIXTURE_DIR=/data/local/tmp/kvid-arm-ref/bge-int8-all KVID_REQUIRE_EMBEDDING_FIXTURE=true status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.2 thermal_status=1 skin_c=na
+[kvid-embedding] cases=194 min_cosine=1.00000000 max_abs_diff=5.960e-08 batched_min_cosine=1.00000000 model=BAAI/bge-small-en-v1.5#kvid-int8-all pooling=cls batch=1 platform=android-37/Pixel_8/arm64-v8a
+### thermal after: battery_c=36.6 thermal_status=1 skin_c=na
+### 2026-11-09T23:44:17Z label=armref-minilm-int8 class=OnnxEmbedderParityTest args=KVID_EMBEDDING_FIXTURE_DIR=/data/local/tmp/kvid-arm-ref/minilm-int8 KVID_REQUIRE_EMBEDDING_FIXTURE=true status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.6 thermal_status=1 skin_c=na
+[kvid-embedding] cases=194 min_cosine=1.00000000 max_abs_diff=2.980e-08 batched_min_cosine=1.00000000 model=sentence-transformers/all-MiniLM-L6-v2 pooling=mean batch=1 platform=android-37/Pixel_8/arm64-v8a
+### thermal after: battery_c=36.5 thermal_status=1 skin_c=na

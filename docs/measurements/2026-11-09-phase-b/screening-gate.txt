@@ -1,0 +1,16 @@
+2026-11-09T23:50:34Z gate label=scr-mixed-b1-bge-fp32@512 waited_s=0 gate=ok battery_c=35.6 thermal_status=0 skin_c=34.9 charge_status=4 level=80 wake=1
+2026-11-09T23:51:45Z gate label=scr-mixed-b1-bge-fp32-opt@512 waited_s=41 gate=ok battery_c=35.2 thermal_status=0 skin_c=35.4 charge_status=4 level=80 wake=1
+2026-11-09T23:53:58Z gate label=scr-mixed-b1-bge-fp32@256 waited_s=82 gate=ok battery_c=35.3 thermal_status=0 skin_c=35.4 charge_status=4 level=80 wake=1
+2026-11-09T23:55:25Z gate label=scr-mixed-b2-bge-fp32@256 waited_s=62 gate=ok battery_c=35.3 thermal_status=0 skin_c=35.3 charge_status=4 level=80 wake=1
+2026-11-09T23:56:48Z gate label=scr-mixed-b2-bge-fp32@512 waited_s=62 gate=ok battery_c=35.3 thermal_status=0 skin_c=35.3 charge_status=4 level=80 wake=1
+2026-11-09T23:57:54Z gate label=scr-mixed-b2-bge-fp32-opt@512 waited_s=41 gate=ok battery_c=35.3 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+2026-11-09T23:59:41Z gate label=scr-mixed-b3-bge-fp32-opt@512 waited_s=82 gate=ok battery_c=35.4 thermal_status=0 skin_c=35.4 charge_status=4 level=80 wake=1
+2026-11-10T00:01:36Z gate label=scr-mixed-b3-bge-fp32@256 waited_s=82 gate=ok battery_c=35.4 thermal_status=0 skin_c=35.4 charge_status=4 level=80 wake=1
+2026-11-10T00:03:46Z gate label=scr-mixed-b3-bge-fp32@512 waited_s=103 gate=ok battery_c=35.5 thermal_status=0 skin_c=35.4 charge_status=4 level=80 wake=1
+2026-11-10T00:05:56Z gate label=scr-m3-b1-bge-fp32@512 waited_s=103 gate=ok battery_c=35.6 thermal_status=0 skin_c=35.4 charge_status=4 level=80 wake=1
+2026-11-10T00:11:13Z gate label=scr-m3-b1-bge-fp32-opt@512 waited_s=226 gate=ok battery_c=35.9 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+2026-11-10T00:16:50Z gate label=scr-m3-b1-bge-fp32@256 waited_s=246 gate=ok battery_c=36.0 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+2026-11-10T00:20:24Z gate label=scr-m3-b2-bge-fp32@256 waited_s=164 gate=ok battery_c=35.6 thermal_status=0 skin_c=35.4 charge_status=4 level=80 wake=1
+2026-11-10T00:22:42Z gate label=scr-m3-b2-bge-fp32@512 waited_s=82 gate=ok battery_c=35.4 thermal_status=0 skin_c=35.4 charge_status=4 level=80 wake=1
+2026-11-10T00:29:00Z gate label=scr-m3-b2-bge-fp32-opt@512 waited_s=287 gate=ok battery_c=35.9 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+2026-11-10T00:50:48Z gate label=scr-m3-b3-bge-fp32-opt@512 waited_s=1207 gate=timeout battery_c=0.0 thermal_status= skin_c=0.0 charge_status= level= wake=

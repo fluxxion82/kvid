@@ -1,0 +1,20 @@
+# Fixture vectors (194 texts) compared across builders, Python ONNX Runtime 1.30.0, CPU provider
+# docker-x86 = python:3.12-slim linux/amd64 under Rosetta on the Mac (AVX2, FMA, F16C; no AVX-512, no VNNI)
+# mac-arm64 = native macOS arm64 build of the same recipes (same model digests for the int8 files)
+
+python ORT mac-arm64 vs linux-x86_64(AVX2) bge-fp32: n=194 min_cos=1.00000000 p1=1.00000000 below_0.9999=0
+python ORT mac-arm64 vs linux-x86_64(AVX2) minilm-fp32: n=194 min_cos=1.00000000 p1=1.00000000 below_0.9999=0
+python ORT mac-arm64 vs linux-x86_64(AVX2) minilm-int8: n=194 min_cos=0.95446194 p1=0.95939967 below_0.9999=194
+python ORT mac-arm64 vs linux-x86_64(AVX2) bge-int8: n=194 min_cos=0.91568454 p1=0.94901134 below_0.9999=194
+python ORT mac-arm64 vs linux-x86_64(AVX2) bge-int8-all: n=194 min_cos=0.99379598 p1=0.99406853 below_0.9999=171
+minilm-fp32-opt not built on mac
+
+bge-int8 drift from fp32, docker-x86: n=194 min=0.9189075752 median=0.991844 mean=0.989338 below_0.9999=194
+bge-int8 drift from fp32, mac-arm64 : n=194 min=0.9872927472 median=0.996603 mean=0.996352 below_0.9999=194
+   mac-arm64 worst three: 0.9872927472 '搜索笔记'; 0.9882644366 'שלום עולם'; 0.9900312275 'TODO'
+bge-int8-all drift from fp32, docker-x86: n=194 min=0.9122277737 median=0.971815 mean=0.969313 below_0.9999=194
+bge-int8-all drift from fp32, mac-arm64 : n=194 min=0.9121064952 median=0.971807 mean=0.969389 below_0.9999=194
+   mac-arm64 worst three: 0.9121064952 'supercalifragilisticexpialidocious super'; 0.9238853248 'مرحبا بالعالم'; 0.9242473510 '搜索笔记'
+minilm-int8 drift from fp32, docker-x86: n=194 min=0.9561120412 median=0.983191 mean=0.981218 below_0.9999=194
+minilm-int8 drift from fp32, mac-arm64 : n=194 min=0.9639951438 median=0.988032 mean=0.986788 below_0.9999=194
+   mac-arm64 worst three: 0.9639951438 '[CLS] [SEP] [PAD] [MASK] [UNK]'; 0.9663900473 'ёВА\nัสี '; 0.9696433014 'word word word word word word word word '
