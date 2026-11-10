@@ -1,0 +1,5 @@
+2026-11-10T03:50:23Z phone attached; starting ./p8-chain.sh
+2026-11-10T03:57:03Z chain ended rc=2
+2026-11-10T05:25:29Z phone attached; starting ./p8-chain.sh
+2026-11-10T05:29:33Z chain ended rc=2
+2026-11-10T17:30:19Z gave up waiting for the phone

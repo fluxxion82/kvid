@@ -268,4 +268,4 @@ Two paired blocks on `mixed`, 200 notes, for all three configurations (`driver/p
 | Pixel 4 XL: `threads=2` at 5,000 notes and for edit latency | Not run; the gain is measured on 200-note runs only |
 | Emulator harness check | Not run: the local API 35 emulator's disk is full |
 
-The model files and the test APK are still on both phones under `/data/local/tmp/kvid-model-variants` (x86 fixtures) and `/data/local/tmp/kvid-arm-ref` (the arm64 fixtures for the three int8 variants). The remaining Pixel 8 queue is `driver/q-s2c.txt`.
+The model files and the test APK are still on both phones under `/data/local/tmp/kvid-model-variants` (x86 fixtures) and `/data/local/tmp/kvid-arm-ref` (the arm64 fixtures for the three int8 variants). The remaining Pixel 8 queue is `driver/q-s2c.txt`. A supervisor script waited for the Pixel 8 until 17:30 UTC on November 10 (`pixel8-session2-supervise.txt`): the phone appeared twice, for seven and four minutes, and left before any run started; after twelve hours without it the wait ended. Nothing is waiting for the phone now.
