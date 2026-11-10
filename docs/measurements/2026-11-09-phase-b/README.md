@@ -134,9 +134,55 @@ The owner offered a Pixel 4 XL for the night. It fills the plan's "second physic
 
 Every figure equals the Pixel 8's to the last printed digit, including the largest absolute differences of the fp32 variants. Two ARM phones with different chips (Tensor G3 and Snapdragon 855) and Android versions (17 and 13) give the same int8 vectors as each other and as macOS arm64, and both miss the x86 reference by the same amount. The three int8 variants are **not timed** on this phone either.
 
-### Timing
+### Timing: cooling rule
 
-In progress when this version was written. The rule was written to `cooling-rule.txt` before any timed run: wait until charging ends, log an idle baseline, then start a run only at thermal status 0 with the skin sensor (`sdm-therm-monitor`; status 1 starts at 40.0 °C) at or below the highest of the last ten idle readings plus 0.5 °C.
+The rule was written to `pixel4xl/cooling-rule.txt` at 02:15, before any timed run: wait until charging ends, log an idle baseline, then start a run only at thermal status 0 with the skin sensor (`sdm-therm-monitor`; status 1 starts at 40.0 °C) at or below the highest of the last ten idle readings plus 0.5 °C.
+
+| | |
+|---|---|
+| Charge wait | 02:15 to 03:45, from 27% to 94% (`pixel4xl/charge-wait.txt`). The phone was off the cable from 02:50 to 02:52 while the owner swapped phones |
+| Idle baseline | 03:45 to 03:50, eleven readings 30 s apart, 29.8 to 30.0 °C, thermal status 0 (`pixel4xl/idle-baseline.txt`) |
+| Rule | Highest idle reading 30.0 °C, so a run starts only at status 0 and skin at or below **30.5 °C** |
+| Charging during the runs | The wait ended when the phone first reported "not charging" at 94%, but it went on topping up: the charge state alternated between 2 (charging) and 4 until 100%. The first run started at 96%, the second at 98%, the rest at 97% to 100% with state 4 or 5 (full). Each run's state is in `pixel4xl/screening-thermal.txt` |
+| Screen and foreground | Screen on, launcher in front for every run; no run was disturbed and none was excluded |
+
+### Screening (03:50 to 07:21)
+
+Same 18-line queue as the Pixel 8 (`driver/q-screen.txt`): 200 notes, three blocks per corpus in the orders ABC, CAB, BCA, a fresh process per run. Raw lines are in `pixel4xl/screening.txt`. Thermal status stayed 0 in every run.
+
+`mixed`, ms per note:
+
+| Block | `bge-fp32@512` | `bge-fp32-opt@512` | `bge-fp32@256` | opt / baseline | 256 / baseline |
+|---|---|---|---|---|---|
+| 1 | 138.5 | 129.4 | 102.2 | 0.93 | 0.74 |
+| 2 | 141.8 | 129.3 | 101.9 | 0.91 | 0.72 |
+| 3 | 139.7 | 130.6 | 100.7 | 0.93 | 0.72 |
+
+`m3`, ms per note:
+
+| Block | `bge-fp32@512` | `bge-fp32-opt@512` | `bge-fp32@256` | opt / baseline | 256 / baseline |
+|---|---|---|---|---|---|
+| 1 | 578.6 | 526.8 | 272.0 | 0.91 | 0.47 |
+| 2 | 575.4 | 532.8 | 272.7 | 0.93 | 0.47 |
+| 3 | 574.8 | 525.9 | 273.1 | 0.91 | 0.48 |
+
+Peak memory (`mem_peak_kb`, KiB), lowest to highest over the three blocks:
+
+| Corpus | `bge-fp32@512` | `bge-fp32-opt@512` | `bge-fp32@256` |
+|---|---|---|---|
+| `mixed` | 427,651 to 435,499 | 387,691 to 389,387 | 277,417 to 283,224 |
+| `m3` | 477,484 to 484,323 | 394,574 to 395,212 | 273,320 to 278,968 |
+
+What the phone showed:
+
+- **About twice as slow as the Pixel 8, far steadier.** Runs of one configuration differ by at most 2.4% (`bge-fp32@512` on `mixed`); the Pixel 8's `mixed` runs differed by up to 17%.
+- **Same ranking.** The 256-token limit is 26% to 28% faster on `mixed` and 52% to 53% faster on `m3`. The optimized graph is 7% to 9% faster on both corpora, in every block, which is below the plan's 10% practical difference. No configuration reaches the 60 ms per note goal on this phone.
+- **Memory.** Every peak is under the 500 MB limit; the baseline on `m3` is the closest at 484,323 KiB (473 MiB).
+- **Cooling took most of the night.** A `mixed` run raised the skin sensor from 30.5 to about 34 °C and the next run could start 2 to 5 minutes later. An `m3` run raised it to 36 to 38 °C; the phone then needed 8 to 9 minutes to fall back to 30.5 °C in the first block and 20 to 30 minutes in the later ones (`pixel4xl/screening-gate.txt`).
+
+### Sweep, edit latency, finalist blocks, indexing
+
+Started at 07:21 as a second session under the same 30.5 °C rule (`driver/p4xl-stage2.sh`, queue `driver/q-p4xl-2.txt`, 30 runs): default threads, 1, 2, 4 threads and XNNPACK for all three configurations, edit latency for each, finalist blocks 4 to 6 on `mixed` in the orders ACB, BAC, CBA, then a 5,000-note `IndexingMeasurementTest` for each. In progress when this version was written.
 
 ## Not done
 

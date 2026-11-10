@@ -1,0 +1,11 @@
+2026-11-10T03:45:37Z battery_c=27.7 thermal_status=0 skin_c=30.0 charge_status=4 level=94 wake=Awake
+2026-11-10T03:46:07Z battery_c=27.7 thermal_status=0 skin_c=29.9 charge_status=4 level=94 wake=Awake
+2026-11-10T03:46:37Z battery_c=27.7 thermal_status=0 skin_c=29.9 charge_status=2 level=94 wake=Awake
+2026-11-10T03:47:07Z battery_c=27.7 thermal_status=0 skin_c=30.0 charge_status=2 level=94 wake=Awake
+2026-11-10T03:47:38Z battery_c=27.7 thermal_status=0 skin_c=29.9 charge_status=2 level=94 wake=Awake
+2026-11-10T03:48:08Z battery_c=27.7 thermal_status=0 skin_c=29.8 charge_status=4 level=94 wake=Awake
+2026-11-10T03:48:38Z battery_c=27.7 thermal_status=0 skin_c=29.9 charge_status=2 level=95 wake=Awake
+2026-11-10T03:49:08Z battery_c=27.7 thermal_status=0 skin_c=29.9 charge_status=2 level=95 wake=Awake
+2026-11-10T03:49:38Z battery_c=27.6 thermal_status=0 skin_c=29.9 charge_status=4 level=95 wake=Awake
+2026-11-10T03:50:08Z battery_c=27.6 thermal_status=0 skin_c=29.9 charge_status=2 level=96 wake=Awake
+2026-11-10T03:50:39Z battery_c=27.7 thermal_status=0 skin_c=29.9 charge_status=4 level=96 wake=Awake

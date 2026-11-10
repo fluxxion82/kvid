@@ -26,6 +26,6 @@ while read -r label cls rest <&3; do
   if [ $gate = timeout ]; then echo "GATE TIMEOUT before $label ($line)"; exit 3; fi
   echo "== $label"
   bash $P/run.sh "$label" "$cls" $rest; rc=$?
-  case $rc in 0) echo "$label" >> "$OUT/done";; 5) echo "$label" >> "$OUT/disturbed";; *) echo "$label" >> "$OUT/failed";; esac
+  case $rc in 0) echo "$label" >> "$OUT/done";; 2) echo "DEVICE GONE during $label"; exit 2;; 5) echo "$label" >> "$OUT/disturbed";; *) echo "$label" >> "$OUT/failed";; esac
 done 3< "$Q"
 echo QUEUE DONE

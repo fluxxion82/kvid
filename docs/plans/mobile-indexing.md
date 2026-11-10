@@ -411,6 +411,23 @@ Each run: fresh process, 200 notes, defaults (batch 4, sorted, arena on, CPU). *
 - **The 5-minute goal:** projected from 200 notes, the baseline needs 6.0 minutes per 5,000 `mixed` notes and 256 tokens 4.4. The 5,000-note store runs, which decide this, were not made.
 - **Heat:** `m3` runs end at 38.3 to 38.9 °C skin temperature, just under the first throttling threshold (39.0 °C); one crossed it for 30 s and one for a minute.
 
+### Screening on the Pixel 4 XL (second phone; reported separately)
+
+Same APK, queue and protocol, November 10, 03:50 to 07:21 UTC. **Cooling rule**, fixed beforehand from its own idle baseline: thermal status 0 and skin temperature at or below 30.5 °C. Every run met it, thermal status stayed 0 during every run, and no run was disturbed. The phone was on external power at 96% to 100%; the first two runs were made while it was still topping up.
+
+| Configuration | `mixed`: per note, blocks 1 to 3 | Ratio to baseline per block | `mixed` peak PSS (KiB) | `m3`: per note, blocks 1 to 3 | Ratio to baseline per block | `m3` peak PSS (KiB) |
+|---|---|---|---|---|---|---|
+| `bge-fp32@512` | 138.5, 141.8, 139.7 ms | | 427,651 to 435,499 | 578.6, 575.4, 574.8 ms | | 477,484 to 484,323 |
+| `bge-fp32-opt@512` | 129.4, 129.3, 130.6 ms | 0.93, 0.91, 0.93 | 387,691 to 389,387 | 526.8, 532.8, 525.9 ms | 0.91, 0.93, 0.91 | 394,574 to 395,212 |
+| `bge-fp32@256` | 102.2, 101.9, 100.7 ms | 0.74, 0.72, 0.72 | 277,417 to 283,224 | 272.0, 272.7, 273.1 ms | 0.47, 0.47, 0.48 | 273,320 to 278,968 |
+
+- **Same ranking as the Pixel 8, at about half the speed and with far less scatter** (at most 2.4% between runs of one configuration).
+- **The optimized graph is 7% to 9% faster in all six blocks.** That is a consistent gain, but below the predeclared 10% difference. On the Pixel 8 it was not distinguishable from noise.
+- **256 tokens** saves about a quarter of the time on `mixed` and half on `m3`, as on the Pixel 8.
+- **Memory:** every peak is under 500 MB; the baseline on `m3` is closest (473 MiB).
+- **No configuration reaches 60 ms per note on this phone.**
+- The sweep, edit latency, finalist blocks 4 to 6 and the 5,000-note runs started at 07:21 UTC under the same rule; see the archive for their state.
+
 ### Still to run on the Pixel 8
 
 Threads 1, 2, 4 and XNNPACK on the best two (one of ten runs exists); edit latency; three more finalist blocks; the 5,000-note `IndexingMeasurementTest` for the baseline and finalists (the baseline run was started and lost when the phone was unplugged); a replacement for the excluded `m3` run. The queue is `driver/q-s2c.txt` in the archive. Also not run: the emulator harness check (the local emulator's disk is full).

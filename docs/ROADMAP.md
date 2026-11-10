@@ -419,7 +419,8 @@ At this size exact search is well within interactive latency on every target, so
 **Mobile indexing study, Phase B (November 9, incomplete).** Parity and the first screening session ran on the Pixel 8 ([results](plans/mobile-indexing.md#phase-b-results-november-9-local-agent-incomplete), [raw lines](measurements/2026-11-09-phase-b/README.md)).
 - **Int8 is not portable:** all three int8 variants miss cosine 0.9999 against the x86 reference on ARM (0.916, 0.994, 0.954), so none was timed. fp32 matches to 3e-7.
 - **Screening, 200 notes:** 72 ms per note for the baseline, 70 ms for the optimized graph (no gain, less memory), 53 ms at 256 tokens.
-- **Not run yet:** the phone was unplugged. Edit latency, the thread and XNNPACK sweep, the second session and the 5,000-note indexing runs remain.
+- **Pixel 4 XL (second phone, November 10):** same parity verdict. Screening: 140 ms per note for the baseline, 130 ms for the optimized graph (7% to 9% faster, under the 10% threshold), 102 ms at 256 tokens; all peaks under 500 MB. Its sweep, edit latency, finalist blocks and 5,000-note runs are in progress.
+- **Not run yet on the Pixel 8:** the phone was unplugged. Edit latency, the thread and XNNPACK sweep, the second session and the 5,000-note indexing runs remain.
 
 Next steps (ADR 0002 accepted; the tokenizer and the JVM/Android embedder are done and reviewed, October 25). Merging `phase-5-onnx-embedder` waits for the local agent's sign-off on `0d85781` (owner, October 25). Then two tracks run in parallel. The [mobile indexing study](plans/mobile-indexing.md) is reviewed by Codex first, then the cloud session measures quality and JVM speed and the local agent measures devices. [iOS through cinterop](plans/ios-embedder.md) is planned and implemented by the local agent; then iOS through cinterop; then an evaluation corpus to measure semantic and hybrid retrieval and tune fusion; then semantic search in the sample.
 

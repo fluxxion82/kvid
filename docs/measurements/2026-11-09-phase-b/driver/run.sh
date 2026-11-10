@@ -17,6 +17,7 @@ samples=$(mktemp)
 ( while :; do sleep ${SAMPLE_S:-15}; echo "$(date -u +%T) $($P/therm.sh)" >> "$samples"; done ) & sp=$!
 res=$(A shell am instrument -w -r -e class "com.kvid.embed.$cls" "${args[@]}" "$INST" 2>&1)
 kill $sp 2>/dev/null; wait $sp 2>/dev/null
+A get-state >/dev/null 2>&1 || { rm -f "$samples"; echo "$(date -u +%FT%TZ) phone left during $label (started $start); run lost" | tee -a "$OUT/gate.log"; exit 2; }
 after=$($P/therm.sh)
 fg1=$($P/fg.sh); dev1=$(A shell date "+%Y-%m-%d\ %H:%M:%S"); other=$($P/fg.sh "$dev0" "$dev1")
 fg="front_before=$fg0 front_after=$fg1 other_app_resumes_during=$other"
