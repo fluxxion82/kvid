@@ -455,3 +455,6 @@ Threads 1, 2, 4 and XNNPACK on the best two (one of ten runs exists); edit laten
 - **Whether to time int8 anyway** as information, outside the rule.
 - **256 tokens** is the only remaining candidate that moves the device numbers; its quality trade-off is the one Phase A measured.
 - **Codex's three additions** (`bge-fp32@128`, `minilm-fp32@128`, `minilm-fp32@256`) are fp32 and would pass parity; with int8 out they are the only untested route to a smaller or faster model.
+- **Thread count.** On the Pixel 4 XL two threads beat the default by 10% to 13% for the plain graph. Whether to set a thread count per device class, or leave the default, waits on the Pixel 8 thread sweep.
+- **XNNPACK** crashes ONNX Runtime 1.30.0 on the Pixel 4 XL with the plain graph and is slower with the optimized one. Proposed: drop it from the remaining Pixel 8 queue unless the owner wants the crash checked there.
+- **The Pixel 8 still decides.** Its sweep, edit latency, finalist blocks 4 to 6 and 5,000-note runs have not run; the Pixel 4 XL numbers bound an older phone and do not replace them.
