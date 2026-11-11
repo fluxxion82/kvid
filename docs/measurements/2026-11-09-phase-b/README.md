@@ -1,6 +1,6 @@
 # Phase B of the mobile indexing study: parity and timing on the Pixel 8 and the Pixel 4 XL (November 9 to 11, 2026)
 
-Protocol: "Phase B commands" in [docs/plans/mobile-indexing.md](../../plans/mobile-indexing.md). Run by the local session. **The Pixel 8 is the owner's daily phone and was attached only at times**: twice for about 50 and 60 minutes on November 9 to 10, and again from 17:57 on November 10 to 01:27 on November 11. Sections 1 and 2 are the first attachment, section 3 the second, section 4 the Pixel 4 XL, which the owner offered for the night, and section 5 the Pixel 8's later attachments, which made the remaining planned runs. What the protocol asks for and was not done is listed at the end. Codex reviewed this archive on November 11; its findings are in the plan and the corrections are made here.
+Protocol: "Phase B commands" in [docs/plans/mobile-indexing.md](../../plans/mobile-indexing.md). Run by the local session. **The Pixel 8 is the owner's daily phone and was attached only at times**: twice for about 50 and 60 minutes on November 9 to 10, and again from 17:57 on November 10 to 01:27 on November 11. Sections 1 and 2 are the first attachment, section 3 the second, section 4 the Pixel 4 XL, which the owner offered for the night, section 5 the Pixel 8's later attachments, which made the remaining planned runs, and section 6 the three retained candidates on the Pixel 4 XL. What the protocol asks for and was not done is listed at the end. Codex reviewed this archive on November 11; its findings are in the plan and the corrections are made here.
 
 **Units and arithmetic.** PSS is recorded in KiB. The 500 MB limit is 488,281 KiB (476.8 MiB); where a peak is near it both MB and MiB are given. Per-run ratios and medians in the tables use the printed `per_note_ms`; the 95% intervals use `total_ms` and resample blocks (10,000 resamples, seed 20261108). Every PSS peak is a 100 ms sampled lower bound in the test process, sampled from after the model is opened; none is a whole-app, full-lifecycle figure.
 
@@ -34,7 +34,7 @@ Times are UTC; the Pixel 8 runs of sections 1 to 3 span 23:41 on November 9 to 0
 | `pixel8-idle-wait.txt`, `pixel8-cooling-rule-2.txt` | Section 5: idle readings every 60 s from 22:52, and the second cooling rule derived from them |
 | `pixel8-xnnpack-crash/` | Output of the two crashed XNNPACK runs on the Pixel 8 and the crash line of a rerun |
 | `excluded-runs.txt` | The runs excluded because the phone was in use, with the evidence |
-| `pixel4xl/` | Pixel 4 XL: device state, parity against both references, the three failure outputs, the idle baseline and cooling rule, `screening*.txt` (first session), `session2*.txt` (sweep, edit latency, finalist blocks, 5,000 notes), `session3*.txt` (default threads against two) and `xnnpack-crash/` (output of the two crashed runs and the crash log of a rerun) |
+| `pixel4xl/` | Pixel 4 XL: device state, parity against both references, the three failure outputs, the idle baseline and cooling rule, `screening*.txt` (first session), `session2*.txt` (sweep, edit latency, finalist blocks, 5,000 notes), `session3*.txt` (default threads against two), `session4*.txt` (section 6, with the plan written before it) and `xnnpack-crash/` (output of the two crashed runs and the crash log of a rerun) |
 | `driver/` | The scripts that ran it (`queue.sh` reads a queue file such as `q-screen.txt` and calls `run.sh`; `run-parity.sh` is the earlier `run.sh` used for the Pixel 8's parity; `fg.sh` reports the app in front; `therm.sh` reads the temperatures; `p4xl-stage1.sh`, `p4xl-stage2.sh` and `p4xl-stage3.sh` are the Pixel 4 XL's three sessions, with queues `q-screen.txt`, `q-p4xl-2.txt` and `q-p4xl-3.txt`; `p8-chain2.sh` to `p8-chain5.sh` and `switch-rule.sh` are section 5, with queues `q-s2d.txt` and `q-s2e.txt`). They write `raw.log`, `gate.log` and `thermal.log`; the copies here are renamed to `.txt` because the repository ignores `*.log` |
 
 ## 1. Parity on the Pixel 8
@@ -337,6 +337,66 @@ Over all six blocks (section 2's blocks 1 to 3 and these): medians 74.3, 73.2 an
 
 `scr-m3-b2r-bge-fp32-opt@512`, made for the run excluded in section 2: 361.0 ms per note, status 0 throughout (second rule, start 36.2 °C), peak 499,136 KiB, which is 511 MB and above the limit. **It is an unpaired observation.** The protocol asks for the whole affected block to be repeated; only this cell was, a day later and under the other rule (the block's baseline had started at 35.4 °C under the first), so it does not repair the block 2 pair.
 
+## 6. Pixel 4 XL, November 11: the three retained candidates
+
+After Codex's review the owner asked for the three uncertain candidates the frozen rule keeps. **Plan written before any run:** `pixel4xl/session4-plan.txt` (configurations, order, exclusions, analysis). Scripts `driver/p4xl-stage4.sh` and `p4xl-stage4b.sh`, queues `driver/q-p4xl-4.txt` and `q-p4xl-4b.txt`; raw lines `pixel4xl/session4.txt`, starts `pixel4xl/session4-gate.txt`.
+
+- **Configurations:** `bge-fp32@128`, `minilm-fp32@256`, `minilm-fp32@128`, and the baseline `bge-fp32@512` in every block. Defaults otherwise. Both model files passed parity on this phone; the token limit does not change the model.
+- **Quality is not settled for any of them** (Phase A: the two 128-token configurations stopped at screening as uncertain, `minilm-fp32@256` is INCONCLUSIVE on full FiQA). **Device speed cannot authorize shipping one**; these runs say whether the quality work is worth doing.
+- **Not on the Pixel 8,** which decides.
+- **State:** same cooling rule as before (status 0, skin at or below 30.5 °C); every start met it (28.3 to 30.5 °C). Launcher in front, screen on. Battery full at 100% for the first run, then not charging at 99% to 94%. 03:18 to 08:04 UTC, 42 runs; one was disturbed (below).
+- **What 128 tokens cuts:** 62 of the 200 `mixed` notes (31%) are longer than 128 tokens and 37 (19%) longer than 256. At 128 tokens the 5,000 notes keep 344,923 of 651,618 tokens (53%); at 256, 511,558 (79%).
+
+### `mixed`, 200 notes, six blocks (ms per note)
+
+| Block (order) | `bge-fp32@512` (A) | `bge-fp32@128` (B) | `minilm-fp32@256` (C) | `minilm-fp32@128` (D) |
+|---|---|---|---|---|
+| 1 (ABCD) | 145.7 | 65.2 | 53.4 | 33.6 |
+| 2 (BDAC) | 139.4 | 65.4 | 53.3 | 33.9 |
+| 3 (CADB) | 140.6 | 64.9 | 52.7 | 33.7 |
+| 4 (DCBA) | 140.1 | 65.4 | 53.1 | 34.5 |
+| 5 (ACDB) | 163.0 | 65.0 | 50.6 | 34.2 |
+| 6 (BADC) | 141.8 | 67.4 | 55.1 | 34.6 |
+| Median | 141.2 | 65.3 | 53.2 | 34.1 |
+| Mean ratio to baseline (95% interval) | | 0.45 (0.43 to 0.47) | 0.37 (0.34 to 0.38) | 0.24 (0.22 to 0.24) |
+| Peak PSS (KiB) | 421,244 to 446,487 | 232,444 to 240,561 | 227,275 to 240,337 | 190,868 to 201,028 |
+
+All 24 runs stayed at thermal status 0 and were undisturbed. The baseline's block 5 run (163.0 ms) is 15% above its other five; nothing was recorded that would exclude it, so it stays in, and it widens the intervals. Without block 5 the ratios are 0.45 to 0.48, 0.37 to 0.39 and 0.23 to 0.25.
+
+### 5,000-note `IndexingMeasurementTest` (`mixed`, one run each, same session)
+
+| Configuration | Total | Notes per second (early, late) | Peak PSS | Thermal |
+|---|---|---|---|---|
+| `bge-fp32@512` | 881.6 s (14.7 min) | 5.67 (5.93, 5.69) | 516,614 KiB (529 MB) | status 1 in 34 of 59 samples; skin up to 41.2 °C |
+| `bge-fp32@128` | 370.7 s (6.2 min) | 13.49 (14.06, 13.26) | 259,113 KiB (265 MB) | status 0 throughout; up to 39.0 °C |
+| `minilm-fp32@256` | 309.4 s (5.2 min) | 16.16 (16.65, 16.09) | 261,355 KiB (268 MB) | status 0 throughout; up to 39.8 °C |
+| `minilm-fp32@128` | **196.1 s (3.3 min)** | 25.50 (26.23, 24.86) | 213,266 KiB (218 MB) | status 0 throughout; up to 38.4 °C |
+
+- **`minilm-fp32@128` indexes 5,000 notes in 3.3 minutes on this phone**, the first configuration under 5 minutes on either phone, and on the older one. `minilm-fp32@256` misses by 9 s (16.2 notes per second against the 16.7 needed); `bge-fp32@128` takes 6.2 minutes.
+- **None of the three throttled.** Each finished before the phone reached thermal status 1, and early and late throughput differ by 3% to 6%. The baseline in the same session throttled as before (881.6 s; 896.4 s in the second session).
+- **All three peak at about half the limit or less** in these sampled test-process runs.
+- One run each: the 9 s miss of `minilm-fp32@256` is within what a repeat could reverse.
+
+### Edit latency (`latency=on`: 200 notes embedded one per call, embedding only, ms)
+
+| Configuration | p50 | p95 | Up to 64 tokens (106 notes): p50, p95 | 65 to 128: p50, p95 | 129 to 256: p50, p95 | Peak PSS (KiB) |
+|---|---|---|---|---|---|---|
+| `bge-fp32@128` | 49.3 | 113.9 | 23.6, 51.2 | 109.5, 115.3 (94 notes) | none | 224,703 |
+| `minilm-fp32@256` | 26.7 | 123.3 | 12.5, 27.3 | 40.5, 58.9 (32 notes) | 117.6, 127.3 (62 notes) | 193,992 |
+| `minilm-fp32@128` | 30.2 | 73.6 | 14.5, 30.7 | 55.5, 84.0 (94 notes) | none | 181,621 |
+
+All three are under 200 ms at p95 for embedding alone, on the older phone (the baseline: 579 ms). The target also covers saving the vector, which is not timed. One run of 200 calls each.
+
+### `m3`, 200 long notes (ms per note)
+
+| Block (order) | `bge-fp32@512` | `bge-fp32@128` | `minilm-fp32@256` | `minilm-fp32@128` |
+|---|---|---|---|---|
+| 1 (ABCD) | 574.2 | 130.5 | 142.8 | 68.8 |
+| 2 (BDAC) | 578.5 | 130.9 | 163.5 (**excluded**) | 68.1 |
+| 3 (CADB) | 581.9 | pending | 142.1 | 69.8 |
+
+Block 2's `minilm-fp32@256` run was disturbed (two foreground changes to another app), so the block is excluded and, as the plan says, repeated whole. Before the last run of block 3 the phone idled at 30.9 °C for two hours, above the rule, and the gate timed out; the rule was not changed. That run and the block 2 repeat were queued again at 10:05 UTC and are pending. On `m3` every note is cut at 128 or 256 tokens, so the candidates take about a quarter of the baseline's time (`minilm-fp32@128` about an eighth).
+
 ## Not done
 
 | The protocol asks for | State |
@@ -352,7 +412,7 @@ Over all six blocks (section 2's blocks 1 to 3 and these): medians 74.3, 73.2 an
 | Fixed ambient conditions and brightness, energy cost, process ID per run | Not recorded |
 | 5,000-note repeats | Pixel 8: two valid baseline runs, one each for the others. Pixel 4 XL: one each |
 | Pixel 4 XL: `threads=2` at 5,000 notes and for edit latency | Not run; the gain is measured on 200-note runs only |
-| Device timing of the uncertain candidates the frozen rule keeps (`bge-fp32@128`, `minilm-fp32@128`, `minilm-fp32@256`) | Not run: the owner's request listed six configurations. Completing the retained frontier, or amending its scope, is the owner's decision |
+| Device timing of the uncertain candidates the frozen rule keeps (`bge-fp32@128`, `minilm-fp32@128`, `minilm-fp32@256`) | Run on the Pixel 4 XL (section 6). **Not run on the Pixel 8**, which decides. Thread sweep and XNNPACK not run for them |
 | Emulator harness check | Not run: the local API 35 emulator's disk is full |
 
 The model files and the test APK are still on both phones under `/data/local/tmp/kvid-model-variants` (x86 fixtures) and `/data/local/tmp/kvid-arm-ref` (the arm64 fixtures for the three int8 variants). Nothing is waiting for either phone.

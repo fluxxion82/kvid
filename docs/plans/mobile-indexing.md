@@ -466,6 +466,23 @@ The phone was at 80% and not charging, launcher in front, at every start. **Two 
 - **XNNPACK crashes here too** (`SIGSEGV`, both token limits): six crashes in six attempts with the plain graph across the two phones.
 - The `m3` cell excluded in screening was rerun: 361.0 ms per note for the optimized graph. It is an unpaired observation under the second rule; the protocol's whole-block repeat was not done, so it does not repair that pair.
 
+### The three retained candidates on the Pixel 4 XL (November 11)
+
+Run after Codex's review, at the owner's request, with the plan written beforehand (`pixel4xl/session4-plan.txt` in the archive): the baseline in every block, six `mixed` blocks, one 5,000-note run each, edit latency, three `m3` blocks. Same cooling rule as the earlier Pixel 4 XL sessions; every start met it. **Quality is unsettled for all three** (Phase A: uncertain, uncertain, INCONCLUSIVE), so these numbers cannot authorize shipping one, and they are **not from the Pixel 8**.
+
+| Configuration | `mixed`, median of six | Mean ratio to baseline (95% interval) | 5,000 notes | Notes per second (early, late) | Peak PSS at 5,000 notes | Edit latency p50, p95 (embedding only) |
+|---|---|---|---|---|---|---|
+| `bge-fp32@512` | 141.2 ms | | 14.7 min, throttled | 5.67 (5.93, 5.69) | 529 MB | 49.5, 578.7 ms (second session) |
+| `bge-fp32@128` | 65.3 ms | 0.45 (0.43 to 0.47) | 6.2 min | 13.49 (14.06, 13.26) | 265 MB | 49.3, 113.9 ms |
+| `minilm-fp32@256` | 53.2 ms | 0.37 (0.34 to 0.38) | 5.2 min | 16.16 (16.65, 16.09) | 268 MB | 26.7, 123.3 ms |
+| `minilm-fp32@128` | 34.1 ms | 0.24 (0.22 to 0.24) | **3.3 min** | 25.50 (26.23, 24.86) | 218 MB | 30.2, 73.6 ms |
+
+- **`minilm-fp32@128` is the first configuration under 5 minutes** for 5,000 notes on either phone (196 s), and on the older one. `minilm-fp32@256` misses by 9 s in its one run; `bge-fp32@128` takes 6.2 minutes.
+- **None of the three throttled:** each finished before the phone reached thermal status 1. The baseline in the same session throttled as before.
+- **Memory and embedding latency are far inside the limits** in these test-process runs (about half the memory limit or less; p95 74 to 123 ms).
+- **What the 128-token limit costs in text:** 31% of the `mixed` notes are longer than 128 tokens, and only 53% of the tokens of the 5,000 notes are kept (79% at 256). Phase A measured its quality on public sets only.
+- **Open:** the `m3` blocks are incomplete (one block excluded for phone use and being repeated whole, one run pending because the phone idled just above the cooling rule); no thread sweep; nothing on the Pixel 8.
+
 ### Not done against the protocol
 
 - **By rule or by failure:** timing of the three int8 variants (parity failed); XNNPACK timing with the plain graph (it crashes; the optimized graph was timed on the Pixel 4 XL only).
@@ -473,15 +490,15 @@ The phone was at 80% and not charging, launcher in front, at every start. **Two 
 - **Sweep scope:** `mixed` only; on the Pixel 8 not for the optimized graph, and no valid one-thread figure at 512 tokens (excluded twice).
 - **Targets as defined in the review's answer 5:** edit latency including saving the vector; query and search p95 at 5,000 notes; whole-app, full-lifecycle PSS; screen-off and background runs.
 - **Recording:** fixed ambient conditions and brightness, energy cost, the sampler's overhead, process IDs.
-- **Frontier:** device timing of the three uncertain candidates the frozen rule keeps (`bge-fp32@128`, `minilm-fp32@128`, `minilm-fp32@256`); the emulator harness check (the local emulator's disk is full).
+- **Frontier:** the three uncertain candidates the frozen rule keeps are timed on the Pixel 4 XL only, not on the Pixel 8, which decides; the emulator harness check (the local emulator's disk is full).
 
 ### For the owner
 
 - **The int8 question changes.** The plan asked whether to accept batch size 1 for int8 or try static quantization, and whether 50 MB outranks `bge-int8-all`'s losses. Parity now says dynamic int8 does not give portable vectors at all. Under the frozen rule int8 stays rejected. Options beyond it: keep fp32 everywhere; allow int8 with the model digest *and* the CPU kernel family as part of the vector space (no cross-device stores without re-embedding); or test whether a statically quantized (QDQ) model is reproducible across architectures. The second would not lower the 0.9999 threshold within a space; it would be an ADR and spec amendment on portability.
 - **Whether to time int8 anyway** as information, outside the rule.
 - **Whether to adopt 256 tokens.** It is the only measured candidate that moves the device numbers: on the Pixel 8 its embedding p95 is 148 ms, its sampled peak 338 MB, and first indexing takes 8.7 minutes against 13 to 14. Its quality trade-off is the one Phase A measured on public sets; the notes-style evaluation the review asked for does not exist yet. Until the owner decides, the 512-token default stays.
-- **The 5-minute goal is not met by any of the three tested configurations**, on either phone, with sustained thermal throttling contributing. Background indexing with progress is already required separately and does not make 8.7 minutes meet a 5-minute goal. The choice left to the owner: change the goal, or complete the retained frontier (next item) in search of a cheaper configuration.
-- **Complete the retained frontier, or amend its scope.** The frozen rule keeps uncertain candidates for devices; `bge-fp32@128`, `minilm-fp32@128` and `minilm-fp32@256` were not timed because the owner's request listed six configurations. They are fp32 and would pass parity, and they are three identified untested candidates for a smaller or faster model. Their quality verdicts are INCONCLUSIVE, so device speed alone could not authorize shipping one.
+- **The 5-minute goal is not met by any of the three first configurations**, on either phone, with sustained thermal throttling contributing. Background indexing with progress is already required separately and does not make 8.7 minutes meet a 5-minute goal. Of the retained candidates, `minilm-fp32@128` meets it on the Pixel 4 XL (3.3 minutes) and `minilm-fp32@256` nearly does (5.2). The choice left to the owner: change the goal, or pursue one of these, which first needs its quality settled.
+- **The retained candidates: quality next, and the Pixel 8.** `bge-fp32@128`, `minilm-fp32@128` and `minilm-fp32@256` are now timed on the Pixel 4 XL (owner's request, November 11). `minilm-fp32@128` is 4.3 times faster than the baseline there and meets the indexing goal; `minilm-fp32@256` is 2.7 times faster. Their quality verdicts are uncertain or INCONCLUSIVE, so device speed alone cannot authorize shipping one. To decide: whether to run the missing quality work (full FiQA for the 128-token configurations, the notes-style evaluation), and whether to time them on the Pixel 8.
 - **Memory limit: unit and scope.** The write-up now treats 500 MB as decimal (488,281 KiB). The review's answer 5 defines the limit as whole-app memory over open, index and close; only sampled test-process peaks exist.
 - **Thread count.** Two threads beat the default by 10% to 13% on the Pixel 4 XL and lost to it by 64% to 74% on the Pixel 8 (single runs there). Proposed: keep the default, as the conservative existing policy.
 - **XNNPACK** crashes ONNX Runtime 1.30.0 with the plain graph on both phones (six attempts of six) and is slower with the optimized one on the Pixel 4 XL. Proposed: drop it.

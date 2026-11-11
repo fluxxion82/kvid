@@ -1,0 +1,5 @@
+cand-m3-b3-bge-fp32@128 OnnxEmbedderTuningTest KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=m3+notes=200+model=bge-fp32+maxTokens=128
+cand-m3-b2r-bge-fp32@128 OnnxEmbedderTuningTest KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=m3+notes=200+model=bge-fp32+maxTokens=128
+cand-m3-b2r-minilm-fp32@128 OnnxEmbedderTuningTest KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=m3+notes=200+model=minilm-fp32+maxTokens=128
+cand-m3-b2r-bge-fp32@512 OnnxEmbedderTuningTest KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=m3+notes=200+model=bge-fp32
+cand-m3-b2r-minilm-fp32@256 OnnxEmbedderTuningTest KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=m3+notes=200+model=minilm-fp32+maxTokens=256
