@@ -1,0 +1,2 @@
+--------- beginning of crash
+11-10 17:27:14.100 24751 24768 F libc    : Fatal signal 11 (SIGSEGV), code 2 (SEGV_ACCERR), fault addr 0xb4000078d0cdc000 in tid 24768 (DefaultDispatch), pid 24751 (kvid.embed.test)

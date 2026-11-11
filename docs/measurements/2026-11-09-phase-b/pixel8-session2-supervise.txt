@@ -3,3 +3,13 @@
 2026-11-10T05:25:29Z phone attached; starting ./p8-chain.sh
 2026-11-10T05:29:33Z chain ended rc=2
 2026-11-10T17:30:19Z gave up waiting for the phone
+2026-11-10T17:57:33Z phone attached; starting ./p8-chain2.sh
+2026-11-10T18:57:37Z chain ended rc=3
+2026-11-10T18:57:50Z phone attached; starting ./p8-chain2.sh
+2026-11-10T21:50:47Z phone attached; starting ./p8-chain2.sh
+2026-11-10T22:50:50Z chain ended rc=3
+2026-11-10T22:52:35Z phone attached; starting ./p8-chain3.sh
+2026-11-10T23:55:37Z phone attached; starting ./p8-chain4.sh
+2026-11-11T01:23:25Z chain ended rc=0
+2026-11-11T01:23:45Z phone attached; starting ./p8-chain5.sh
+2026-11-11T01:26:49Z chain ended rc=0

@@ -5,3 +5,8 @@ session 2: sweep-mixed-bge-fp32@256-default  run 01:09:50Z-01:10:15Z  another ap
 All other session 1 runs (14) and the session 2 runs before 01:10Z had the launcher in front for the whole run.
 From 01:15Z the driver checks this itself (fg.sh): it waits for the launcher before a run and marks a run
 "disturbed" if another app came to the front during it.
+
+November 10 to 11 (the Pixel 8's third and fourth attachments), marked by the driver itself:
+idx-mixed-5000-bge-fp32@512  run 18:58:52Z-19:12:18Z  another app in front at the end of the run  (770.9 s; rerun valid at 23:40:56Z)
+sweep-mixed-bge-fp32@512-t1  run 00:33:23Z  two foreground changes to another app during the run  (238.6 ms per note)
+sweep-mixed-bge-fp32@512-t1  rerun 01:25:49Z  another app in front at the end of the run  (228.4 ms per note); not retried

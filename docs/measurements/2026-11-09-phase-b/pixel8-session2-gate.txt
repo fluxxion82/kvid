@@ -6,3 +6,43 @@
 2026-11-10T01:15Z-01:52Z: queue idle, no runs: fg.sh was not executable, so the launcher check never passed (driver bug)
 2026-11-10T01:52:06Z gate label=idx-mixed-5000-bge-fp32@512 waited_s=1 gate=ok battery_c=29.7 thermal_status=0 skin_c=30.2 charge_status=2 level=80 wake=1
 2026-11-10T02:03:40Z Pixel 8 disconnected during idx-mixed-5000-bge-fp32@512 (started 01:52:06Z); run lost, no result line; queue stopped
+2026-11-10T02:50:22Z Pixel 4 XL disconnected during the charge wait at 74% (no timed run made yet); Pixel 8 attached on the same cable
+2026-11-10T02:50:32Z third attachment: charge wait, then q-s2c.txt
+2026-11-10T02:52:19Z Pixel 8 left again after 1 minute (02:51Z), in the charge wait; supervisor now waits for it
+2026-11-10T17:57:33Z third attachment: owner cannot promise a long attachment; chain p8-chain2.sh (no charge wait; charge state in each gate line). Phone at 39%, charging, skin 39.0, status 1
+2026-11-10T18:57:37Z gate label=idx-mixed-5000-bge-fp32@512 waited_s=3604 gate=timeout battery_c=36.5 thermal_status=0 skin_c=35.7 charge_status=4 level=80 wake=1
+2026-11-10T18:57:50Z gate timed out after 60 min while the phone charged from 39% to 80% (skin 35.7 at the timeout, charging just ended); chain restarted with a fresh gate timer, rule unchanged
+2026-11-10T18:58:52Z gate label=idx-mixed-5000-bge-fp32@512 waited_s=62 gate=ok battery_c=36.2 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+2026-11-10T19:19:33Z gate label=idx-mixed-5000-bge-fp32@256 waited_s=435 gate=ok battery_c=36.5 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+2026-11-10T19:48:35Z gate label=lat-mixed-bge-fp32@512 waited_s=1192 gate=ok battery_c=36.2 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+2026-11-10T19:55:56Z gate label=lat-mixed-bge-fp32-opt@512 waited_s=412 gate=ok battery_c=36.3 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+2026-11-10T20:05:00Z gate label=lat-mixed-bge-fp32@256 waited_s=515 gate=ok battery_c=36.2 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+2026-11-10T21:50:47Z fourth attachment (session restarted; earlier supervisor gone); chain p8-chain2.sh again. Phone at 67%, charging, skin 36.1, status 0, another app in front
+2026-11-10T22:50:50Z gate label=idx-mixed-5000-bge-fp32@512 waited_s=3603 gate=timeout battery_c=38.0 thermal_status=0 skin_c=37.4 charge_status=4 level=80 wake=1
+2026-11-10T22:52:35Z gate timed out after 60 min: phone at 80%, not charging, launcher in front, status 0, but skin rose 36.1 > 36.6 > 37.4 while idle (load average 2.4 to 2.7, swap full, no kvid process). Chain restarted as p8-chain3.sh (gate timer 3 h), rule unchanged; idle readings every 60 s in session2/idle-wait.log
+2026-11-10T23:40:56Z gate label=idx-mixed-5000-bge-fp32@512 waited_s=2901 gate=ok battery_c=36.3 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+2026-11-10T23:55:37Z switched to the second cooling rule (skin <= 36.4, session2/cooling-rule-2.txt); chain p8-chain4.sh
+2026-11-11T00:11:04Z gate label=idx-mixed-5000-bge-fp32-opt@512 waited_s=926 gate=ok battery_c=37.5 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+2026-11-11T00:29:28Z gate label=sweep-mixed-bge-fp32@256-default waited_s=330 gate=ok battery_c=37.2 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+2026-11-11T00:31:35Z gate label=sweep-mixed-bge-fp32@256-t1 waited_s=103 gate=ok battery_c=36.9 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+2026-11-11T00:33:23Z gate label=sweep-mixed-bge-fp32@512-t1 waited_s=63 gate=ok battery_c=36.7 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+2026-11-11T00:37:49Z gate label=sweep-mixed-bge-fp32@512-t2 waited_s=206 gate=ok battery_c=36.7 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+2026-11-11T00:51:50Z gate label=sweep-mixed-bge-fp32@256-t2 waited_s=802 gate=ok battery_c=35.5 thermal_status=0 skin_c=35.2 charge_status=4 level=80 wake=1
+2026-11-11T00:52:42Z gate label=sweep-mixed-bge-fp32@256-t4 waited_s=21 gate=ok battery_c=35.4 thermal_status=0 skin_c=36.3 charge_status=4 level=80 wake=1
+2026-11-11T00:53:25Z gate label=sweep-mixed-bge-fp32@512-t4 waited_s=21 gate=ok battery_c=35.4 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+2026-11-11T00:54:33Z gate label=sweep-mixed-bge-fp32@512-xnnpack waited_s=42 gate=ok battery_c=35.6 thermal_status=0 skin_c=36.1 charge_status=4 level=80 wake=1
+2026-11-11T00:54:43Z gate label=sweep-mixed-bge-fp32@256-xnnpack waited_s=1 gate=ok battery_c=35.6 thermal_status=0 skin_c=36.0 charge_status=4 level=80 wake=1
+2026-11-11T00:54:50Z gate label=fin-mixed-b4-bge-fp32@512 waited_s=1 gate=ok battery_c=35.6 thermal_status=0 skin_c=36.1 charge_status=4 level=80 wake=1
+2026-11-11T00:55:58Z gate label=fin-mixed-b4-bge-fp32@256 waited_s=42 gate=ok battery_c=35.7 thermal_status=0 skin_c=36.3 charge_status=4 level=80 wake=1
+2026-11-11T00:57:01Z gate label=fin-mixed-b4-bge-fp32-opt@512 waited_s=42 gate=ok battery_c=35.9 thermal_status=0 skin_c=36.2 charge_status=4 level=80 wake=1
+2026-11-11T00:58:08Z gate label=fin-mixed-b5-bge-fp32-opt@512 waited_s=41 gate=ok battery_c=35.9 thermal_status=0 skin_c=36.3 charge_status=4 level=80 wake=1
+2026-11-11T00:59:57Z gate label=fin-mixed-b5-bge-fp32@512 waited_s=83 gate=ok battery_c=36.1 thermal_status=0 skin_c=36.1 charge_status=4 level=80 wake=1
+2026-11-11T01:01:29Z gate label=fin-mixed-b5-bge-fp32@256 waited_s=62 gate=ok battery_c=36.2 thermal_status=0 skin_c=36.3 charge_status=4 level=80 wake=1
+2026-11-11T01:02:33Z gate label=fin-mixed-b6-bge-fp32@256 waited_s=42 gate=ok battery_c=36.3 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+2026-11-11T01:03:36Z gate label=fin-mixed-b6-bge-fp32-opt@512 waited_s=41 gate=ok battery_c=36.3 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+2026-11-11T01:05:46Z gate label=fin-mixed-b6-bge-fp32@512 waited_s=103 gate=ok battery_c=36.3 thermal_status=0 skin_c=36.2 charge_status=4 level=80 wake=1
+2026-11-11T01:07:16Z gate label=scr-m3-b2r-bge-fp32-opt@512 waited_s=62 gate=ok battery_c=36.3 thermal_status=0 skin_c=36.2 charge_status=4 level=80 wake=1
+2026-11-11T01:10:05Z gate label=idx-mixed-5000-bge-fp32@512-r2 waited_s=83 gate=ok battery_c=36.5 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+2026-11-11T01:23:45Z queue done; rerun of the disturbed sweep-mixed-bge-fp32@512-t1 (chain p8-chain5.sh, second rule)
+2026-11-11T01:25:49Z gate label=sweep-mixed-bge-fp32@512-t1 waited_s=124 gate=ok battery_c=37.3 thermal_status=0 skin_c=36.3 charge_status=4 level=80 wake=1
+2026-11-11T01:27:33Z rerun of sweep-mixed-bge-fp32@512-t1 excluded again (another app in front at its end; the owner was using the phone). Not retried. XNNPACK rerun for the crash log made at 01:27Z (session2/xnnpack-crash)

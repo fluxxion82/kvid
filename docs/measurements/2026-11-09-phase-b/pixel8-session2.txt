@@ -34,3 +34,410 @@
 [kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=256 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=744.5 notes=200 tokens=19761 max_tokens=256 padded_tokens=20136 total_ms=14628.8 warmup=8 latency=off per_note_ms=73.1 tokens_per_s=1351 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=93751 mem_after_open_kb=197637 mem_peak_kb=300667 mem_after_kb=278618 mem_after_close_kb=106577 mem_idle_5s_kb=106574
 ### thermal during: 01:10:05 battery_c=35.0 thermal_status=0 skin_c=35.6 charge_status=4 level=80 wake=1
 ### thermal after: battery_c=35.0 thermal_status=0 skin_c=37.2 charge_status=4 level=80 wake=1 end=2026-11-10T01:10:15Z
+### 2026-11-10T18:58:52Z label=idx-mixed-5000-bge-fp32@512 class=IndexingMeasurementTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_INDEX_MEASURE=corpus=mixed+notes=5000+model=bge-fp32 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.2 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+[kvid-index-measure] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=5000+model=bge-fp32 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 max_input_tokens=512 batch=4 sort=on arena=on threads=default ep=cpu outer=32 chunk=500 notes=5000 tokens=651618 insert_ms=24007 open_ms=1365 close_ms=149 index_total_ms=770890 notes_per_s=6.49 early_notes_per_s=8.50 late_notes_per_s=6.16 calls=10 file_bytes=17973248 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=57579 mem_after_open_kb=219030 mem_peak_kb=522029 mem_after_index_kb=458945 mem_after_close_kb=81497
+### thermal during: 18:59:09 battery_c=36.2 thermal_status=0 skin_c=35.7 charge_status=4 level=80 wake=1
+### thermal during: 18:59:24 battery_c=36.1 thermal_status=0 skin_c=35.7 charge_status=4 level=80 wake=1
+### thermal during: 18:59:40 battery_c=36.1 thermal_status=0 skin_c=36.6 charge_status=4 level=80 wake=1
+### thermal during: 18:59:56 battery_c=36.0 thermal_status=0 skin_c=38.0 charge_status=4 level=80 wake=1
+### thermal during: 19:00:12 battery_c=36.0 thermal_status=0 skin_c=38.4 charge_status=4 level=80 wake=1
+### thermal during: 19:00:27 battery_c=36.0 thermal_status=0 skin_c=38.4 charge_status=4 level=80 wake=1
+### thermal during: 19:00:43 battery_c=36.0 thermal_status=0 skin_c=38.5 charge_status=4 level=80 wake=1
+### thermal during: 19:00:59 battery_c=36.1 thermal_status=0 skin_c=38.8 charge_status=4 level=80 wake=1
+### thermal during: 19:01:15 battery_c=36.1 thermal_status=0 skin_c=38.9 charge_status=4 level=80 wake=1
+### thermal during: 19:01:31 battery_c=36.3 thermal_status=0 skin_c=38.9 charge_status=4 level=80 wake=1
+### thermal during: 19:01:46 battery_c=36.4 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 19:02:03 battery_c=36.4 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 19:02:18 battery_c=36.6 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 19:02:34 battery_c=36.6 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 19:02:50 battery_c=36.6 thermal_status=1 skin_c=38.9 charge_status=4 level=80 wake=1
+### thermal during: 19:03:05 battery_c=36.9 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 19:03:21 battery_c=37.0 thermal_status=1 skin_c=39.7 charge_status=4 level=80 wake=1
+### thermal during: 19:03:37 battery_c=37.1 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=1
+### thermal during: 19:03:53 battery_c=37.2 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 19:04:08 battery_c=37.3 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 19:04:24 battery_c=37.4 thermal_status=1 skin_c=39.7 charge_status=4 level=80 wake=1
+### thermal during: 19:04:40 battery_c=37.5 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=1
+### thermal during: 19:04:56 battery_c=37.5 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 19:05:12 battery_c=37.7 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 19:05:28 battery_c=37.7 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 19:05:44 battery_c=37.7 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 19:06:00 battery_c=37.9 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 19:06:16 battery_c=37.9 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=3
+### thermal during: 19:06:31 battery_c=38.0 thermal_status=1 skin_c=39.8 charge_status=4 level=80 wake=3
+### thermal during: 19:06:47 battery_c=38.1 thermal_status=1 skin_c=40.6 charge_status=4 level=80 wake=3
+### thermal during: 19:07:03 battery_c=38.1 thermal_status=1 skin_c=40.4 charge_status=4 level=80 wake=3
+### thermal during: 19:07:19 battery_c=38.2 thermal_status=1 skin_c=41.1 charge_status=4 level=80 wake=1
+### thermal during: 19:07:35 battery_c=38.2 thermal_status=1 skin_c=40.8 charge_status=4 level=80 wake=3
+### thermal during: 19:07:51 battery_c=38.2 thermal_status=1 skin_c=40.0 charge_status=4 level=80 wake=3
+### thermal during: 19:08:07 battery_c=38.4 thermal_status=1 skin_c=39.8 charge_status=4 level=80 wake=3
+### thermal during: 19:08:23 battery_c=38.5 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=3
+### thermal during: 19:08:39 battery_c=38.4 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=3
+### thermal during: 19:08:55 battery_c=38.5 thermal_status=1 skin_c=39.7 charge_status=4 level=80 wake=1
+### thermal during: 19:09:11 battery_c=38.5 thermal_status=1 skin_c=39.8 charge_status=4 level=80 wake=3
+### thermal during: 19:09:27 battery_c=38.6 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=3
+### thermal during: 19:09:42 battery_c=38.6 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=3
+### thermal during: 19:09:58 battery_c=38.6 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=3
+### thermal during: 19:10:14 battery_c=38.6 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=3
+### thermal during: 19:10:30 battery_c=38.7 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=3
+### thermal during: 19:10:46 battery_c=38.6 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=3
+### thermal during: 19:11:02 battery_c=38.6 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=3
+### thermal during: 19:11:18 battery_c=38.6 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=3
+### thermal during: 19:11:34 battery_c=38.6 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=3
+### thermal during: 19:11:50 battery_c=38.6 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=3
+### thermal during: 19:12:06 battery_c=38.6 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=3
+### thermal after: battery_c=38.6 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=3 end=2026-11-10T19:12:18Z
+### foreground: front_before=launcher front_after=other other_app_resumes_during=0
+### 2026-11-10T19:19:33Z label=idx-mixed-5000-bge-fp32@256 class=IndexingMeasurementTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_INDEX_MEASURE=corpus=mixed+notes=5000+model=bge-fp32+maxTokens=256 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.5 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+[kvid-index-measure] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=5000+model=bge-fp32+maxTokens=256 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 max_input_tokens=256 batch=4 sort=on arena=on threads=default ep=cpu outer=32 chunk=500 notes=5000 tokens=511558 insert_ms=19647 open_ms=1302 close_ms=53 index_total_ms=521019 notes_per_s=9.60 early_notes_per_s=12.99 late_notes_per_s=8.52 calls=10 file_bytes=17973248 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=58384 mem_after_open_kb=210780 mem_peak_kb=330370 mem_after_index_kb=295415 mem_after_close_kb=118191
+### thermal during: 19:19:48 battery_c=36.5 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+### thermal during: 19:20:04 battery_c=36.5 thermal_status=0 skin_c=36.7 charge_status=4 level=80 wake=1
+### thermal during: 19:20:20 battery_c=36.5 thermal_status=0 skin_c=38.0 charge_status=4 level=80 wake=1
+### thermal during: 19:20:35 battery_c=36.3 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 19:20:51 battery_c=36.3 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 19:21:07 battery_c=36.3 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 19:21:23 battery_c=36.5 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 19:21:39 battery_c=36.5 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 19:21:55 battery_c=36.6 thermal_status=1 skin_c=38.9 charge_status=4 level=80 wake=1
+### thermal during: 19:22:11 battery_c=36.8 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 19:22:26 battery_c=36.9 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 19:22:42 battery_c=37.0 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 19:22:58 battery_c=37.1 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 19:23:13 battery_c=37.1 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 19:23:29 battery_c=37.3 thermal_status=1 skin_c=38.9 charge_status=4 level=80 wake=1
+### thermal during: 19:23:45 battery_c=37.5 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 19:24:01 battery_c=37.5 thermal_status=1 skin_c=39.8 charge_status=4 level=80 wake=1
+### thermal during: 19:24:17 battery_c=37.5 thermal_status=1 skin_c=39.7 charge_status=4 level=80 wake=1
+### thermal during: 19:24:33 battery_c=37.7 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 19:24:49 battery_c=37.8 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 19:25:04 battery_c=37.8 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 19:25:20 battery_c=37.8 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 19:25:36 battery_c=38.0 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 19:25:52 battery_c=38.1 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 19:26:08 battery_c=38.2 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 19:26:24 battery_c=38.2 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 19:26:40 battery_c=38.2 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 19:26:56 battery_c=38.3 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=1
+### thermal during: 19:27:11 battery_c=38.3 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 19:27:27 battery_c=38.5 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 19:27:43 battery_c=38.5 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 19:27:59 battery_c=38.5 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 19:28:15 battery_c=38.6 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 19:28:31 battery_c=38.6 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal after: battery_c=38.6 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=1 end=2026-11-10T19:28:43Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-10T19:48:36Z label=lat-mixed-bge-fp32@512 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+latency=on status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.2 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+latency=on model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=512 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=2264.5 notes=200 tokens=24836 max_tokens=512 padded_tokens=25664 total_ms=14872.6 warmup=8 latency=on per_note_ms=74.4 tokens_per_s=1670 p50_ms=32.4 p95_ms=284.1 n_le64=106 p50_le64_ms=16.2 p95_le64_ms=34.3 n_le128=32 p50_le128_ms=50.9 p95_le128_ms=71.6 n_le256=25 p50_le256_ms=88.8 p95_le256_ms=127.7 n_gt256=37 p50_gt256_ms=217.4 p95_gt256_ms=334.3 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=93596 mem_after_open_kb=191052 mem_peak_kb=306473 mem_after_kb=282113 mem_after_close_kb=111993 mem_idle_5s_kb=111993
+### thermal during: 19:48:51 battery_c=36.2 thermal_status=0 skin_c=35.9 charge_status=4 level=80 wake=1
+### thermal after: battery_c=36.2 thermal_status=0 skin_c=37.2 charge_status=4 level=80 wake=1 end=2026-11-10T19:49:04Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-10T19:55:56Z label=lat-mixed-bge-fp32-opt@512 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32-opt+latency=on status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.3 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32-opt+latency=on model=BAAI/bge-small-en-v1.5#kvid-opt variant=bge-fp32-opt max_input_tokens=512 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:6e377cdafc9d00bded962a09f85fcd12b03acd9b8b51fc82805a292d547862e3 model_bytes=132878223 open_ms=816.7 notes=200 tokens=24836 max_tokens=512 padded_tokens=25664 total_ms=16182.8 warmup=8 latency=on per_note_ms=80.9 tokens_per_s=1535 p50_ms=34.0 p95_ms=292.5 n_le64=106 p50_le64_ms=14.7 p95_le64_ms=45.6 n_le128=32 p50_le128_ms=48.6 p95_le128_ms=253.7 n_le256=25 p50_le256_ms=96.2 p95_le256_ms=216.0 n_gt256=37 p50_gt256_ms=235.8 p95_gt256_ms=530.1 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=43835 mem_after_open_kb=228858 mem_peak_kb=335612 mem_after_kb=286515 mem_after_close_kb=108682 mem_idle_5s_kb=108686
+### thermal during: 19:56:12 battery_c=36.3 thermal_status=0 skin_c=36.0 charge_status=4 level=80 wake=1
+### thermal after: battery_c=36.2 thermal_status=0 skin_c=37.3 charge_status=4 level=80 wake=1 end=2026-11-10T19:56:25Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-10T20:05:00Z label=lat-mixed-bge-fp32@256 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256+latency=on status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.2 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256+latency=on model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=256 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=2219.1 notes=200 tokens=19761 max_tokens=256 padded_tokens=20136 total_ms=12016.4 warmup=8 latency=on per_note_ms=60.1 tokens_per_s=1645 p50_ms=34.3 p95_ms=148.4 n_le64=106 p50_le64_ms=16.0 p95_le64_ms=36.5 n_le128=32 p50_le128_ms=52.7 p95_le128_ms=127.8 n_le256=62 p50_le256_ms=135.3 p95_le256_ms=178.2 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=71749 mem_after_open_kb=194605 mem_peak_kb=275428 mem_after_kb=235354 mem_after_close_kb=96782 mem_idle_5s_kb=96486
+### thermal during: 20:05:16 battery_c=36.2 thermal_status=0 skin_c=35.9 charge_status=4 level=80 wake=1
+### thermal after: battery_c=36.2 thermal_status=0 skin_c=37.2 charge_status=4 level=80 wake=1 end=2026-11-10T20:05:25Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-10T23:40:56Z label=idx-mixed-5000-bge-fp32@512 class=IndexingMeasurementTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_INDEX_MEASURE=corpus=mixed+notes=5000+model=bge-fp32 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.3 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+[kvid-index-measure] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=5000+model=bge-fp32 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 max_input_tokens=512 batch=4 sort=on arena=on threads=default ep=cpu outer=32 chunk=500 notes=5000 tokens=651618 insert_ms=25173 open_ms=2312 close_ms=186 index_total_ms=837586 notes_per_s=5.97 early_notes_per_s=8.33 late_notes_per_s=5.25 calls=10 file_bytes=17973248 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=61998 mem_after_open_kb=195152 mem_peak_kb=520158 mem_after_index_kb=473807 mem_after_close_kb=95492
+### thermal during: 23:41:13 battery_c=36.3 thermal_status=0 skin_c=35.7 charge_status=4 level=80 wake=1
+### thermal during: 23:41:28 battery_c=36.3 thermal_status=0 skin_c=35.8 charge_status=4 level=80 wake=1
+### thermal during: 23:41:43 battery_c=36.3 thermal_status=0 skin_c=36.2 charge_status=4 level=80 wake=1
+### thermal during: 23:41:59 battery_c=36.2 thermal_status=0 skin_c=38.2 charge_status=4 level=80 wake=1
+### thermal during: 23:42:15 battery_c=36.3 thermal_status=0 skin_c=38.5 charge_status=4 level=80 wake=1
+### thermal during: 23:42:31 battery_c=36.3 thermal_status=0 skin_c=38.7 charge_status=4 level=80 wake=1
+### thermal during: 23:42:47 battery_c=36.3 thermal_status=0 skin_c=38.9 charge_status=4 level=80 wake=1
+### thermal during: 23:43:02 battery_c=36.5 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 23:43:18 battery_c=36.6 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 23:43:34 battery_c=36.7 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 23:43:50 battery_c=36.7 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 23:44:06 battery_c=36.9 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 23:44:22 battery_c=36.9 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 23:44:38 battery_c=37.2 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=1
+### thermal during: 23:44:54 battery_c=37.3 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=1
+### thermal during: 23:45:10 battery_c=37.5 thermal_status=1 skin_c=40.1 charge_status=4 level=80 wake=1
+### thermal during: 23:45:26 battery_c=37.6 thermal_status=1 skin_c=40.4 charge_status=4 level=80 wake=1
+### thermal during: 23:45:41 battery_c=37.7 thermal_status=1 skin_c=41.1 charge_status=4 level=80 wake=1
+### thermal during: 23:45:58 battery_c=37.8 thermal_status=1 skin_c=41.2 charge_status=4 level=80 wake=1
+### thermal during: 23:46:14 battery_c=37.8 thermal_status=1 skin_c=40.7 charge_status=4 level=80 wake=1
+### thermal during: 23:46:30 battery_c=38.0 thermal_status=1 skin_c=40.4 charge_status=4 level=80 wake=1
+### thermal during: 23:46:46 battery_c=38.0 thermal_status=1 skin_c=40.1 charge_status=4 level=80 wake=1
+### thermal during: 23:47:02 battery_c=38.3 thermal_status=1 skin_c=40.3 charge_status=4 level=80 wake=1
+### thermal during: 23:47:18 battery_c=38.4 thermal_status=1 skin_c=40.6 charge_status=4 level=80 wake=1
+### thermal during: 23:47:34 battery_c=38.5 thermal_status=1 skin_c=40.4 charge_status=4 level=80 wake=1
+### thermal during: 23:47:50 battery_c=38.6 thermal_status=1 skin_c=40.3 charge_status=4 level=80 wake=1
+### thermal during: 23:48:05 battery_c=38.7 thermal_status=1 skin_c=40.3 charge_status=4 level=80 wake=1
+### thermal during: 23:48:21 battery_c=38.7 thermal_status=1 skin_c=40.3 charge_status=4 level=80 wake=1
+### thermal during: 23:48:37 battery_c=38.9 thermal_status=1 skin_c=40.4 charge_status=4 level=80 wake=1
+### thermal during: 23:48:53 battery_c=38.9 thermal_status=1 skin_c=40.3 charge_status=4 level=80 wake=1
+### thermal during: 23:49:09 battery_c=38.9 thermal_status=1 skin_c=40.3 charge_status=4 level=80 wake=1
+### thermal during: 23:49:25 battery_c=38.9 thermal_status=1 skin_c=40.3 charge_status=4 level=80 wake=1
+### thermal during: 23:49:41 battery_c=39.1 thermal_status=1 skin_c=40.3 charge_status=4 level=80 wake=1
+### thermal during: 23:49:57 battery_c=39.1 thermal_status=1 skin_c=40.2 charge_status=4 level=80 wake=1
+### thermal during: 23:50:12 battery_c=39.1 thermal_status=1 skin_c=40.3 charge_status=4 level=80 wake=1
+### thermal during: 23:50:28 battery_c=39.4 thermal_status=1 skin_c=40.3 charge_status=4 level=80 wake=1
+### thermal during: 23:50:44 battery_c=39.4 thermal_status=1 skin_c=40.3 charge_status=4 level=80 wake=1
+### thermal during: 23:51:00 battery_c=39.4 thermal_status=1 skin_c=40.4 charge_status=4 level=80 wake=1
+### thermal during: 23:51:16 battery_c=39.4 thermal_status=1 skin_c=40.5 charge_status=4 level=80 wake=1
+### thermal during: 23:51:32 battery_c=39.6 thermal_status=1 skin_c=40.5 charge_status=4 level=80 wake=1
+### thermal during: 23:51:48 battery_c=39.6 thermal_status=1 skin_c=40.5 charge_status=4 level=80 wake=1
+### thermal during: 23:52:04 battery_c=39.6 thermal_status=1 skin_c=40.5 charge_status=4 level=80 wake=1
+### thermal during: 23:52:20 battery_c=39.6 thermal_status=1 skin_c=40.6 charge_status=4 level=80 wake=1
+### thermal during: 23:52:36 battery_c=39.9 thermal_status=1 skin_c=40.7 charge_status=4 level=80 wake=1
+### thermal during: 23:52:52 battery_c=39.9 thermal_status=1 skin_c=41.4 charge_status=4 level=80 wake=1
+### thermal during: 23:53:08 battery_c=39.9 thermal_status=1 skin_c=41.9 charge_status=4 level=80 wake=1
+### thermal during: 23:53:24 battery_c=39.9 thermal_status=1 skin_c=41.3 charge_status=4 level=80 wake=1
+### thermal during: 23:53:40 battery_c=40.0 thermal_status=1 skin_c=41.1 charge_status=4 level=80 wake=1
+### thermal during: 23:53:56 battery_c=40.0 thermal_status=1 skin_c=41.0 charge_status=4 level=80 wake=1
+### thermal during: 23:54:11 battery_c=40.0 thermal_status=1 skin_c=41.2 charge_status=4 level=80 wake=1
+### thermal during: 23:54:27 battery_c=40.0 thermal_status=1 skin_c=41.2 charge_status=4 level=80 wake=1
+### thermal during: 23:54:43 battery_c=40.3 thermal_status=1 skin_c=41.2 charge_status=4 level=80 wake=1
+### thermal during: 23:54:59 battery_c=40.3 thermal_status=1 skin_c=41.1 charge_status=4 level=80 wake=1
+### thermal during: 23:55:15 battery_c=40.3 thermal_status=1 skin_c=41.1 charge_status=4 level=80 wake=1
+### thermal after: battery_c=40.4 thermal_status=1 skin_c=41.0 charge_status=4 level=80 wake=1 end=2026-11-10T23:55:31Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:11:04Z label=idx-mixed-5000-bge-fp32-opt@512 class=IndexingMeasurementTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_INDEX_MEASURE=corpus=mixed+notes=5000+model=bge-fp32-opt status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=37.4 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+[kvid-index-measure] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=5000+model=bge-fp32-opt model=BAAI/bge-small-en-v1.5#kvid-opt variant=bge-fp32-opt model_digest=sha256:6e377cdafc9d00bded962a09f85fcd12b03acd9b8b51fc82805a292d547862e3 max_input_tokens=512 batch=4 sort=on arena=on threads=default ep=cpu outer=32 chunk=500 notes=5000 tokens=651618 insert_ms=27000 open_ms=1054 close_ms=98 index_total_ms=737317 notes_per_s=6.78 early_notes_per_s=8.81 late_notes_per_s=6.19 calls=10 file_bytes=17973248 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=47185 mem_after_open_kb=232123 mem_peak_kb=436146 mem_after_index_kb=376072 mem_after_close_kb=89279
+### thermal during: 00:11:20 battery_c=37.3 thermal_status=0 skin_c=36.6 charge_status=4 level=80 wake=1
+### thermal during: 00:11:35 battery_c=37.2 thermal_status=0 skin_c=36.6 charge_status=4 level=80 wake=1
+### thermal during: 00:11:50 battery_c=37.2 thermal_status=0 skin_c=36.8 charge_status=4 level=80 wake=1
+### thermal during: 00:12:06 battery_c=37.1 thermal_status=0 skin_c=38.6 charge_status=4 level=80 wake=1
+### thermal during: 00:12:21 battery_c=37.1 thermal_status=0 skin_c=38.9 charge_status=4 level=80 wake=1
+### thermal during: 00:12:37 battery_c=37.1 thermal_status=0 skin_c=38.9 charge_status=4 level=80 wake=1
+### thermal during: 00:12:53 battery_c=37.1 thermal_status=0 skin_c=38.9 charge_status=4 level=80 wake=1
+### thermal during: 00:13:09 battery_c=37.1 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 00:13:25 battery_c=37.2 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 00:13:41 battery_c=37.3 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 00:13:57 battery_c=37.3 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 00:14:12 battery_c=37.3 thermal_status=1 skin_c=38.8 charge_status=4 level=80 wake=1
+### thermal during: 00:14:28 battery_c=37.5 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 00:14:44 battery_c=37.5 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 00:15:00 battery_c=37.5 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 00:15:16 battery_c=37.5 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 00:15:32 battery_c=37.7 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 00:15:48 battery_c=37.7 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 00:16:04 battery_c=37.7 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 00:16:20 battery_c=37.9 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=1
+### thermal during: 00:16:35 battery_c=37.9 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 00:16:51 battery_c=37.9 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 00:17:07 battery_c=37.9 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 00:17:23 battery_c=37.9 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 00:17:39 battery_c=38.1 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 00:17:55 battery_c=38.1 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 00:18:11 battery_c=38.2 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=1
+### thermal during: 00:18:27 battery_c=38.2 thermal_status=1 skin_c=39.8 charge_status=4 level=80 wake=1
+### thermal during: 00:18:43 battery_c=38.3 thermal_status=1 skin_c=39.7 charge_status=4 level=80 wake=1
+### thermal during: 00:18:59 battery_c=38.3 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=1
+### thermal during: 00:19:15 battery_c=38.4 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 00:19:31 battery_c=38.4 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 00:19:47 battery_c=38.4 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 00:20:03 battery_c=38.4 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 00:20:19 battery_c=38.4 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 00:20:35 battery_c=38.4 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 00:20:51 battery_c=38.4 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 00:21:07 battery_c=38.4 thermal_status=1 skin_c=39.7 charge_status=4 level=80 wake=1
+### thermal during: 00:21:22 battery_c=38.4 thermal_status=1 skin_c=39.7 charge_status=4 level=80 wake=1
+### thermal during: 00:21:38 battery_c=38.5 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 00:21:54 battery_c=38.5 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 00:22:10 battery_c=38.5 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 00:22:26 battery_c=38.5 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 00:22:42 battery_c=38.6 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 00:22:58 battery_c=38.6 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 00:23:14 battery_c=38.6 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 00:23:30 battery_c=38.7 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 00:23:46 battery_c=38.7 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal after: battery_c=38.7 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1 end=2026-11-11T00:23:58Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:29:28Z label=sweep-mixed-bge-fp32@256-default class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=37.2 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=256 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=956.4 notes=200 tokens=19761 max_tokens=256 padded_tokens=20136 total_ms=10815.0 warmup=8 latency=off per_note_ms=54.1 tokens_per_s=1827 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=42312 mem_after_open_kb=206354 mem_peak_kb=317314 mem_after_kb=280186 mem_after_close_kb=108166 mem_idle_5s_kb=107966
+### thermal during: 00:29:44 battery_c=37.2 thermal_status=0 skin_c=37.2 charge_status=4 level=80 wake=1
+### thermal after: battery_c=37.2 thermal_status=0 skin_c=37.8 charge_status=4 level=80 wake=1 end=2026-11-11T00:29:51Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:31:35Z label=sweep-mixed-bge-fp32@256-t1 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256+threads=1 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.9 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256+threads=1 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=256 batch=4 sort=on arena=on pattern=on threads=1 ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=797.1 notes=200 tokens=19761 max_tokens=256 padded_tokens=20136 total_ms=33569.8 warmup=8 latency=off per_note_ms=167.8 tokens_per_s=589 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=93740 mem_after_open_kb=194826 mem_peak_kb=284682 mem_after_kb=256766 mem_after_close_kb=85106 mem_idle_5s_kb=84814
+### thermal during: 00:31:50 battery_c=36.9 thermal_status=0 skin_c=36.5 charge_status=4 level=80 wake=1
+### thermal during: 00:32:06 battery_c=36.9 thermal_status=0 skin_c=37.2 charge_status=4 level=80 wake=1
+### thermal after: battery_c=36.9 thermal_status=0 skin_c=37.5 charge_status=4 level=80 wake=1 end=2026-11-11T00:32:20Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:33:23Z label=sweep-mixed-bge-fp32@512-t1 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+threads=1 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.7 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+threads=1 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=512 batch=4 sort=on arena=on pattern=on threads=1 ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=727.1 notes=200 tokens=24836 max_tokens=512 padded_tokens=25664 total_ms=47711.0 warmup=8 latency=off per_note_ms=238.6 tokens_per_s=521 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=93145 mem_after_open_kb=194352 mem_peak_kb=434342 mem_after_kb=434342 mem_after_close_kb=100356 mem_idle_5s_kb=76297
+### thermal during: 00:33:38 battery_c=36.7 thermal_status=0 skin_c=36.6 charge_status=4 level=80 wake=1
+### thermal during: 00:33:54 battery_c=36.7 thermal_status=0 skin_c=37.3 charge_status=4 level=80 wake=1
+### thermal during: 00:34:09 battery_c=36.7 thermal_status=0 skin_c=37.7 charge_status=4 level=80 wake=1
+### thermal after: battery_c=36.8 thermal_status=0 skin_c=39.1 charge_status=4 level=80 wake=1 end=2026-11-11T00:34:23Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=2
+### 2026-11-11T00:37:49Z label=sweep-mixed-bge-fp32@512-t2 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+threads=2 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.7 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+threads=2 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=512 batch=4 sort=on arena=on pattern=on threads=2 ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=1077.3 notes=200 tokens=24836 max_tokens=512 padded_tokens=25664 total_ms=25854.3 warmup=8 latency=off per_note_ms=129.3 tokens_per_s=961 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=43452 mem_after_open_kb=209996 mem_peak_kb=433222 mem_after_kb=433222 mem_after_close_kb=99102 mem_idle_5s_kb=98866
+### thermal during: 00:38:05 battery_c=36.7 thermal_status=0 skin_c=36.6 charge_status=4 level=80 wake=1
+### thermal during: 00:38:20 battery_c=36.6 thermal_status=0 skin_c=37.4 charge_status=4 level=80 wake=1
+### thermal after: battery_c=36.6 thermal_status=0 skin_c=38.1 charge_status=4 level=80 wake=1 end=2026-11-11T00:38:28Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:51:50Z label=sweep-mixed-bge-fp32@256-t2 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256+threads=2 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=35.5 thermal_status=0 skin_c=35.2 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256+threads=2 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=256 batch=4 sort=on arena=on pattern=on threads=2 ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=953.3 notes=200 tokens=19761 max_tokens=256 padded_tokens=20136 total_ms=17788.6 warmup=8 latency=off per_note_ms=88.9 tokens_per_s=1111 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=40988 mem_after_open_kb=207542 mem_peak_kb=292328 mem_after_kb=292328 mem_after_close_kb=120552 mem_idle_5s_kb=83116
+### thermal during: 00:52:05 battery_c=35.5 thermal_status=0 skin_c=35.5 charge_status=4 level=80 wake=1
+### thermal after: battery_c=35.5 thermal_status=0 skin_c=36.8 charge_status=4 level=80 wake=1 end=2026-11-11T00:52:21Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:52:42Z label=sweep-mixed-bge-fp32@256-t4 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256+threads=4 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=35.4 thermal_status=0 skin_c=36.3 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256+threads=4 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=256 batch=4 sort=on arena=on pattern=on threads=4 ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=697.4 notes=200 tokens=19761 max_tokens=256 padded_tokens=20136 total_ms=10712.5 warmup=8 latency=off per_note_ms=53.6 tokens_per_s=1845 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=44750 mem_after_open_kb=211904 mem_peak_kb=297627 mem_after_kb=297627 mem_after_close_kb=125607 mem_idle_5s_kb=125607
+### thermal during: 00:52:58 battery_c=35.4 thermal_status=0 skin_c=36.5 charge_status=4 level=80 wake=1
+### thermal after: battery_c=35.4 thermal_status=0 skin_c=37.2 charge_status=4 level=80 wake=1 end=2026-11-11T00:53:04Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:53:25Z label=sweep-mixed-bge-fp32@512-t4 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+threads=4 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=35.4 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+threads=4 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=512 batch=4 sort=on arena=on pattern=on threads=4 ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=740.5 notes=200 tokens=24836 max_tokens=512 padded_tokens=25664 total_ms=15385.5 warmup=8 latency=off per_note_ms=76.9 tokens_per_s=1614 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=41609 mem_after_open_kb=201719 mem_peak_kb=447931 mem_after_kb=447931 mem_after_close_kb=113499 mem_idle_5s_kb=113499
+### thermal during: 00:53:41 battery_c=35.5 thermal_status=0 skin_c=36.9 charge_status=4 level=80 wake=1
+### thermal after: battery_c=35.5 thermal_status=0 skin_c=37.7 charge_status=4 level=80 wake=1 end=2026-11-11T00:53:51Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:54:33Z label=sweep-mixed-bge-fp32@512-xnnpack class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+ep=xnnpack status=[INSTRUMENTATION_CODE: 0 ]
+### thermal before: battery_c=35.6 thermal_status=0 skin_c=36.1 charge_status=4 level=80 wake=1
+
+### thermal after: battery_c=35.6 thermal_status=0 skin_c=36.0 charge_status=4 level=80 wake=1 end=2026-11-11T00:54:42Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:54:43Z label=sweep-mixed-bge-fp32@256-xnnpack class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256+ep=xnnpack status=[INSTRUMENTATION_CODE: 0 ]
+### thermal before: battery_c=35.6 thermal_status=0 skin_c=36.0 charge_status=4 level=80 wake=1
+
+### thermal after: battery_c=35.6 thermal_status=0 skin_c=36.1 charge_status=4 level=80 wake=1 end=2026-11-11T00:54:49Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:54:50Z label=fin-mixed-b4-bge-fp32@512 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=35.6 thermal_status=0 skin_c=36.1 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=512 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=670.6 notes=200 tokens=24836 max_tokens=512 padded_tokens=25664 total_ms=15367.4 warmup=8 latency=off per_note_ms=76.8 tokens_per_s=1616 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=39608 mem_after_open_kb=205183 mem_peak_kb=456814 mem_after_kb=456814 mem_after_close_kb=122385 mem_idle_5s_kb=122275
+### thermal during: 00:55:06 battery_c=35.6 thermal_status=0 skin_c=36.7 charge_status=4 level=80 wake=1
+### thermal after: battery_c=35.6 thermal_status=0 skin_c=37.5 charge_status=4 level=80 wake=1 end=2026-11-11T00:55:16Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:55:58Z label=fin-mixed-b4-bge-fp32@256 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=35.7 thermal_status=0 skin_c=36.3 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=256 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=770.0 notes=200 tokens=19761 max_tokens=256 padded_tokens=20136 total_ms=10554.6 warmup=8 latency=off per_note_ms=52.8 tokens_per_s=1872 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=42629 mem_after_open_kb=205377 mem_peak_kb=295719 mem_after_kb=295719 mem_after_close_kb=123630 mem_idle_5s_kb=123630
+### thermal during: 00:56:14 battery_c=35.7 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+### thermal after: battery_c=35.7 thermal_status=0 skin_c=36.9 charge_status=4 level=80 wake=1 end=2026-11-11T00:56:19Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:57:01Z label=fin-mixed-b4-bge-fp32-opt@512 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32-opt status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=35.9 thermal_status=0 skin_c=36.2 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32-opt model=BAAI/bge-small-en-v1.5#kvid-opt variant=bge-fp32-opt max_input_tokens=512 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:6e377cdafc9d00bded962a09f85fcd12b03acd9b8b51fc82805a292d547862e3 model_bytes=132878223 open_ms=657.2 notes=200 tokens=24836 max_tokens=512 padded_tokens=25664 total_ms=14724.7 warmup=8 latency=off per_note_ms=73.6 tokens_per_s=1687 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=41385 mem_after_open_kb=225517 mem_peak_kb=412250 mem_after_kb=412250 mem_after_close_kb=114738 mem_idle_5s_kb=114738
+### thermal during: 00:57:17 battery_c=35.9 thermal_status=0 skin_c=36.9 charge_status=4 level=80 wake=1
+### thermal after: battery_c=35.9 thermal_status=0 skin_c=37.9 charge_status=4 level=80 wake=1 end=2026-11-11T00:57:26Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:58:09Z label=fin-mixed-b5-bge-fp32-opt@512 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32-opt status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=35.9 thermal_status=0 skin_c=36.3 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32-opt model=BAAI/bge-small-en-v1.5#kvid-opt variant=bge-fp32-opt max_input_tokens=512 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:6e377cdafc9d00bded962a09f85fcd12b03acd9b8b51fc82805a292d547862e3 model_bytes=132878223 open_ms=671.8 notes=200 tokens=24836 max_tokens=512 padded_tokens=25664 total_ms=14566.9 warmup=8 latency=off per_note_ms=72.8 tokens_per_s=1705 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=37842 mem_after_open_kb=219221 mem_peak_kb=404051 mem_after_kb=404051 mem_after_close_kb=106503 mem_idle_5s_kb=106503
+### thermal during: 00:58:24 battery_c=35.9 thermal_status=0 skin_c=36.7 charge_status=4 level=80 wake=1
+### thermal after: battery_c=36.1 thermal_status=0 skin_c=37.4 charge_status=4 level=80 wake=1 end=2026-11-11T00:58:34Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T00:59:57Z label=fin-mixed-b5-bge-fp32@512 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.1 thermal_status=0 skin_c=36.1 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=512 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=1511.2 notes=200 tokens=24836 max_tokens=512 padded_tokens=25664 total_ms=14962.4 warmup=8 latency=off per_note_ms=74.8 tokens_per_s=1660 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=91772 mem_after_open_kb=182224 mem_peak_kb=436177 mem_after_kb=436177 mem_after_close_kb=101773 mem_idle_5s_kb=101305
+### thermal during: 01:00:13 battery_c=36.1 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+### thermal after: battery_c=36.1 thermal_status=0 skin_c=37.8 charge_status=4 level=80 wake=1 end=2026-11-11T01:00:27Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T01:01:29Z label=fin-mixed-b5-bge-fp32@256 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.2 thermal_status=0 skin_c=36.3 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=256 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=725.9 notes=200 tokens=19761 max_tokens=256 padded_tokens=20136 total_ms=10706.5 warmup=8 latency=off per_note_ms=53.5 tokens_per_s=1846 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=93553 mem_after_open_kb=193100 mem_peak_kb=312677 mem_after_kb=264953 mem_after_close_kb=92937 mem_idle_5s_kb=92593
+### thermal during: 01:01:45 battery_c=36.2 thermal_status=0 skin_c=37.1 charge_status=4 level=80 wake=1
+### thermal after: battery_c=36.2 thermal_status=0 skin_c=37.1 charge_status=4 level=80 wake=1 end=2026-11-11T01:01:51Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T01:02:33Z label=fin-mixed-b6-bge-fp32@256 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.3 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+maxTokens=256 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=256 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=746.7 notes=200 tokens=19761 max_tokens=256 padded_tokens=20136 total_ms=10762.0 warmup=8 latency=off per_note_ms=53.8 tokens_per_s=1836 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=38226 mem_after_open_kb=197947 mem_peak_kb=323588 mem_after_kb=257952 mem_after_close_kb=85936 mem_idle_5s_kb=85494
+### thermal during: 01:02:48 battery_c=36.3 thermal_status=0 skin_c=36.6 charge_status=4 level=80 wake=1
+### thermal after: battery_c=36.3 thermal_status=0 skin_c=37.1 charge_status=4 level=80 wake=1 end=2026-11-11T01:02:54Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T01:03:36Z label=fin-mixed-b6-bge-fp32-opt@512 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32-opt status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.3 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32-opt model=BAAI/bge-small-en-v1.5#kvid-opt variant=bge-fp32-opt max_input_tokens=512 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:6e377cdafc9d00bded962a09f85fcd12b03acd9b8b51fc82805a292d547862e3 model_bytes=132878223 open_ms=692.6 notes=200 tokens=24836 max_tokens=512 padded_tokens=25664 total_ms=15824.3 warmup=8 latency=off per_note_ms=79.1 tokens_per_s=1569 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=40678 mem_after_open_kb=218569 mem_peak_kb=401622 mem_after_kb=401622 mem_after_close_kb=104130 mem_idle_5s_kb=70613
+### thermal during: 01:03:52 battery_c=36.3 thermal_status=0 skin_c=37.0 charge_status=4 level=80 wake=1
+### thermal after: battery_c=36.3 thermal_status=0 skin_c=38.8 charge_status=4 level=80 wake=1 end=2026-11-11T01:04:03Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T01:05:47Z label=fin-mixed-b6-bge-fp32@512 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.3 thermal_status=0 skin_c=36.2 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=512 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=991.7 notes=200 tokens=24836 max_tokens=512 padded_tokens=25664 total_ms=14974.7 warmup=8 latency=off per_note_ms=74.9 tokens_per_s=1659 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=38602 mem_after_open_kb=204326 mem_peak_kb=452999 mem_after_kb=452999 mem_after_close_kb=118571 mem_idle_5s_kb=118575
+### thermal during: 01:06:02 battery_c=36.3 thermal_status=0 skin_c=36.7 charge_status=4 level=80 wake=1
+### thermal after: battery_c=36.3 thermal_status=0 skin_c=37.7 charge_status=4 level=80 wake=1 end=2026-11-11T01:06:14Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T01:07:16Z label=scr-m3-b2r-bge-fp32-opt@512 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=m3+notes=200+model=bge-fp32-opt status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.3 thermal_status=0 skin_c=36.2 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=m3+notes=200+model=bge-fp32-opt model=BAAI/bge-small-en-v1.5#kvid-opt variant=bge-fp32-opt max_input_tokens=512 batch=4 sort=on arena=on pattern=on threads=default ep=cpu batch_invariant=true model_digest=sha256:6e377cdafc9d00bded962a09f85fcd12b03acd9b8b51fc82805a292d547862e3 model_bytes=132878223 open_ms=650.4 notes=200 tokens=95342 max_tokens=512 padded_tokens=95788 total_ms=72200.0 warmup=8 latency=off per_note_ms=361.0 tokens_per_s=1321 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=116503 mem_after_open_kb=301110 mem_peak_kb=499136 mem_after_kb=398188 mem_after_close_kb=83207 mem_idle_5s_kb=83179
+### thermal during: 01:07:32 battery_c=36.3 thermal_status=0 skin_c=36.7 charge_status=4 level=80 wake=1
+### thermal during: 01:07:48 battery_c=36.3 thermal_status=0 skin_c=38.3 charge_status=4 level=80 wake=1
+### thermal during: 01:08:04 battery_c=36.3 thermal_status=0 skin_c=38.8 charge_status=4 level=80 wake=1
+### thermal during: 01:08:20 battery_c=36.4 thermal_status=0 skin_c=38.7 charge_status=4 level=80 wake=1
+### thermal during: 01:08:36 battery_c=36.3 thermal_status=0 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal after: battery_c=36.3 thermal_status=0 skin_c=39.0 charge_status=4 level=80 wake=1 end=2026-11-11T01:08:42Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T01:10:05Z label=idx-mixed-5000-bge-fp32@512-r2 class=IndexingMeasurementTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_INDEX_MEASURE=corpus=mixed+notes=5000+model=bge-fp32 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=36.5 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+[kvid-index-measure] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=5000+model=bge-fp32 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 max_input_tokens=512 batch=4 sort=on arena=on threads=default ep=cpu outer=32 chunk=500 notes=5000 tokens=651618 insert_ms=26872 open_ms=850 close_ms=142 index_total_ms=764825 notes_per_s=6.54 early_notes_per_s=8.22 late_notes_per_s=5.90 calls=10 file_bytes=17973248 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=59548 mem_after_open_kb=225977 mem_peak_kb=522986 mem_after_index_kb=466687 mem_after_close_kb=88164
+### thermal during: 01:10:21 battery_c=36.5 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=1
+### thermal during: 01:10:36 battery_c=36.4 thermal_status=0 skin_c=36.3 charge_status=4 level=80 wake=1
+### thermal during: 01:10:52 battery_c=36.4 thermal_status=0 skin_c=36.7 charge_status=4 level=80 wake=1
+### thermal during: 01:11:07 battery_c=36.4 thermal_status=0 skin_c=38.7 charge_status=4 level=80 wake=1
+### thermal during: 01:11:23 battery_c=36.4 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=1
+### thermal during: 01:11:39 battery_c=36.3 thermal_status=1 skin_c=39.7 charge_status=4 level=80 wake=1
+### thermal during: 01:11:55 battery_c=36.4 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 01:12:11 battery_c=36.4 thermal_status=1 skin_c=38.9 charge_status=4 level=80 wake=1
+### thermal during: 01:12:27 battery_c=36.4 thermal_status=1 skin_c=38.7 charge_status=4 level=80 wake=1
+### thermal during: 01:12:43 battery_c=36.6 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 01:12:59 battery_c=36.7 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 01:13:15 battery_c=36.8 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 01:13:31 battery_c=36.9 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 01:13:47 battery_c=36.9 thermal_status=1 skin_c=38.9 charge_status=4 level=80 wake=1
+### thermal during: 01:14:02 battery_c=37.0 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 01:14:18 battery_c=37.1 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 01:14:34 battery_c=37.1 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 01:14:50 battery_c=37.1 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=1
+### thermal during: 01:15:06 battery_c=37.1 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 01:15:22 battery_c=37.1 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 01:15:38 battery_c=37.3 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 01:15:54 battery_c=37.3 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 01:16:10 battery_c=37.4 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 01:16:26 battery_c=37.4 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=1
+### thermal during: 01:16:42 battery_c=37.5 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 01:16:58 battery_c=37.6 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 01:17:14 battery_c=37.6 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 01:17:30 battery_c=37.7 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 01:17:45 battery_c=37.7 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 01:18:01 battery_c=37.7 thermal_status=1 skin_c=39.6 charge_status=4 level=80 wake=1
+### thermal during: 01:18:17 battery_c=37.7 thermal_status=1 skin_c=39.8 charge_status=4 level=80 wake=1
+### thermal during: 01:18:33 battery_c=37.7 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 01:18:49 battery_c=37.7 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 01:19:05 battery_c=37.7 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 01:19:21 battery_c=37.9 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 01:19:37 battery_c=37.8 thermal_status=1 skin_c=39.0 charge_status=4 level=80 wake=1
+### thermal during: 01:19:53 battery_c=37.9 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 01:20:08 battery_c=37.8 thermal_status=1 skin_c=39.9 charge_status=4 level=80 wake=1
+### thermal during: 01:20:24 battery_c=37.8 thermal_status=1 skin_c=40.0 charge_status=4 level=80 wake=1
+### thermal during: 01:20:40 battery_c=37.8 thermal_status=1 skin_c=39.8 charge_status=4 level=80 wake=1
+### thermal during: 01:20:56 battery_c=37.8 thermal_status=1 skin_c=39.5 charge_status=4 level=80 wake=1
+### thermal during: 01:21:12 battery_c=37.9 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 01:21:28 battery_c=37.8 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 01:21:43 battery_c=37.8 thermal_status=1 skin_c=39.4 charge_status=4 level=80 wake=1
+### thermal during: 01:21:59 battery_c=37.8 thermal_status=1 skin_c=39.2 charge_status=4 level=80 wake=1
+### thermal during: 01:22:15 battery_c=37.8 thermal_status=1 skin_c=39.3 charge_status=4 level=80 wake=1
+### thermal during: 01:22:31 battery_c=37.9 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 01:22:47 battery_c=37.8 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 01:23:03 battery_c=37.8 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal during: 01:23:19 battery_c=37.8 thermal_status=1 skin_c=39.1 charge_status=4 level=80 wake=1
+### thermal after: battery_c=37.8 thermal_status=1 skin_c=38.9 charge_status=4 level=80 wake=1 end=2026-11-11T01:23:25Z
+### foreground: front_before=launcher front_after=launcher other_app_resumes_during=0
+### 2026-11-11T01:25:49Z label=sweep-mixed-bge-fp32@512-t1 class=OnnxEmbedderTuningTest args=KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+threads=1 status=[OK (1 test) INSTRUMENTATION_CODE: -1 ]
+### thermal before: battery_c=37.3 thermal_status=0 skin_c=36.3 charge_status=4 level=80 wake=1
+[kvid-embedding-tune] platform=android-37/Pixel_8/arm64-v8a config=corpus=mixed+notes=200+model=bge-fp32+threads=1 model=BAAI/bge-small-en-v1.5 variant=bge-fp32 max_input_tokens=512 batch=4 sort=on arena=on pattern=on threads=1 ep=cpu batch_invariant=true model_digest=sha256:828e1496d7fabb79cfa4dcd84fa38625c0d3d21da474a00f08db0f559940cf35 model_bytes=133093490 open_ms=997.7 notes=200 tokens=24836 max_tokens=512 padded_tokens=25664 total_ms=45688.5 warmup=8 latency=off per_note_ms=228.4 tokens_per_s=544 mem_kind=pss mem_peak=sampled-100ms mem_before_kb=44477 mem_after_open_kb=210685 mem_peak_kb=432627 mem_after_kb=432627 mem_after_close_kb=99031 mem_idle_5s_kb=99031
+### thermal during: 01:26:04 battery_c=37.2 thermal_status=0 skin_c=36.4 charge_status=4 level=80 wake=3
+### thermal during: 01:26:20 battery_c=37.0 thermal_status=0 skin_c=37.7 charge_status=4 level=80 wake=3
+### thermal during: 01:26:35 battery_c=36.8 thermal_status=0 skin_c=37.5 charge_status=4 level=80 wake=3
+### thermal after: battery_c=36.8 thermal_status=0 skin_c=37.6 charge_status=4 level=80 wake=3 end=2026-11-11T01:26:49Z
+### foreground: front_before=launcher front_after=other other_app_resumes_during=0

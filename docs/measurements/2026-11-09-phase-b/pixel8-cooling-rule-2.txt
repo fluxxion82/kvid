@@ -1,0 +1,6 @@
+2026-11-10T23:45:15Z Pixel 8, second cooling rule, by owner decision ("Use today's idle level", November 10)
+basis: idle readings every 60 s, 23:25 to 23:40 UTC (session2/idle-wait.log): n=16, min 35.5, max 36.3, median 35.85 C,
+       phone at 80%, not charging, launcher in front, thermal status 0
+rule: thermal status 0 and skin_max_c=36.4 (median 35.85, rounded to 35.9, plus 0.5; same formula as the first rule: 35.0 + 0.5)
+applies to: every run that starts after this file was written, except the 5,000-note baseline run that had already
+            started at 23:40:56 under the first rule (skin 35.5)

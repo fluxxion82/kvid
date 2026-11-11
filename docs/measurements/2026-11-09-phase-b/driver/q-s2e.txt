@@ -1,0 +1,1 @@
+sweep-mixed-bge-fp32@512-t1 OnnxEmbedderTuningTest KVID_MODEL_VARIANTS_DIR=/data/local/tmp/kvid-model-variants KVID_EMBEDDING_TUNE=corpus=mixed+notes=200+model=bge-fp32+threads=1

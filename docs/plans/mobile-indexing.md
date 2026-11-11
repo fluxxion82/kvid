@@ -369,9 +369,9 @@ Codex (`gpt-6.1-sol`, high effort, read-only) reviewed "Phase A results" and `do
   3. **Is an exploratory `bge-int8@256` quality run worth adding?** Yes, on all three datasets including full FiQA, labelled exploratory: neither the losses nor the speedups can be assumed to combine. It stays at 69.8 MB and batch 1.
 - **Local agent's note.** Phase B on November 9 times the six variants the owner listed. The three Codex adds are an owner decision; device parity covers all seven variants either way.
 
-## Phase B results (November 9, local agent; incomplete)
+## Phase B results (November 9 to 11, local agent)
 
-Run at `phase-5-mobile-indexing` `586cbde` on the Pixel 8 with one arm64 test APK. Raw lines, thermal readings, the driver scripts and the full tables: [docs/measurements/2026-11-09-phase-b](../measurements/2026-11-09-phase-b/README.md). **The Pixel 8 was attached for about 50 and 60 minutes.** Parity and screening are complete there; the sweep, edit latency, finalist blocks and 5,000-note runs are not. The same APK then ran on a Pixel 4 XL the owner offered for the night; its results are reported separately.
+Run at `phase-5-mobile-indexing` `586cbde` on the Pixel 8 with one arm64 test APK. Raw lines, thermal readings, the driver scripts and the full tables: [docs/measurements/2026-11-09-phase-b](../measurements/2026-11-09-phase-b/README.md). **The Pixel 8 was attached only at times:** about 50 and 60 minutes on November 9 to 10 (parity, screening), then November 10 to 11 (5,000-note runs, edit latency, sweep, finalist blocks). In between, the same APK ran the whole protocol on a Pixel 4 XL the owner offered for the night; its results are reported separately and never pooled.
 
 ### Device parity: no int8 variant is portable
 
@@ -445,16 +445,38 @@ Second session, 07:21 to 11:32 UTC, same rule, 30 runs: 28 completed, two crashe
 - **Threads:** four equals the default. **Two are faster in nine of nine pairs** (the sweep and two paired blocks in a third session, 11:34 to 12:37 UTC, 12 runs, all clean): 10% to 13% for the plain graph at both token limits, 6% to 9% for the optimized graph, same peak memory. With two threads the optimized graph leads the plain one by only 2% to 3%. Not tried at 5,000 notes or for edit latency, and the Pixel 8 thread sweep has not run.
 - **XNNPACK is not usable:** it crashes ONNX Runtime (`SIGSEGV`) on the plain graph at both token limits, three times out of three, and is 78% slower than the CPU provider on the optimized graph.
 
-### Still to run on the Pixel 8
+### Sweep, edit latency, finalists and 5,000 notes on the Pixel 8 (November 10 to 11)
 
-Threads 1, 2, 4 and XNNPACK on the best two (one of ten runs exists); edit latency; three more finalist blocks; the 5,000-note `IndexingMeasurementTest` for the baseline and finalists (the baseline run was started and lost when the phone was unplugged); a replacement for the excluded `m3` run. The queue is `driver/q-s2c.txt` in the archive. Also not run: the emulator harness check (the local emulator's disk is full).
+The phone was at 80% and not charging, launcher in front, at every start. **Two cooling rules.** The 5,000-note baseline and 256-token runs and the edit-latency runs started under the first rule (skin at or below 35.5 °C). The phone then idled warmer than on November 9, and the owner chose a second rule from that day's idle level: status 0 and skin at or below 36.4 °C (median of 16 idle readings, 35.85 °C, plus 0.5), fixed before any run used it. The other runs below started under it, at 35.2 to 36.4 °C.
+
+| Configuration | 5,000 notes | Notes per second (early, late) | Peak PSS at 5,000 notes | Edit latency p50, p95 | Blocks 4 to 6 | Threads 1 / 2 / 4 | XNNPACK |
+|---|---|---|---|---|---|---|---|
+| `bge-fp32@512` | 14.0 min; repeat 12.7 min | 5.97 (8.33, 5.25); 6.54 (8.22, 5.90) | 508 MiB; 511 MiB | 32.4, 284.1 ms | 76.8, 74.8, 74.9 ms | excluded / 129.3 / 76.9 ms (default 74.1) | crash |
+| `bge-fp32-opt@512` | 12.3 min | 6.78 (8.81, 6.19) | 426 MiB | 34.0, 292.5 ms | 73.6, 72.8, 79.1 ms | not run | not run |
+| `bge-fp32@256` | 8.7 min | 9.60 (12.99, 8.52) | 323 MiB | 34.3, 148.4 ms | 52.8, 53.5, 53.8 ms | 167.8 / 88.9 / 53.6 ms (default 54.1) | crash |
+
+- **First indexing: no configuration meets 5 minutes on the Pixel 8.** The goal needs 16.7 notes per second. The best, 256 tokens, averages 9.6 and takes 8.7 minutes; the baseline takes 12.7 to 14.0 minutes.
+- **Throttling is the reason the 200-note figures do not carry over.** Every 5,000-note run reached thermal status 1 within one to two minutes and stayed there (never status 2); throughput fell 28% to 37% from the early to the late figure. Screening had suggested 74 ms per note for the baseline; the 5,000-note runs cost 153 to 168 ms.
+- **One run per configuration cannot rank close candidates at 5,000 notes:** the two valid baseline runs differ by 9%.
+- **Memory: the baseline exceeds 500 MB** in each of its 5,000-note runs (508 to 511 MiB). The optimized graph (426 MiB) and the 256-token limit (323 MiB) stay under.
+- **Edit latency: the 256-token limit meets 200 ms at p95** (148 ms). At 512 tokens it is missed (284 and 293 ms) because of notes over 256 tokens.
+- **The optimized graph is not faster on the Pixel 8:** ratio to the baseline 0.96 to 1.10 over six blocks, median 1.00. Its benefit there is memory (about 85 MiB at 5,000 notes). On the Pixel 4 XL it was 7% to 12% faster.
+- **The 256-token limit** takes 0.69 to 0.79 of the baseline's time over six blocks (median 0.72) and 0.62 to 0.68 at 5,000 notes.
+- **Threads: the default is right on the Pixel 8.** Four threads equal it; two are 64% to 74% slower, the opposite of the Pixel 4 XL. The one-thread run at 512 tokens was excluded twice because the phone was in use (238.6 and 228.4 ms); at 256 tokens one thread is three times slower.
+- **XNNPACK crashes here too** (`SIGSEGV`, both token limits): five crashes in five runs of the plain graph across the two phones.
+- The `m3` run excluded in screening was replaced: 361.0 ms per note for the optimized graph (its other two: 372.1 and 334.5).
+
+### Not run
+
+The three int8 variants (parity failed); XNNPACK timing (it crashes); a valid one-thread figure at 512 tokens on the Pixel 8; the thread sweep for the optimized graph on the Pixel 8; Codex's three additions (they need the owner's approval); the emulator harness check (the local emulator's disk is full).
 
 ### For the owner
 
 - **The int8 question changes.** The plan asked whether to accept batch size 1 for int8 or try static quantization, and whether 50 MB outranks `bge-int8-all`'s losses. Parity now says dynamic int8 does not give portable vectors at all. Options: keep fp32 everywhere; allow int8 with the model digest *and* the CPU kernel family as part of the vector space (no cross-device stores without re-embedding); or test whether a statically quantized (QDQ) model is reproducible across architectures. ADR 0002's parity threshold would have to change for the second.
 - **Whether to time int8 anyway** as information, outside the rule.
-- **256 tokens** is the only remaining candidate that moves the device numbers; its quality trade-off is the one Phase A measured.
+- **256 tokens** is the only measured candidate that moves the device numbers: it meets the edit-latency target and the memory limit on the Pixel 8 and cuts first indexing from 13 to 14 minutes to 8.7. Its quality trade-off is the one Phase A measured.
+- **The 5-minute goal is not met by anything measured**, on either phone, and sustained throttling is what stands in the way. That leaves the owner a choice the measurements cannot make: change the goal (or make first indexing a resumable background task), or look for a cheaper configuration (Codex's additions below).
 - **Codex's three additions** (`bge-fp32@128`, `minilm-fp32@128`, `minilm-fp32@256`) are fp32 and would pass parity; with int8 out they are the only untested route to a smaller or faster model.
-- **Thread count.** On the Pixel 4 XL two threads beat the default by 10% to 13% for the plain graph. Whether to set a thread count per device class, or leave the default, waits on the Pixel 8 thread sweep.
-- **XNNPACK** crashes ONNX Runtime 1.30.0 on the Pixel 4 XL with the plain graph and is slower with the optimized one. Proposed: drop it from the remaining Pixel 8 queue unless the owner wants the crash checked there.
-- **The Pixel 8 still decides.** Its sweep, edit latency, finalist blocks 4 to 6 and 5,000-note runs have not run; the Pixel 4 XL numbers bound an older phone and do not replace them.
+- **Thread count.** Two threads beat the default by 10% to 13% on the Pixel 4 XL and lose to it by 64% to 74% on the Pixel 8. Proposed: keep the default.
+- **XNNPACK** crashes ONNX Runtime 1.30.0 with the plain graph on both phones and is slower with the optimized one on the Pixel 4 XL. Proposed: drop it.
+- **The optimized graph** buys memory, not speed, on the Pixel 8 (about 85 MiB at 5,000 notes, which brings the 512-token configuration under the limit), and 7% to 12% of speed on the Pixel 4 XL. Whether that is worth shipping a second model file is for Phase C.
