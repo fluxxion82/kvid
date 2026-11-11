@@ -10,3 +10,7 @@ November 10 to 11 (the Pixel 8's third and fourth attachments), marked by the dr
 idx-mixed-5000-bge-fp32@512  run 18:58:52Z-19:12:18Z  another app in front at the end of the run  (770.9 s; rerun valid at 23:40:56Z)
 sweep-mixed-bge-fp32@512-t1  run 00:33:23Z  two foreground changes to another app during the run  (238.6 ms per note)
 sweep-mixed-bge-fp32@512-t1  rerun 01:25:49Z  another app in front at the end of the run  (228.4 ms per note); not retried
+
+November 11, Pixel 4 XL, fourth session, marked by the driver:
+cand-m3-b2-minilm-fp32@256  run 06:02:31Z  two foreground changes to another app during the run  (163.5 ms per note);
+  the whole block (cand-m3-b2-*) is excluded and was repeated as cand-m3-b2r-* at 12:26Z-12:42Z

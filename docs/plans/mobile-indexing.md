@@ -481,7 +481,8 @@ Run after Codex's review, at the owner's request, with the plan written beforeha
 - **None of the three throttled:** each finished before the phone reached thermal status 1. The baseline in the same session throttled as before.
 - **Memory and embedding latency are far inside the limits** in these test-process runs (about half the memory limit or less; p95 74 to 123 ms).
 - **What the 128-token limit costs in text:** 31% of the `mixed` notes are longer than 128 tokens, and only 53% of the tokens of the 5,000 notes are kept (79% at 256). Phase A measured its quality on public sets only.
-- **Open:** the `m3` blocks are incomplete (one block excluded for phone use and being repeated whole, one run pending because the phone idled just above the cooling rule); no thread sweep; nothing on the Pixel 8.
+- **`m3`:** the candidates take 0.22 to 0.25 of the baseline's time (`minilm-fp32@128` 0.12) in three blocks. One block was excluded for phone use and repeated whole; one run was made four hours after the rest of its block because the phone idled just above the cooling rule.
+- **Open:** no thread sweep for the candidates; nothing on the Pixel 8.
 
 ### Not done against the protocol
 

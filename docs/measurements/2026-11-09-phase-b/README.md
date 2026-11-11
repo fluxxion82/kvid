@@ -344,7 +344,7 @@ After Codex's review the owner asked for the three uncertain candidates the froz
 - **Configurations:** `bge-fp32@128`, `minilm-fp32@256`, `minilm-fp32@128`, and the baseline `bge-fp32@512` in every block. Defaults otherwise. Both model files passed parity on this phone; the token limit does not change the model.
 - **Quality is not settled for any of them** (Phase A: the two 128-token configurations stopped at screening as uncertain, `minilm-fp32@256` is INCONCLUSIVE on full FiQA). **Device speed cannot authorize shipping one**; these runs say whether the quality work is worth doing.
 - **Not on the Pixel 8,** which decides.
-- **State:** same cooling rule as before (status 0, skin at or below 30.5 °C); every start met it (28.3 to 30.5 °C). Launcher in front, screen on. Battery full at 100% for the first run, then not charging at 99% to 94%. 03:18 to 08:04 UTC, 42 runs; one was disturbed (below).
+- **State:** same cooling rule as before (status 0, skin at or below 30.5 °C); every start met it (28.3 to 30.5 °C). Launcher in front, screen on. Battery full at 100% for the first run, then not charging at 99% to 94%. 03:18 to 12:42 UTC, 47 runs; one was disturbed and its block repeated (below).
 - **What 128 tokens cuts:** 62 of the 200 `mixed` notes (31%) are longer than 128 tokens and 37 (19%) longer than 256. At 128 tokens the 5,000 notes keep 344,923 of 651,618 tokens (53%); at 256, 511,558 (79%).
 
 ### `mixed`, 200 notes, six blocks (ms per note)
@@ -392,10 +392,15 @@ All three are under 200 ms at p95 for embedding alone, on the older phone (the b
 | Block (order) | `bge-fp32@512` | `bge-fp32@128` | `minilm-fp32@256` | `minilm-fp32@128` |
 |---|---|---|---|---|
 | 1 (ABCD) | 574.2 | 130.5 | 142.8 | 68.8 |
-| 2 (BDAC) | 578.5 | 130.9 | 163.5 (**excluded**) | 68.1 |
-| 3 (CADB) | 581.9 | pending | 142.1 | 69.8 |
+| 2 (BDAC), **excluded** | 578.5 | 130.9 | 163.5 (disturbed) | 68.1 |
+| 2 repeated whole (BDAC), 12:26 to 12:42 | 575.4 | 128.3 | 140.9 | 69.5 |
+| 3 (CADB) | 581.9 | 136.0 (made 4 h later) | 142.1 | 69.8 |
+| Ratio to baseline: blocks 1, 2 repeated, 3 | | 0.23, 0.22, 0.23 | 0.25, 0.24, 0.24 | 0.12, 0.12, 0.12 |
 
-Block 2's `minilm-fp32@256` run was disturbed (two foreground changes to another app), so the block is excluded and, as the plan says, repeated whole. Before the last run of block 3 the phone idled at 30.9 °C for two hours, above the rule, and the gate timed out; the rule was not changed. That run and the block 2 repeat were queued again at 10:05 UTC and are pending. On `m3` every note is cut at 128 or 256 tokens, so the candidates take about a quarter of the baseline's time (`minilm-fp32@128` about an eighth).
+- Block 2's `minilm-fp32@256` run was disturbed (two foreground changes to another app), so the block is excluded and, as the plan says, was repeated whole.
+- Before the last run of block 3 the phone idled at 30.9 °C for two hours, above the rule, and the gate timed out; the rule was not changed. The run was queued again and started at 11:56, after another 1 h 51 min wait, about four hours after the rest of its block; its ratio pairs it with a baseline that old.
+- All 16 runs stayed at thermal status 0; the 12 counted ones were undisturbed. On `m3` every note is cut at 128 or 256 tokens, so the candidates take about a quarter of the baseline's time (`minilm-fp32@128` an eighth). The baseline's peak here reached 483,031 KiB (495 MB), just under the limit.
+- 47 runs in all, 03:18 to 12:42 UTC.
 
 ## Not done
 

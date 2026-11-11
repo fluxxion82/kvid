@@ -42,3 +42,8 @@
 2026-11-11T08:04:03Z gate label=cand-m3-b3-minilm-fp32@128 waited_s=405 gate=ok battery_c=28.8 thermal_status=0 skin_c=30.2 charge_status=4 level=95 wake=Awake
 2026-11-11T10:04:38Z gate label=cand-m3-b3-bge-fp32@128 waited_s=7211 gate=timeout battery_c=28.6 thermal_status=0 skin_c=30.9 charge_status=4 level=94 wake=Awake
 2026-11-11T10:05:18Z gate timed out after 2 h before cand-m3-b3-bge-fp32@128 (phone idle at 30.9 C, rule 30.5, unchanged). Remainder restarted (p4xl-stage4b.sh, q-p4xl-4b.txt): that run, then the whole-block repeat of m3 block 2 (one of its runs was disturbed), as the plan written before the session says
+2026-11-11T11:56:21Z gate label=cand-m3-b3-bge-fp32@128 waited_s=6663 gate=ok battery_c=28.4 thermal_status=0 skin_c=30.5 charge_status=4 level=94 wake=Awake
+2026-11-11T12:26:57Z gate label=cand-m3-b2r-bge-fp32@128 waited_s=1798 gate=ok battery_c=28.6 thermal_status=0 skin_c=30.3 charge_status=4 level=94 wake=Awake
+2026-11-11T12:31:17Z gate label=cand-m3-b2r-minilm-fp32@128 waited_s=223 gate=ok battery_c=28.7 thermal_status=0 skin_c=30.2 charge_status=4 level=93 wake=Awake
+2026-11-11T12:33:22Z gate label=cand-m3-b2r-bge-fp32@512 waited_s=101 gate=ok battery_c=28.6 thermal_status=0 skin_c=30.3 charge_status=4 level=93 wake=Awake
+2026-11-11T12:41:37Z gate label=cand-m3-b2r-minilm-fp32@256 waited_s=364 gate=ok battery_c=29.4 thermal_status=0 skin_c=30.5 charge_status=4 level=93 wake=Awake
