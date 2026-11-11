@@ -1,6 +1,8 @@
 # Phase B of the mobile indexing study: parity and timing on the Pixel 8 and the Pixel 4 XL (November 9 to 11, 2026)
 
-Protocol: "Phase B commands" in [docs/plans/mobile-indexing.md](../../plans/mobile-indexing.md). Run by the local session. **The Pixel 8 is the owner's daily phone and was attached only at times**: twice for about 50 and 60 minutes on November 9 to 10, and again from 17:57 on November 10 to 01:27 on November 11. Sections 1 and 2 are the first attachment, section 3 the second, section 4 the Pixel 4 XL, which the owner offered for the night, and section 5 the Pixel 8's later attachments, which completed its protocol. What was not run is listed at the end.
+Protocol: "Phase B commands" in [docs/plans/mobile-indexing.md](../../plans/mobile-indexing.md). Run by the local session. **The Pixel 8 is the owner's daily phone and was attached only at times**: twice for about 50 and 60 minutes on November 9 to 10, and again from 17:57 on November 10 to 01:27 on November 11. Sections 1 and 2 are the first attachment, section 3 the second, section 4 the Pixel 4 XL, which the owner offered for the night, and section 5 the Pixel 8's later attachments, which made the remaining planned runs. What the protocol asks for and was not done is listed at the end. Codex reviewed this archive on November 11; its findings are in the plan and the corrections are made here.
+
+**Units and arithmetic.** PSS is recorded in KiB. The 500 MB limit is 488,281 KiB (476.8 MiB); where a peak is near it both MB and MiB are given. Per-run ratios and medians in the tables use the printed `per_note_ms`; the 95% intervals use `total_ms` and resample blocks (10,000 resamples, seed 20261108). Every PSS peak is a 100 ms sampled lower bound in the test process, sampled from after the model is opened; none is a whole-app, full-lifecycle figure.
 
 | | |
 |---|---|
@@ -59,7 +61,7 @@ What the diagnostic adds:
 
 So no int8 variant gives one vector per text across architectures at 0.9999, on any pair of machines measured. Phase A's int8 quality figures were measured on x86 and are not established for ARM; the drift figures suggest they would be similar for `bge-int8`, which is a guess until the evaluation is repeated on arm64.
 
-A side finding: built natively on macOS arm64, `bge-fp32-opt` and `minilm-fp32-opt` do not reproduce their pinned digests (the offline graph optimizer writes a different file there), so the plan's build commands only work on x86. The phone ran the container-built files.
+A side observation, **not archived**: a native macOS arm64 build did not reproduce the pinned digest of an `-opt` variant (the offline graph optimizer writes a different file there), which is why the files were built in the x86 container. No digests of that native build were kept, and `reference-drift.txt` records only that `minilm-fp32-opt` was not built on the Mac, so treat this as unverified. The phone ran the container-built files.
 
 ## 2. Screening (session 1)
 
@@ -77,7 +79,7 @@ Order: three blocks per corpus as a Latin square (ABC, CAB, BCA).
 | `bge-fp32-opt@512` | 69.5, 69.8, 81.1 | 69.8 (69.5 to 81.1) | 1.04, 0.96, 1.10 | 411,828; 407,323; 391,283 | 114,264; 109,775; 93,006 |
 | `bge-fp32@256` | 52.8, 52.5, 53.9 | 52.8 (52.5 to 53.9) | 0.79, 0.73, 0.73 | 313,103; 311,481; 321,596 | 97,311; 98,677; 87,384 |
 
-### `m3`, 200 notes, every note at the limit (95,342 tokens at 512; 51,116 at 256)
+### `m3`, 200 long notes (95,342 tokens at 512; 51,116 at 256)
 
 Blocks 1 and 2 ran in session 1; block 3 ran 31 minutes later, after the phone had been away (section 3).
 
@@ -91,11 +93,11 @@ Blocks 1 and 2 ran in session 1; block 3 ran 31 minutes later, after the phone h
 - **Throttled:** the baseline in block 3 ran last in its block and reported thermal status 1 from about 50 s in until the end (skin temperature up to 40.1 °C), although it started inside the cooling rule. Its 458.0 ms is kept and marked; the two block 3 ratios are therefore not like for like.
 
 Reading, as screening evidence only (three runs per configuration and corpus):
-- **The optimized graph is not shown to be faster.** Its ratios to the baseline straddle 1 on `mixed`. On `m3` only one pair is clean (0.99); in block 3 it took 334.5 ms against a throttled baseline. It does hold less memory: about 40,000 KiB less at peak on `mixed` and about 85,000 to 115,000 KiB less on `m3`.
+- **The optimized graph is not shown to be faster.** Its ratios to the baseline straddle 1 on `mixed`. On `m3` no pair is free of throttling or interruption: in block 1 the optimized run reported thermal status 1 for its last 30 s (ratio 0.99), in block 2 it was disturbed, and in block 3 it took 334.5 ms against a throttled baseline. It does hold less memory: about 40,000 KiB less at peak on `mixed` and about 85,000 to 115,000 KiB less on `m3`.
 - **256 tokens is faster in every block:** 0.73 to 0.79 of the baseline's time on `mixed`, where a fifth of the tokens are cut, and 0.43 and 0.51 on `m3` in the two clean blocks. On `mixed` it also peaks about 130,000 KiB lower.
-- **The baseline's peak on `m3` is above 500 MB** in all three runs (529,425 to 543,114 KiB, a sampled lower bound). `bge-fp32@256` on `m3` reached 505,880, 398,759 and 497,164 KiB: two of three runs are at the limit too.
-- **Against the 5-minute goal** (60 ms per note): on `mixed`, 72.4 ms per note is 6.0 minutes per 5,000 notes and 52.8 ms is 4.4 minutes. These are projections from a 200-note microbenchmark, which the plan does not accept as the answer; the 5,000-note store runs have not been made.
-- **Heat:** the `mixed` runs end at a skin temperature of 36.2 to 37.5 °C; the `m3` runs at 38.3 to 38.9 °C, just under the phone's first throttling threshold (39.0 °C). Two runs crossed it: `bge-fp32-opt@512`, `m3`, block 1 reported thermal status 1 for its last 30 s, and the baseline in block 3 for most of the run.
+- **The baseline's peak on `m3` is above 500 MB** in all three runs (529,425 to 543,114 KiB, a sampled lower bound). `bge-fp32@256` on `m3` reached 505,880, 398,759 and 497,164 KiB: two of three runs are above 500 MB as well (518 and 509 MB, which is 494 and 486 MiB).
+- **Against the 5-minute goal** (60 ms per note): on `mixed`, 72.4 ms per note is 6.0 minutes per 5,000 notes and 52.8 ms is 4.4 minutes. These are projections from a 200-note microbenchmark, which the plan does not accept as the answer; the 5,000-note store runs are in section 5.
+- **Heat:** the `mixed` runs end at a skin temperature of 36.2 to 37.5 °C; the `m3` runs at 37.9 to 38.9 °C, with up to 40.1 °C during a run; the phone's first throttling threshold is 39.0 °C. Two runs crossed it: `bge-fp32-opt@512`, `m3`, block 1 reported thermal status 1 for its last 30 s, and the baseline in block 3 for most of the run.
 
 ## 3. The Pixel 8's later runs
 
@@ -196,19 +198,19 @@ Same rule (status 0, skin at or below 30.5 °C before each run), script `driver/
 | `bge-fp32@256` | 102.1 | 179.0 | 91.3 | 101.8 | **crash** |
 
 - **Four threads equals the default** (within 1%).
-- **Two threads were 10% to 11% faster than the default in this single pass** (ratios 0.89, 0.91, 0.89). One run per cell is not enough for that size of difference; two paired blocks follow in the third session.
+- **Two threads were 9% to 11% faster than the default in this single pass** (ratios 0.89, 0.91, 0.89). One run per cell is not enough for that size of difference; two paired blocks follow in the third session.
 - **One thread is 75% to 85% slower.**
 - **XNNPACK is unusable here.** With the plain `bge-fp32` graph the test process dies with `SIGSEGV` inside `libonnxruntime.so` about 4 s after it starts, at both token limits and again in a rerun made only to keep the crash log (`pixel4xl/xnnpack-crash/`). With the optimized graph it runs, 78% slower than the CPU provider (228.6 against 128.5 ms), and the process still holds 266,411 KiB after the embedder is closed (CPU provider runs: 63,392 to 115,062 KiB).
 
 #### Edit latency (`latency=on`: 200 notes embedded one per call, ms)
 
-| Configuration | p50 | p95 | Up to 64 tokens (106 notes): p50, p95 | Up to 128 (32): p50, p95 | Up to 256: p50, p95 | Over 256: p50, p95 |
+| Configuration | p50 | p95 | Up to 64 tokens (106 notes): p50, p95 | 65 to 128 (32 notes): p50, p95 | 129 to 256: p50, p95 | Over 256: p50, p95 |
 |---|---|---|---|---|---|---|
 | `bge-fp32@512` | 49.5 | 578.7 | 22.4, 49.8 | 79.7, 110.1 | 166.3, 215.2 (25 notes) | 362.2, 637.3 (37 notes) |
 | `bge-fp32-opt@512` | 48.8 | 540.2 | 21.7, 48.9 | 79.2, 110.6 | 165.2, 220.6 (25 notes) | 356.9, 610.6 (37 notes) |
 | `bge-fp32@256` | 56.0 | 254.8 | 25.0, 57.2 | 84.2, 120.8 | 223.9, 260.2 (62 notes) | none |
 
-- **No configuration meets 200 ms at p95 over all notes on this phone.** Notes of up to 128 tokens do (p95 110 to 121 ms); notes of 129 to 256 tokens are just over (215 to 221 ms).
+- **No configuration meets 200 ms at p95 over all notes on this phone**, for embedding alone; the target also covers saving the vector, which this test does not time. Notes of up to 128 tokens are under it (p95 110 to 121 ms); notes of 129 to 256 tokens are just over (215 to 221 ms). One run of 200 calls per configuration.
 - **The 256-token limit cuts the tail** from about 580 to 255 ms because the 37 long notes are truncated. Its short-note figures are 6% to 15% higher than the baseline's in this one run each; the model and thread settings are the same, so treat that as run-to-run difference until repeated.
 
 #### Finalist blocks 4 to 6 (`mixed`, 200 notes, ms per note)
@@ -219,7 +221,7 @@ Same rule (status 0, skin at or below 30.5 °C before each run), script `driver/
 | 5 (BAC) | 139.4 | 127.4 | 100.2 | 0.91 | 0.72 |
 | 6 (CBA) | 144.6 | 127.8 | 102.5 | 0.88 | 0.71 |
 
-Over all six blocks (screening blocks 1 to 3 and these): medians 139.6, 128.6 and 102.0 ms; the optimized graph's ratio is 0.88 to 0.93 (median 0.92), the 256-token limit's 0.71 to 0.74 (median 0.72). The optimized graph is faster in six of six blocks, by 7% to 12%; the gain reaches the 10% practical difference in one block only.
+Over all six blocks (screening blocks 1 to 3 and these): medians 139.6, 128.6 and 102.0 ms; the optimized graph's ratio is 0.88 to 0.93 (median 0.92), the 256-token limit's 0.71 to 0.74 (median 0.72). The optimized graph is faster in six of six blocks, by 7% to 12%; the gain reaches the 10% practical difference in one block only. Block-resampled 95% interval of the mean ratio: 0.92 (0.90 to 0.93) for the optimized graph, a real gain that stays under the 10% threshold; 0.72 (0.72 to 0.73) for the 256-token limit.
 
 #### 5,000-note `IndexingMeasurementTest` (`mixed`, one run each)
 
@@ -229,10 +231,10 @@ Over all six blocks (screening blocks 1 to 3 and these): medians 139.6, 128.6 an
 | `bge-fp32-opt@512` | 829.2 s (13.8 min) | 6.03 (6.50, 5.76) | 165.8 | 428,152 KiB (418 MiB) | status 1 from 4.0 min in; skin up to 42.2 °C |
 | `bge-fp32@256` | 607.1 s (10.1 min) | 8.24 (8.71, 8.08) | 121.4 | 306,019 KiB (299 MiB) | status 1 from 4.0 min in; skin up to 42.1 °C |
 
-- **Every run is two to three times over the 5-minute goal** on this phone. The goal names a Pixel 8-class phone; this one is four chip generations older.
+- **Each of the three tested configurations is two to three times over the 5-minute goal** on this phone. The goal names a Pixel 8-class phone; this one is four chip generations older.
 - **Every run was throttled.** Each started inside the cooling rule, crossed 40 °C after four minutes and stayed at thermal status 1 (never 2) to the end. Late throughput is 7% to 11% below early throughput.
 - **Ratios hold under load:** the optimized graph takes 0.93 of the baseline's time, the 256-token limit 0.68.
-- **The baseline exceeds the 500 MB limit** (509 MiB). The optimized graph peaks 91 MiB lower, the 256-token limit 210 MiB lower.
+- **The baseline exceeds the 500 MB limit** (521,064 KiB: 534 MB, 509 MiB). The optimized graph peaks 91 MiB lower (438 MB), the 256-token limit 210 MiB lower (313 MB).
 - Per note the store run costs more than the 200-note screening (179 against 140 ms for the baseline): the 5,000 notes average 130 tokens against 124, and the phone throttles.
 
 ### Third session (11:34 to 12:37): default threads against `threads=2`
@@ -251,10 +253,10 @@ Two paired blocks on `mixed`, 200 notes, for all three configurations (`driver/p
 | | block 1 | 103.4 | 92.3 | 0.89 |
 | | block 2 | 101.6 | 91.4 | 0.90 |
 
-- **Two threads are faster than the default in nine of nine pairs on this phone.** For the plain graph the gain is 10% to 13% at both token limits, at or above the 10% practical difference in all six pairs. For the optimized graph it is 6% to 9%, below it.
-- **Peak memory does not change** (within 2% per configuration).
+- **Two threads are faster than the default in nine of nine pairs on this phone** (three pairs per configuration, the sweep's included; with three pairs the interval is no more than their range). For the plain graph the gain is 10% to 13% at both token limits, at or above the 10% practical difference in all six pairs. For the optimized graph it is 6% to 9%, below it.
+- **Peak memory barely changes** (two threads against the default: −1.5% to +3.2% per pair).
 - **With two threads the optimized graph's lead shrinks to 2% to 3%** (119.5 and 120.7 against 123.4 and 122.7 ms): the two gains do not add up.
-- This is the Snapdragon 855 (one prime, three large and four small cores). The Pixel 8's thread sweep has not run, so nothing here says what the default should be there. Two threads were not tried with the 5,000-note run or with edit latency.
+- This is the Snapdragon 855 (one prime, three large and four small cores). The Pixel 8's sweep (section 5) shows the opposite. Two threads were not tried with the 5,000-note run or with edit latency.
 
 ## 5. Pixel 8, November 10 to 11: indexing, edit latency, sweep, finalist blocks
 
@@ -267,12 +269,14 @@ Same APK, same model files. The files named `pixel8-session2*` continue from sec
 | 20:05 to 21:50 | No runs: the phone was away and the local session restarted |
 | 21:50 to 23:40 | Attached at 67% and charging, with another app in front until 22:27. At 80% and idle the skin temperature then rose to 37.4 °C (load average 2.4 to 2.7 from the phone's own apps, no kvid process) and fell slowly; the gate passed at 23:40 after a second timeout and restart |
 | 23:40 to 23:55 | The 5,000-note baseline under the first rule. Valid |
-| 23:55 | **Second cooling rule**, by the owner's decision ("use today's idle level"): thermal status 0 and skin at or below **36.4 °C**. Basis: the median of the 16 idle readings from 23:25 to 23:40 (35.85 °C) plus 0.5, the first rule's formula. Written to `pixel8-cooling-rule-2.txt` before any run used it |
+| 23:45 to 23:55 | **Second cooling rule**, by the owner's decision ("use today's idle level"): thermal status 0 and skin at or below **36.4 °C**. Basis: the median of the 16 idle readings from 23:25 to 23:40 (35.85 °C) plus 0.5. Written to `pixel8-cooling-rule-2.txt` at 23:45:15 and in force from 23:55:37, when the baseline run had ended |
 | 00:11 to 01:23 | 21 runs under the second rule: 5,000 notes with the optimized graph, the thread sweep, finalist blocks 4 to 6, the `m3` replacement and a repeat of the 5,000-note baseline. Starts were at 35.2 to 36.4 °C and status 0; waits 1 to 926 s |
 | 01:25 | Rerun of the excluded one-thread run: excluded again (the owner picked the phone up). Not retried |
 | 01:27 | XNNPACK rerun to keep the crash line. Not timed |
 
-**Which rule each result was made under.** First rule (35.5 °C): the baseline and 256-token 5,000-note runs, the three edit-latency runs, and section 3's default-thread sweep run. Second rule (36.4 °C): everything else in this section. The second rule was set after it was known that the phone can reach the first one; it was the owner's choice to shorten waits. The start temperature of every run is in the gate file.
+**Which rule each result was made under.** First rule (35.5 °C): the baseline and 256-token 5,000-note runs, the three edit-latency runs, and section 3's default-thread sweep run. Second rule (36.4 °C): everything else in this section. The start temperature of every run is in the gate file.
+
+**The second rule is a mid-study amendment, not a replication of the first rule's conditions.** The owner authorized it, but its window and threshold were chosen after the cooling difficulty and some results were known, and after the phone had been seen to reach the first rule again. Its formula is also not the first rule's: that one was the top of the settled idle range (35.0 to 35.4 °C) plus 0.1, with no median archived as its basis. The rule file's remark "same formula as the first rule" is therefore wrong; the file is kept as it was written. Consequences: results from the two rules are kept apart below; small speed differences between runs made under different rules are confounded with the rule; the 5-minute misses are not in doubt (the baseline repeat under the warmer rule was the faster of the two).
 
 ### 5,000-note `IndexingMeasurementTest` (`mixed`)
 
@@ -285,20 +289,20 @@ Same APK, same model files. The files named `pixel8-session2*` continue from sec
 
 Thermal samples are 15 s apart. No run reached status 2. The excluded baseline run (18:58, first rule) took 770.9 s with a peak of 522,029 KiB.
 
-- **No configuration meets the 5-minute goal on the Pixel 8.** The goal needs 16.7 notes per second; the best run, at 256 tokens, averages 9.6 and takes 8.7 minutes. The baseline takes 12.7 to 14.0 minutes.
-- **Sustained load throttles the phone within one to two minutes** and it stays at thermal status 1 to the end. Throughput falls 28% to 37% from the early to the late figure. The 200-note screening (74 ms per note for the baseline) does not see this; the 5,000-note runs cost 153 to 168 ms per note.
+- **None of the three tested configurations meets the 5-minute goal on the Pixel 8.** The goal needs 16.7 notes per second; the best run, at 256 tokens, averages 9.6 and takes 8.7 minutes. The baseline takes 12.7 to 14.0 minutes.
+- **Sustained load throttles the phone within one to two minutes** and it stays at thermal status 1 to the end. Throughput falls 28% to 37% from the early to the late figure. The 200-note screening gave 74 ms per note for the baseline; the 5,000-note runs cost 153 to 168 ms. Throttling contributes to that gap but is not isolated as its only cause: the store run also writes vectors, calls the embedder in outer batches of 32, and has longer notes (130.3 against 124.2 tokens per note).
 - **The two valid baseline runs differ by 9%** (837.6 and 764.8 s; the excluded one, 770.9 s). Differences of that size between configurations cannot be told apart from one run each. The optimized graph's 737.3 s is 0.88 and 0.96 of the two baseline runs; the 256-token limit's 521.0 s is 0.62 and 0.68.
-- **The baseline exceeds the 500 MB limit** in all three of its runs (508 to 511 MiB). The optimized graph peaks about 85 MiB lower, the 256-token limit about 185 MiB lower.
+- **The baseline exceeds the 500 MB limit** in all three of its runs (520,158 to 522,986 KiB: 533 to 536 MB, 508 to 511 MiB). The optimized graph peaks about 85 MiB lower (447 MB), the 256-token limit about 185 MiB lower (338 MB). Those two are below the limit in these sampled test-process runs on `mixed`; that is not yet a whole-app pass.
 
 ### Edit latency (`latency=on`: 200 notes embedded one per call, ms; first rule)
 
-| Configuration | p50 | p95 | Up to 64 tokens (106 notes): p50, p95 | Up to 128 (32): p50, p95 | Up to 256: p50, p95 | Over 256: p50, p95 | Peak PSS (KiB) |
+| Configuration | p50 | p95 | Up to 64 tokens (106 notes): p50, p95 | 65 to 128 (32 notes): p50, p95 | 129 to 256: p50, p95 | Over 256: p50, p95 | Peak PSS (KiB) |
 |---|---|---|---|---|---|---|---|
 | `bge-fp32@512` | 32.4 | 284.1 | 16.2, 34.3 | 50.9, 71.6 | 88.8, 127.7 (25 notes) | 217.4, 334.3 (37 notes) | 306,473 |
 | `bge-fp32-opt@512` | 34.0 | 292.5 | 14.7, 45.6 | 48.6, 253.7 | 96.2, 216.0 (25 notes) | 235.8, 530.1 (37 notes) | 335,612 |
 | `bge-fp32@256` | 34.3 | 148.4 | 16.0, 36.5 | 52.7, 127.8 | 135.3, 178.2 (62 notes) | none | 275,428 |
 
-- **The 256-token limit meets the 200 ms target** (p95 148 ms). At 512 tokens the target is missed (284 and 293 ms) because of the 37 notes over 256 tokens; notes of up to 256 tokens meet it with the plain graph (p95 128 ms).
+- **Embedding alone is under 200 ms at p95 with the 256-token limit** (148.4 ms, one run of 200 calls). **That does not yet validate the target**, which includes saving the vector; `latency=on` times only the embedding call (tokenizing included). At 512 tokens embedding alone already misses (284 and 293 ms) because of the 37 notes over 256 tokens; each bucket up to 256 tokens is under 200 ms with the plain graph (p95 34, 72 and 128 ms).
 - **The optimized graph's run has outliers** in the middle buckets (p95 254 ms for 65 to 128 tokens against 72 ms for the plain graph) while its medians match. One run each; the cause is not known, and nothing was in front of the launcher.
 
 ### Threads and XNNPACK (`mixed`, 200 notes, one run per cell, ms per note)
@@ -309,9 +313,9 @@ Thermal samples are 15 s apart. No run reached status 2. The excluded baseline r
 | `bge-fp32@256` | 54.1 | 167.8 | 88.9 | 53.6 | **crash** |
 
 - **Four threads equal the default** (within 4%).
-- **Two threads are 64% to 74% slower than the default on this phone**, the opposite of the Pixel 4 XL, where they were 10% to 13% faster. No fixed thread count suits both phones.
+- **Two threads were 64% to 74% slower than the default on this phone**, the opposite of the Pixel 4 XL, where they were 10% to 13% faster. These are single runs, and the 512-token default figure is from section 3 under the first rule (the block 4 to 6 defaults under the second rule, 74.8 to 76.8 ms, agree with it). The size of the difference is far beyond the run-to-run spread, but it is not a paired, repeated comparison. On this evidence no fixed thread count suits both phones.
 - **One thread is three times slower** (the valid 256-token run; the two excluded 512-token runs agree).
-- **XNNPACK crashes here too:** `Process crashed` for both runs, and `Fatal signal 11 (SIGSEGV), code 2 (SEGV_ACCERR)` in the rerun (`pixel8-xnnpack-crash/`). With the Pixel 4 XL that is five crashes in five runs of the plain graph on two chips.
+- **XNNPACK crashes here too:** `Process crashed` for both runs, and `Fatal signal 11 (SIGSEGV), code 2 (SEGV_ACCERR)` in the rerun (`pixel8-xnnpack-crash/`). With the Pixel 4 XL that is six crashes in six attempts with the plain graph on two chips (two sweep runs and one diagnostic rerun per phone).
 
 ### Finalist blocks 4 to 6 (`mixed`, 200 notes, ms per note; second rule)
 
@@ -325,25 +329,30 @@ All nine runs stayed at status 0 and were undisturbed. Peaks: 436,177 to 456,814
 
 Over all six blocks (section 2's blocks 1 to 3 and these): medians 74.3, 73.2 and 53.2 ms.
 
-- **The optimized graph is not faster on the Pixel 8.** Its ratio to the baseline is 0.96 to 1.10 over the six blocks (median 1.00); it is faster in three blocks and slower in three. It does use less memory.
-- **The 256-token limit** takes 0.69 to 0.79 of the baseline's time (median 0.72), in six of six blocks.
+- **No speed gain is demonstrated for the optimized graph on the Pixel 8.** Its ratio to the baseline is 0.96 to 1.10 over the six blocks; it is faster in three blocks and slower in three. Block-resampled 95% interval of the mean ratio: 1.01 (0.98 to 1.06), which includes no gain and excludes a 10% gain. It does use less memory.
+- **The 256-token limit** takes 0.69 to 0.79 of the baseline's time in six of six blocks; interval of the mean ratio 0.73 (0.71 to 0.75), beyond the 10% threshold.
+- Blocks 1 to 3 ran under the first rule and blocks 4 to 6 under the second, a day apart; each ratio is within one block, so the rule does not enter it.
 
 ### `m3` replacement
 
-`scr-m3-b2r-bge-fp32-opt@512`, the replacement for the run excluded in section 2: 361.0 ms per note, peak 499,136 KiB, status 0 throughout (second rule, start 36.2 °C). The optimized graph's three `m3` runs are now 372.1, 361.0 and 334.5 ms.
+`scr-m3-b2r-bge-fp32-opt@512`, made for the run excluded in section 2: 361.0 ms per note, status 0 throughout (second rule, start 36.2 °C), peak 499,136 KiB, which is 511 MB and above the limit. **It is an unpaired observation.** The protocol asks for the whole affected block to be repeated; only this cell was, a day later and under the other rule (the block's baseline had started at 35.4 °C under the first), so it does not repair the block 2 pair.
 
 ## Not done
 
-| Planned | State |
+| The protocol asks for | State |
 |---|---|
 | Timing of `bge-int8@512`, `bge-int8-all@512`, `minilm-int8@256` | Skipped by rule on both phones: parity failed |
-| `ep=xnnpack` for `bge-fp32@512` and `bge-fp32@256` | Crashed on both phones (`SIGSEGV` in ONNX Runtime); no timing |
-| Pixel 8: `threads=1` for `bge-fp32@512` | Run twice, excluded twice (phone in use); no valid figure |
-| Pixel 8: finalist blocks "over two cooled sessions" | Six blocks exist, three per session, but the second session used the second cooling rule |
-| Pixel 8: sweep on "the best two" | Run for `bge-fp32@512` and `bge-fp32@256`, as queued before the finalists were known; not for the optimized graph |
-| Pixel 4 XL: `m3` beyond screening; 5,000-note repeats | Not planned; one 5,000-note run per configuration |
+| `ep=xnnpack` on the best two | The plain graph crashed on both phones (`SIGSEGV` in ONNX Runtime), so no timing. The optimized graph was timed on the Pixel 4 XL only (228.6 ms per note) |
+| Threads 1, 2, 4 on the best two | Pixel 8: run for `bge-fp32@512` and `bge-fp32@256`, as queued before the finalists were known, not for the optimized graph; `threads=1` at 512 tokens was run twice and excluded twice (phone in use). `mixed` only on both phones |
+| Six paired blocks over two cooled sessions | Pixel 8: six blocks on `mixed`, three per session, but the sessions used different cooling rules; no same-rule replication. Finalist blocks on `m3` stop at screening's three on both phones |
+| Repeat the whole affected block after an interruption | Not done: only the excluded `m3` cell was rerun (unpaired) |
+| Edit latency including saving the vector; query and search p95 at 5,000 notes | Not run: `latency=on` times the embedding call only |
+| Screen-off and background validation | Not run: every run had the screen on and the launcher in front |
+| Whole-app, full-lifecycle PSS; a check of the sampler's overhead; batching and arena rechecked for the chosen graph | Not run |
+| Fixed ambient conditions and brightness, energy cost, process ID per run | Not recorded |
+| 5,000-note repeats | Pixel 8: two valid baseline runs, one each for the others. Pixel 4 XL: one each |
 | Pixel 4 XL: `threads=2` at 5,000 notes and for edit latency | Not run; the gain is measured on 200-note runs only |
-| Codex's three additions (`bge-fp32@128`, `minilm-fp32@128`, `minilm-fp32@256`) | Not run: they need the owner's approval |
+| Device timing of the uncertain candidates the frozen rule keeps (`bge-fp32@128`, `minilm-fp32@128`, `minilm-fp32@256`) | Not run: the owner's request listed six configurations. Completing the retained frontier, or amending its scope, is the owner's decision |
 | Emulator harness check | Not run: the local API 35 emulator's disk is full |
 
 The model files and the test APK are still on both phones under `/data/local/tmp/kvid-model-variants` (x86 fixtures) and `/data/local/tmp/kvid-arm-ref` (the arm64 fixtures for the three int8 variants). Nothing is waiting for either phone.
