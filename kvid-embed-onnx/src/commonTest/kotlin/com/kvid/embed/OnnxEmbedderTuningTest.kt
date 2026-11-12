@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.kvid.embed
 
 import kotlinx.coroutines.Dispatchers
@@ -9,17 +11,17 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.AtomicLong
 import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.fail
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.TimeSource
 
 /**
  * Compares runtime settings of [OnnxEmbedder] on the Milestone 3 synthetic notes. Runs only when
@@ -44,11 +46,18 @@ import kotlin.time.Duration.Companion.seconds
  * - `latency=on`: each note is embedded alone (a new or edited note), and the line adds p50 and p95 call
  *   latency, overall and by token length (up to 64, 128, 256 and above).
  *
- * Memory is also read after the embedder is closed and again after 5 s idle. It is sampled every 100 ms from
- * before the model is opened until it is closed: `mem_peak_kb` is the peak while embedding, as before, and
- * `mem_open_peak_kb` (opening and warm-up), `mem_embed_peak_kb`, `mem_close_peak_kb` and
- * `mem_lifecycle_peak_kb` cover the phases ([PhaseSampler]). Sampled peaks are lower bounds that can miss
- * short peaks.
+ * Memory ([PhaseSampler], `mem_peak=sampled-100ms+readings-from-before-open`) is sampled every 100 ms and
+ * read explicitly before the open, after it, after embedding, after close and after 5 s idle, all in the
+ * same peaks:
+ * - `mem_open_peak_kb` covers the reading before the open, the open and the warm-up; then
+ *   `mem_embed_peak_kb`, `mem_close_peak_kb` and `mem_idle_peak_kb` (the 5 s after close);
+ * - `mem_peak_kb` is the embedding phase's peak, including the reading after embedding, as before;
+ * - `mem_lifecycle_peak_kb` is the highest reading of all, so it is at least every other memory value on
+ *   the line.
+ *
+ * A sample during which the phase changed counts for the lifecycle only. Sampled peaks are lower bounds
+ * that can miss short peaks. `open_epoch_ms` is the wall-clock time at the open, and `phase_start_s` the
+ * phases' starts in seconds from it, for lining the line up with a driver's thermal readings.
  *
  * An unknown setting, a flag other than `on`/`off` or a count that is not positive fails the test, so a
  * misspelt option cannot produce a plausible default measurement. The line repeats the resolved settings
@@ -97,23 +106,35 @@ class OnnxEmbedderTuningTest {
 
         val warmup = settings["warmup"]?.toInt() ?: 8
         val latency = flag("latency", false)
-        val memBefore = memoryKb()
-        val sampler = PhaseSampler(memBefore)
+        val sampler = PhaseSampler()
         val callMs = ArrayList<Double>()
-        val line = coroutineScope {
-            // Sampling starts before the model is opened, so opening and warm-up are inside the measured lifecycle.
+        val clock = TimeSource.Monotonic.markNow()
+        val openEpochMs = Clock.System.now().toEpochMilliseconds()
+        fun now() = clock.elapsedNow().inWholeMicroseconds / 1_000_000.0
+        val marks = linkedMapOf("open" to now())
+        // Reading before the open: OPEN runs from here until open and warm-up are done.
+        val memBefore = sampler.reading()
+        var memAfterOpen: Long? = null
+        var memAfter: Long? = null
+        var memAfterClose: Long? = null
+        var memIdle: Long? = null
+        var openMs = 0.0
+        var totalMs = 0.0
+        var digest = ""
+        coroutineScope {
             val sampling = launch { sampler.run() }
             try {
-                sampler.phase = Phase.OPEN
-                val openStart = kotlin.time.TimeSource.Monotonic.markNow()
-                val embedder = openForTuning(fixture.modelPath, fixture.vocabPath, model, options, ep, providerThreads = threads ?: 4)
-                val openMs = openStart.elapsedNow().inWholeMicroseconds / 1000.0
-                val memAfterOpen = memoryKb()
+                var opened: OnnxEmbedder? = null
+                openMs = timedMs { opened = openForTuning(fixture.modelPath, fixture.vocabPath, model, options, ep, providerThreads = threads ?: 4) }
+                val embedder = opened!!
+                digest = embedder.spec.modelDigest
                 embedder.use {
+                    memAfterOpen = sampler.reading()
                     if (warmup > 0) embedder.embed(notes.take(warmup))
                     sampler.phase = Phase.EMBED
+                    marks["embed"] = now()
                     var vectors: List<FloatArray> = emptyList()
-                    val totalMs = if (latency) {
+                    totalMs = if (latency) {
                         val each = ArrayList<FloatArray>(notes.size)
                         for (note in notes) callMs += timedMs { each += embedder.embed(listOf(note)) }
                         vectors = each
@@ -122,35 +143,49 @@ class OnnxEmbedderTuningTest {
                         timedMs { vectors = embedder.embed(notes) }
                     }
                     assertEquals(notes.size, vectors.size)
-                    val memAfter = memoryKb()
+                    memAfter = sampler.reading()
                     sampler.phase = Phase.CLOSE
-                    val mem = if (memBefore == null) "mem=not-measured"
-                    else "mem_kind=$memoryKind mem_peak=sampled-100ms mem_before_kb=$memBefore mem_after_open_kb=$memAfterOpen " +
-                        "mem_peak_kb=${maxOf(sampler.peak(Phase.EMBED), memAfter ?: 0L)} mem_after_kb=$memAfter"
-                    val latencies = if (!latency) "" else " " + latencySummary(callMs, lengths)
-                    val resolved = "model=${model.name} variant=${variant ?: "fixture"} max_input_tokens=${model.maxInputTokens} " +
-                        "batch=${options.maxBatchSize} sort=${onOff(options.sortByLength)} arena=${onOff(options.cpuMemoryArena)} " +
-                        "pattern=${onOff(options.memoryPattern)} threads=${options.intraOpThreads ?: "default"} ep=$ep" +
-                        (if (ep == "xnnpack") " ep_threads=${threads ?: 4}" else "")
-                    "[kvid-embedding-tune] platform=$testPlatform config=$config $resolved " +
-                        "batch_invariant=${fixture.maxBatchSize.let { it == null || options.maxBatchSize <= it }} " +
-                        "model_digest=${embedder.spec.modelDigest} model_bytes=${SystemFileSystem.metadataOrNull(Path(fixture.modelPath))?.size} " +
-                        "open_ms=${fmt("%.1f", openMs)} notes=${notes.size} tokens=${lengths.sum()} " +
-                        "max_tokens=${lengths.max()} padded_tokens=$padded total_ms=${fmt("%.1f", totalMs)} " +
-                        "warmup=$warmup latency=${onOff(latency)} " +
-                        "per_note_ms=${fmt("%.1f", totalMs / notes.size)} tokens_per_s=${fmt("%.0f", lengths.sum() / (totalMs / 1000))}$latencies $mem"
+                    marks["close"] = now()
                 }
+                memAfterClose = sampler.reading()
+                // After the process has been idle for a while: what an app keeps once indexing ends.
+                sampler.phase = Phase.IDLE
+                marks["idle"] = now()
+                delay(5.seconds)
+                memIdle = sampler.reading()
+                marks["end"] = now()
             } finally {
                 sampling.cancelAndJoin()
             }
         }
-        // After close, and after the process has been idle for a while: what an app keeps once indexing ends.
-        val memAfterClose = memoryKb()
-        delay(5.seconds)
-        val memIdle = memoryKb()
-        println(if (memBefore == null) line else "$line mem_after_close_kb=$memAfterClose mem_idle_5s_kb=$memIdle ${sampler.summary()}")
+        // Built only after the sampler has stopped, so every reading is in the summary.
+        val mem = if (memBefore == null) "mem=not-measured"
+        else "mem_kind=$memoryKind mem_peak=$MEMORY_METHOD mem_before_kb=$memBefore mem_after_open_kb=$memAfterOpen " +
+            "mem_peak_kb=${sampler.peak(Phase.EMBED)} mem_after_kb=$memAfter mem_after_close_kb=$memAfterClose mem_idle_5s_kb=$memIdle " +
+            sampler.summary(TUNING_PHASES)
+        val latencies = if (!latency) "" else " " + latencySummary(callMs, lengths)
+        val resolved = "model=${model.name} variant=${variant ?: "fixture"} max_input_tokens=${model.maxInputTokens} " +
+            "batch=${options.maxBatchSize} sort=${onOff(options.sortByLength)} arena=${onOff(options.cpuMemoryArena)} " +
+            "pattern=${onOff(options.memoryPattern)} threads=${options.intraOpThreads ?: "default"} ep=$ep" +
+            (if (ep == "xnnpack") " ep_threads=${threads ?: 4}" else "")
+        println(
+            "[kvid-embedding-tune] platform=$testPlatform config=$config $resolved " +
+                "batch_invariant=${fixture.maxBatchSize.let { it == null || options.maxBatchSize <= it }} " +
+                "model_digest=$digest model_bytes=${SystemFileSystem.metadataOrNull(Path(fixture.modelPath))?.size} " +
+                "open_epoch_ms=$openEpochMs open_ms=${fmt("%.1f", openMs)} notes=${notes.size} tokens=${lengths.sum()} " +
+                "max_tokens=${lengths.max()} padded_tokens=$padded total_ms=${fmt("%.1f", totalMs)} " +
+                "warmup=$warmup latency=${onOff(latency)} " +
+                "per_note_ms=${fmt("%.1f", totalMs / notes.size)} tokens_per_s=${fmt("%.0f", lengths.sum() / (totalMs / 1000))}$latencies " +
+                "phase_start_s=${phaseStarts(marks)} $mem"
+        )
     }
 }
+
+/** The tuning test's phases, in the order they run. */
+private val TUNING_PHASES = listOf(Phase.OPEN, Phase.EMBED, Phase.CLOSE, Phase.IDLE)
+
+/** `name:seconds` for each mark, comma separated, as `phase_start_s` prints them. */
+internal fun phaseStarts(marks: Map<String, Double>): String = marks.entries.joinToString(",") { "${it.key}:${fmt("%.1f", it.value)}" }
 
 private fun onOff(value: Boolean) = if (value) "on" else "off"
 
@@ -177,41 +212,6 @@ internal fun latencySummary(callMs: List<Double>, tokens: List<Int>, prefix: Str
         lower = upper
     }
     return parts.joinToString(" ")
-}
-
-/** The phases [PhaseSampler] attributes memory samples to. */
-internal enum class Phase { OPEN, EMBED, INDEX, PAUSE, EDITS, QUERIES, CLOSE }
-
-/**
- * Samples [read] ([memoryKb] by default) every 100 ms into the peak of the [phase] current at each sample,
- * from when [run] starts (before the model is opened) until it is cancelled; [summary] prints a peak per
- * phase that saw a sample, and the lifecycle peak. Does nothing where memory is not measured ([before] is
- * null).
- */
-internal class PhaseSampler(private val before: Long?, private val read: () -> Long? = ::memoryKb) {
-    private val current = AtomicInt(Phase.OPEN.ordinal)
-    private val peaks = Array(Phase.entries.size) { AtomicLong(0L) }
-
-    var phase: Phase
-        get() = Phase.entries[current.load()]
-        set(value) = current.store(value.ordinal)
-
-    suspend fun run() {
-        if (before == null) return
-        while (true) {
-            read()?.let { kb ->
-                val peak = peaks[current.load()]
-                if (kb > peak.load()) peak.store(kb)
-            }
-            delay(100.milliseconds)
-        }
-    }
-
-    fun peak(phase: Phase): Long = peaks[phase.ordinal].load()
-
-    fun summary(): String =
-        Phase.entries.filter { peak(it) > 0 }.joinToString(" ") { "mem_${it.name.lowercase()}_peak_kb=${peak(it)}" } +
-            " mem_lifecycle_peak_kb=${peaks.maxOf { it.load() }}"
 }
 
 private val FLAGS = setOf("sort", "arena", "pattern", "latency")
