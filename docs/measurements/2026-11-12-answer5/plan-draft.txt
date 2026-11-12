@@ -1,11 +1,13 @@
-DRAFT, revised 2026-11-12T20:40Z for commit 31f1e0c and the cloud session's comments (docs/plans/mobile-indexing.md,
+DRAFT, revised 2026-11-12 (about 20:15Z and 20:30Z) for commit 31f1e0c and the cloud session's comments (docs/plans/mobile-indexing.md,
 "Reporting fixes after the smoke check and Codex's review"). Written before any timed run. Not in force until the
 open fields below are filled in, the file is committed as plan.txt, and the owner gives the go-ahead. plan.txt is
 not changed after its commit.
 
 open fields
   cooling value, Pixel 8: from the baseline procedure below, at the start of the first session.
-  Codex's review of 31f1e0c: any change it leads to in this plan is made before plan.txt is committed.
+  code after Codex's second review (codex-review-2-2026-11-12.md): no P1; the cloud session decides whether
+    the checker's gaps and the open mark (finding 7) are fixed before the runs. A new test commit means a new
+    APK and a third smoke check, and this draft is revised again before plan.txt is committed.
   owner's go-ahead: date and words.
 
 code and APK
@@ -19,8 +21,10 @@ every run
   KVID_INDEX_MEASURE=corpus=mixed+notes=5000+<configuration>+edits=200+queries=200+pause=300
   queries=200 is kept: a multiple of 4, so each of the four query call orders is used 50 times.
   Phase order in the test: open, index, pause, queries, edits, close.
-  Fresh instrumentation process, same APK, model files as in Phase B. Screen on, launcher in front, phone at its
-  charge limit and not charging (state recorded in each gate line; a run does not start while it charges).
+  Fresh instrumentation process, same APK, model files as in Phase B. At the start of a run: launcher in front,
+  screen on (the driver sends the wake key if it finds the screen off, and notes it), phone not charging (state
+  recorded in each gate line; a run does not start while it charges). The driver does not hold the screen on
+  during a run; the phone's own screen timeout applies, as in Phase B.
 
 captured per run
   adb logcat -d -s System.out | grep -E "\[kvid-(index-measure|index-samples|embedding-tune)\]"
@@ -29,7 +33,11 @@ captured per run
 checker, after every run and before the next one starts
   python3 -I kvid-embed-onnx/scripts/check_measure_lines.py <the run's raw file>     (script at 31f1e0c)
   It must print OK. A failure is a harness fault, not an exclusion: the queue stops, nothing further is run, and
-  the raw file and the checker's output go to the cloud session.
+  the raw file and the checker's output go to the cloud session. The same holds for an instrumentation run that
+  does not end "OK (1 test)".
+  Codex's second review found that the checker at 31f1e0c does not recompute the by-token-length percentiles.
+  Unless a later checker does, the analysis recomputes them from the edit_tokens and edit_total_ms samples and
+  compares them with the line; a difference is reported as a harness fault.
 
 configurations
   A  model=bge-fp32                 (baseline, 512 tokens)
@@ -38,12 +46,18 @@ configurations
 unit and order (step 3, Pixel 8)
   The unit is a block of two runs, one per configuration. Order by block: AB, BA, AB, BA.
   At least three valid blocks, over at least two sessions; the fourth if the phone is available.
-  A session is one attachment of the phone. A block that loses a run is repeated whole and reported as excluded.
+  A session is one attachment of the phone. At most two valid blocks in one session, so that three blocks
+  always span two sessions.
+  A block that loses a run is listed as excluded and repeated whole under a new label (b1, b1r1, b1r2), at
+  most three attempts per block; its remaining runs are not made.
   Roughly 45 to 60 minutes per run with its cooling wait, so a block needs about two hours of attachment.
 
 cooling rule (fixed here; do not reuse either Phase B rule for the Pixel 8)
   Baseline at the start of each session: phone at its charge limit and not charging, launcher in front, screen on,
   nothing run by the driver for at least 20 minutes, VIRTUAL-SKIN read every 60 s.
+  A reading counts when the thermal status is 0, the launcher is in front and the phone is not charging; a
+  reading that does not count restarts the count. The baseline ends after 21 counted readings in a row; if that
+  does not happen within 2 hours the session is not run. A screen found off gets the wake key and is noted.
   Idle level = median of the last 15 readings. Threshold = idle level + 0.5 C, rounded to 0.1 C.
   A run starts only at thermal status 0 with skin at or below the threshold; gate timer 2 hours.
   The threshold of a later session is computed the same way and recorded. If it differs from the first session's
@@ -87,5 +101,13 @@ optional parts
     CDE, DEC, ECD; same rule, same exclusions, same captures and checker.
   step 5: step 3 on the Pixel 4 XL with the same baseline procedure on that phone (sensor sdm-therm-monitor);
     reported separately, never pooled.
+
+driver
+  docs/measurements/2026-11-12-answer5/driver/: chain5.sh (one session: baseline5.sh, then queue5.sh), run5.sh
+  (one run: thermal log, raw file, checker), therm5.sh, with blocks-step3.txt and configs-step3.txt.
+  Tried on the Pixel 4 XL on 2026-11-12 with a 300-note setting and a 15 s baseline: one run valid with its
+  checker output and thermal log, then the gate timer (set to 60 s) ran out on a warm phone. No result of that
+  trial is kept. Not yet tried on the Pixel 8 (Android 17): `date +%s%3N` and the gate there are checked in the
+  first baseline, before any run.
 
 not covered by these runs: whole-app memory, screen-off and background runs, energy.

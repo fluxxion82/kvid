@@ -1,0 +1,2 @@
+A model=bge-fp32
+B model=bge-fp32+maxTokens=256

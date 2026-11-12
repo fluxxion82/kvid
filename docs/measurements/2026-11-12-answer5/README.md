@@ -9,6 +9,8 @@ For "Measurements added for the targets in answer 5" in [docs/plans/mobile-index
 | `smoke2-pixel4xl-index.txt`, `smoke2-pixel4xl-tune.txt` | Second smoke check, APK at `31f1e0c`: the `[kvid-index-measure]` line with its nine `[kvid-index-samples]` lines, and the `[kvid-embedding-tune]` line, as `logcat` printed them |
 | `smoke2-checker.txt` | Output of `check_measure_lines.py` (at `31f1e0c`) on the second smoke files, and on the first ones for comparison |
 | `codex-review-2026-11-12.md`, `codex-review-prompt.txt` | Codex's review of the measurement code, the retained candidates' quality and the notes-evaluation proposal, and the prompt it was given. Local paths are shortened to repository paths; nothing else is changed |
+| `codex-review-2-2026-11-12.md`, `codex-review-2-prompt.txt` | Codex's second review: the fixes at `31f1e0c` and the revised documents. Local paths shortened as before |
+| `driver/` | The driver for the timed runs, as tried on the Pixel 4 XL. Serials are passed in the environment |
 | `plan-draft.txt` | The run plan for the timed runs, a draft, revised for `31f1e0c`: the Pixel 8's first cooling value and the owner's go-ahead are not filled in |
 
 ## First smoke check (`6e41d47`)
@@ -74,10 +76,39 @@ Observations for the cloud session; none of them fails a documented invariant:
 - **`mem_boundary_samples=0` on both lines.** No read spanned a phase change in either run, so the device has not exercised that path.
 - **The close phase's peak is the reading after the close.** `mem_close_peak_kb` equals `mem_after_close_kb` on both lines (104,106 and 92,064 KiB). Close lasted 0.1 s and under 0.05 s, no sample fell in it, and the only reading credited to it is the one taken once the memory was released. The field therefore does not show the memory held while the store was closing; that is covered by the preceding phase's peak and by the lifecycle peak. This matches the documented meaning but is easy to misread.
 - **Clocks.** The phone's clock was 0.47 s behind the host's when measured after the runs (`adb shell date +%s%3N` between two host readings 68 ms apart). The run plan logs thermal readings with the phone's clock, so the offset does not enter the alignment.
-- **Line length.** The longest line is 2,121 characters (the result line). A samples line with 200 values of the widest series is estimated at about 1,500 characters; none was produced here.
+- **Line length.** The longest line is 2,121 characters (the result line). No 200-value samples line was produced here; Codex computed about 2,300 bytes for one, under logcat's limit of about 4,000.
+
+## Codex's second review (summary; full text in `codex-review-2-2026-11-12.md`)
+
+`gpt-6.1-sol`, high effort, read-only, on `planning` at `7dca06a` and the code diff `6e41d47..31f1e0c`. **No P1. Its findings 1, 2 and 8 are resolved in the measurement paths**; of the document findings, 4, 6, 7 and 9 are resolved and 3 and 5 are "substantially addressed but incomplete".
+
+| # | Finding | Where | Checked by the local session |
+|---|---|---|---|
+| 1 | P2: the checker does not recompute the by-token-length percentiles; `edit_tokens` is ignored after its length check | `check_measure_lines.py:102` | **Confirmed:** `edit_total_le64_p95_ms` changed from 96.8 to 999.0 in the second smoke file still gives `OK`; the same change to `edit_total_p95_ms` gives `FAIL` |
+| 2 | P2: top-10 results and known targets are not all nDCG@10 needs; relevant notes outside them change the ideal ranking. Judge the declared pool completely | `notes-evaluation.md:101` | Not checked |
+| 3 | P2: the cumulative quotas allow strata with no queries (600, 0, 0, 200) that the reweighting then needs | `notes-evaluation.md:81` | Not checked |
+| 4 | P3: completeness of a samples series uses only the first part's `part=k/m` and `n` | `check_measure_lines.py:68` | Not checked |
+| 5 | P3: a `nan` phase time passes the order check | `check_measure_lines.py:131` | **Confirmed:** `index:nan` in the second smoke file gives `OK` |
+| 6 | P3: an odd `edits` count legitimately fails the half-and-half check | `check_measure_lines.py:99` | Not checked; `edits=200` is not affected |
+| 7 | P3: the `open` mark is `now()` taken after the monotonic origin and the wall-clock read, so a stall of 50 ms or more between them prints `open:0.1` and fails the checker | `IndexingMeasurementTest.kt:127`, tuning test line 114 | **Code confirmed** (the mark is `now()`, two statements after the origin). Both device lines printed `open:0.0`. On a long run this would stop the queue as a harness fault without a real fault |
+| 8 | P3: evidence boundaries must count the two special tokens (126 content pieces at a limit of 128) | `notes-evaluation.md:78` | Not checked |
+| 9 | P3: the export allowlist excludes the overlap statistics that line 93 asks to report | `notes-evaluation.md:48` | Not checked |
+
+Answers to the questions in the prompt, in Codex's words shortened:
+
+- **Phase attribution and atomics:** sound for these call sites; the CAS maximum is safe across threads.
+- **Lifecycle peak:** at least every printed memory value by construction. `none` is still possible where a read returns null (an iOS `task_info` failure) and no sample covers the phase.
+- **Queries before edits:** does not change what `edit_total_` times, but the edits now follow the queries' cache and heat effects. Report both as continuous warm measurements; "short compared with the pause" is not evidence of cooling.
+- **Williams square:** correct; each row 50 times over 200 counted queries. Transitions between successive queries are not balanced.
+- **Samples lines:** complete; nearest-rank percentiles reproduce from the one-decimal values; a 200-value line is about 2,300 bytes, under the limit.
+- **`open_epoch_ms` with `phase_start_s`:** adequate for 15 s thermal sampling with a measured phone-to-host offset; not exact (0.1 s rounding).
+- **Run-plan comments:** correct.
+- **Retained candidates:** the report's tables reproduce in memory, all three INCONCLUSIVE. The full qrels and `trec_eval` reproduction was not run (prepared datasets absent).
 
 ## State
 
 - **The second smoke check passes.** Nothing was timed.
+- **Codex's second review has no P1.** Its code findings are about the checker (1, 4, 5, 6) and the open mark (7). Whether they are fixed before the timed runs is for the cloud session and the owner. A change to the test code means a new APK and a third smoke check; a change to the checker alone does not.
 - **Not done: the Pixel 8 idle baseline.** The phone was not attached on November 12 when the smoke check ran. The cooling value is measured at the start of the first session, as the plan says.
-- **The run plan is still a draft** (`plan-draft.txt`), revised for `31f1e0c` and the cloud session's comments. It becomes `plan.txt` once the Pixel 8's first threshold is measured and Codex's review of `31f1e0c` is in, and the timed runs start only after the owner's go-ahead.
+- **The run plan is still a draft** (`plan-draft.txt`), revised for `31f1e0c`, the cloud session's comments and Codex's second review. It becomes `plan.txt` once the code is settled and the Pixel 8's first threshold is measured, and the timed runs start only after the owner's go-ahead.
+- **The driver for the timed runs is written** (`driver/`) and was tried on the Pixel 4 XL with a small setting. It is not yet tried on the Pixel 8.

@@ -1,0 +1,41 @@
+Prompt given to Codex (gpt-6.1-sol, high effort, read-only sandbox), 2026-11-12, for its second review. The first paragraph was added by the local session; the rest is the owner's prompt.
+
+Where things are: your working directory is the `planning` worktree (checked out at 7dca06a). The code branch phase-5-mobile-indexing is checked out at 31f1e0c in a sibling worktree; both commits are also reachable from this repository, so `git diff 6e41d47..31f1e0c` works here. Do your assigned scope yourself; do not delegate further. Do not modify files.
+
+Review read-only, high effort. Report findings as P1/P2/P3 with file:line, and say what you ran or
+recomputed. Your previous review is docs/measurements/2026-11-12-answer5/codex-review-2026-11-12.md
+on `planning`.
+
+A. Code (gates the device runs): phase-5-mobile-indexing, diff 6e41d47..31f1e0c:
+   - kvid-embed-onnx/src/commonTest/kotlin/com/kvid/embed/: PhaseSampler.kt (new),
+     IndexingMeasurementTest.kt, OnnxEmbedderTuningTest.kt, PhaseSamplerTest.kt;
+   - kvid-embed-onnx/scripts/check_measure_lines.py (new).
+   The intended behaviour and every changed field are in docs/plans/mobile-indexing.md on `planning`
+   (7dca06a), last section.
+   Questions:
+   - Are your findings 1, 2 and 8 resolved?
+   - PhaseSampler packs the phase and a change counter into one AtomicInt with a single writer.
+     Can any sample or explicit reading still be credited to the wrong phase? Is the CAS-based peak
+     update safe with run() and reading() on different threads?
+   - Is "mem_lifecycle_peak_kb >= every other mem_*_kb value" guaranteed by construction? Can a
+     phase that ran still print `none`?
+   - Queries now run before edits. Does that change what edit_total_ measures, or bias the edits
+     through the queries' effect on caches or heat?
+   - Is the Williams square correct, and does indexing rows by (i - warmup) mod 4 balance the
+     counted queries?
+   - [kvid-index-samples]: are the series complete and consistent with the printed percentiles
+     (values are printed to one decimal), and safe from logcat's line limit?
+   - Can check_measure_lines.py pass a line that violates a documented invariant?
+   - open_epoch_ms is wall-clock time while phase_start_s is monotonic. Is that pairing adequate for
+     aligning thermal logs?
+   - Review the run-plan comments in that section against
+     docs/measurements/2026-11-12-answer5/plan-draft.txt.
+
+B. Revised documents (does not gate the device runs), on `planning` at 21d56bc and later:
+   - docs/plans/notes-evaluation.md: do the revisions resolve your findings 3 to 6 without
+     loosening the frozen rule? In particular the veto/hold/clear criteria, the per-query strata
+     (by where the target's evidence ends), Part R as a requirement and its export allowlist, the
+     11-ranking pool with targets and depth audit, and the three reweighting scenarios.
+   - docs/plans/mobile-indexing.md, "Quality of the retained candidates", Reading: is finding 7 resolved?
+   - docs/measurements/2026-11-12-retained-quality/README.md: is finding 9 resolved? Run the
+     reproduction if you can.

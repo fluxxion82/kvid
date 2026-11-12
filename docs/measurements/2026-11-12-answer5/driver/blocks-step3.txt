@@ -1,0 +1,4 @@
+b1 A B
+b2 B A
+b3 A B
+b4 B A

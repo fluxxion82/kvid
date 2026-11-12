@@ -753,3 +753,20 @@ Not checked by the script: `mem_samples` should be roughly ten per second of the
   - exclusions decided by rule only;
   - the 10% threshold;
   - the optional steps.
+
+## Second smoke check and Codex's review of the fixes (November 12, local session)
+
+Records: [docs/measurements/2026-11-12-answer5](../measurements/2026-11-12-answer5/README.md) (`smoke2-*.txt`, `codex-review-2-2026-11-12.md`, the revised `plan-draft.txt`, `driver/`). **No timed run has been made.**
+
+- **Smoke check** (APK built at `31f1e0c`, sha256 `e6963588…6748d5`; Pixel 4 XL, the Pixel 8 was not attached). Both instrumentation runs ended OK and `check_measure_lines.py` prints `OK` for the index line and the tuning line. The faults of the first smoke check are gone.
+  - `mem_samples` is about 8 per second on this phone (491 in 62.5 s, 292 in 36.3 s), not 10: the 100 ms is the delay between reads.
+  - `mem_boundary_samples` is 0 on both lines, so the device has not exercised that path.
+  - `mem_close_peak_kb` equals `mem_after_close_kb` on both lines: close is too short for a sample, and the only reading credited to it is the one after the memory is released.
+- **Codex** (`gpt-6.1-sol`, high effort, read-only; `planning` at `7dca06a`, code diff `6e41d47..31f1e0c`): **no P1**; its earlier code findings 1, 2 and 8 are resolved.
+  - **Checker, P2:** the by-token-length percentiles are not recomputed, so a wrong `edit_total_le64_p95_ms` passes. The local session reproduced this. **P3:** part metadata of a samples series is checked on the first part only; a `nan` phase time passes (reproduced); an odd `edits` count fails although legitimate.
+  - **Test, P3:** the `open` mark is taken with `now()` after the origin, so a stall of 50 ms or more prints `open:0.1` and fails the checker. On a long run that would stop the queue without a real fault.
+  - **Sound:** the phase attribution and the CAS peak; the lifecycle peak by construction; the Williams square; the samples lines and their length; `open_epoch_ms` for 15 s thermal sampling; the run-plan comments. Queries before edits do not change what `edit_total_` times, but the edits now follow the queries' cache and heat effects.
+  - **Documents:** earlier findings 4, 6, 7 and 9 are resolved; 3 and 5 are incomplete. **Two new P2 on the notes proposal:** the judging passes can leave the ideal ranking for nDCG@10 incomplete, and the quotas allow empty strata that the reweighting needs. **P3:** evidence boundaries must count the special tokens; the export allowlist and the overlap report disagree.
+- **Run plan.** Still a draft: revised for `31f1e0c`, the cloud session's comments, and two points of practice (at most two valid blocks per session; what counts as a baseline reading). The driver for the runs is written and was tried on the Pixel 4 XL with a small setting.
+- **Open before step 3:** the cloud session's decision on Codex's checker findings and finding 7 (a test change means a new APK and a third smoke check); the Pixel 8 idle baseline; `plan.txt`; the owner's go-ahead.
+
