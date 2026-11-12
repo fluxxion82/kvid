@@ -26,22 +26,39 @@ The 128-token candidates the frozen rule keeps (Codex's first P2 on Phase A), on
 
 ## Reproducing the analysis
 
-From the archived records, no model runs needed:
+_Changed after Codex's review (finding 9): the commands now say where the analyzer is, where to run them from, and what must be prepared first._
+
+No model runs are needed, but the analyzer re-reads each dataset's `qrels.tsv`, so the datasets must be prepared once (they are BEIR's, CC-BY-SA-4.0, never committed). Run everything from a checkout of the code branch at the analyzer's commit. `A` is this directory's parent in a checkout of `planning`.
 
 ```sh
-S=work; mkdir -p $S/eval-out $S/eval-full-out $S/eval-full-128-out
-gunzip -c ../2026-11-09-phase-a/records/screening-queries.jsonl.gz > $S/eval-out/queries.jsonl
-cp ../2026-11-09-phase-a/screening-summary.jsonl $S/eval-out/summary.jsonl
-gunzip -c ../2026-11-09-phase-a/records/fiqa-full-queries.jsonl.gz > $S/eval-full-out/queries.jsonl
-cp ../2026-11-09-phase-a/fiqa-full-summary.jsonl $S/eval-full-out/summary.jsonl
-gunzip -c fiqa-full-128-queries.jsonl.gz > $S/eval-full-128-out/queries.jsonl
-cp fiqa-full-128-summary.jsonl $S/eval-full-128-out/summary.jsonl
-python3 -I combine_retained.py $S                       # writes $S/retained-out
-# DATA holds scifact/ and nfcorpus/ from prepare_retrieval_eval.py (screening) and fiqa/ from the full preparation
-python3 -I analyze_retrieval_eval.py $S/retained-out DATA --report report.md
+git checkout 6e41d47          # phase-5-mobile-indexing; the analyzer is unchanged at 31f1e0c
+A=/path/to/planning/docs/measurements
+python3 -m venv venv && venv/bin/pip install -r kvid-embed-onnx/scripts/requirements-study.txt   # pytrec-eval for the cross-check
+
+# Prepared datasets: SciFact and NFCorpus from the screening preparation, FiQA from the full one
+venv/bin/python -I kvid-embed-onnx/scripts/prepare_retrieval_eval.py EVAL
+venv/bin/python -I kvid-embed-onnx/scripts/prepare_retrieval_eval.py EVAL_FULL --datasets fiqa --max-docs 1000000
+mkdir -p DATA && ln -s "$PWD/EVAL/scifact" DATA/scifact && ln -s "$PWD/EVAL/nfcorpus" DATA/nfcorpus && ln -s "$PWD/EVAL_FULL/fiqa" DATA/fiqa
+
+# The archived records, in the layout combine_retained.py expects
+W=work; mkdir -p $W/eval-out $W/eval-full-out $W/eval-full-128-out
+gunzip -c $A/2026-11-09-phase-a/records/screening-queries.jsonl.gz > $W/eval-out/queries.jsonl
+cp $A/2026-11-09-phase-a/screening-summary.jsonl $W/eval-out/summary.jsonl
+gunzip -c $A/2026-11-09-phase-a/records/fiqa-full-queries.jsonl.gz > $W/eval-full-out/queries.jsonl
+cp $A/2026-11-09-phase-a/fiqa-full-summary.jsonl $W/eval-full-out/summary.jsonl
+gunzip -c $A/2026-11-12-retained-quality/fiqa-full-128-queries.jsonl.gz > $W/eval-full-128-out/queries.jsonl
+cp $A/2026-11-12-retained-quality/fiqa-full-128-summary.jsonl $W/eval-full-128-out/summary.jsonl
+
+python3 -I $A/2026-11-12-retained-quality/combine_retained.py $W        # writes $W/retained-out
+venv/bin/python -I kvid-embed-onnx/scripts/analyze_retrieval_eval.py $W/retained-out DATA --report report.md
+diff report.md $A/2026-11-12-retained-quality/report.md                # no output: identical
 ```
 
-Phase A's screening records contain the FiQA-subset lexical block twice. The selection drops FiQA-subset records altogether, so the duplicate does not reach this analysis. (`analyze_retrieval_eval.py` keys records by dataset, run, instruction, mode and query, so a repeated record would replace the earlier one rather than count twice.)
+The uncompressed records can be checked against `SHA256SUMS-uncompressed` here and in `../2026-11-09-phase-a/records/`.
+
+**Duplicates** _(corrected after Codex's review)_. Both of Phase A's record files contain an identical duplicate FiQA lexical block: each of the two FiQA invocations wrote the lexical run.
+- The selection drops the screening file's FiQA-subset records altogether.
+- The full-FiQA duplicate does reach this analysis. `analyze_retrieval_eval.py` keys records by dataset, run, instruction, mode and query, so the second copy replaces the first and nothing counts twice. Codex checked the deduplication.
 
 ## What to know when reading the numbers
 

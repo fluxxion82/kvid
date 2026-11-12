@@ -558,8 +558,11 @@ Per-set hybrid nDCG@10 deltas against the baseline (95% CI). These are reported 
   - **`bge-fp32@128` loses where documents are long.** The loss is on full FiQA, where 46.8% of documents exceed 128 tokens.
     - Queries whose longest relevant document has 257 to 512 tokens fall from 0.372 to 0.328 (253 queries). Those over 512 fall from 0.382 to 0.324 (108 queries).
     - Queries with relevant documents of up to 256 tokens are unchanged (0.305 and 0.315 against 0.312 and 0.319).
-    - This is the cost of truncation.
-  - **MiniLM loses on SciFact at both limits.** The loss is −0.035 at 128 tokens and −0.029 at 256. On full FiQA it is level with the baseline at both limits, so it is a property of the model on scientific claims rather than of the limit.
+    - _Changed after Codex's review:_ this is consistent with an input-limit effect concentrated in long documents (Codex reproduces −0.044 and −0.058 in those two groups). It does not show that the answers sit after token 128: document length is not answer position, and truncation also changes the competing documents.
+  - **MiniLM loses on SciFact at both limits.** The loss is −0.035 at 128 tokens and −0.029 at 256. On full FiQA it is level with the baseline at both limits.
+    - _Changed after Codex's review_ (it said "a property of the model rather than of the limit", which is too strong). The model explains a substantial part: at the same 256-token limit, MiniLM minus bge on SciFact is −0.029, with a diagnostic paired interval of −0.047 to −0.011.
+    - The evidence does not separate the model from the limit. MiniLM at 128 minus MiniLM at 256 is −0.006 (−0.022, +0.009), which does not exclude a further truncation loss.
+    - Both figures were recomputed from the archived per-query records and match Codex's. They are diagnostics, not part of the rule.
   - SciFact is the proxy least like notes. Neither pattern says how either candidate does on notes.
 - **The guardrails show a real loss in dense retrieval.**
   - **Semantic nDCG@10.** All three lose more than the margin on semantic nDCG@10, with upper bounds below −0.02 (−0.025, −0.032, −0.025). Hybrid search hides most of it because BM25 carries part of the ranking.
@@ -569,22 +572,36 @@ Per-set hybrid nDCG@10 deltas against the baseline (95% CI). These are reported 
 
 ## Proposal: a notes-style evaluation set (November 11, cloud session)
 
-The proposal is [notes-evaluation.md](notes-evaluation.md), for the owner and for review by Codex before anything is built. Nothing is built yet.
-- **Real note lengths first.** A local survey script prints aggregate token statistics of a person's notes and nothing else. The owner runs it on their notes first.
+The proposal is [notes-evaluation.md](notes-evaluation.md), for the owner and for review by Codex before anything is built. Nothing is built yet. _Revised November 12 after Codex's review (findings 3 to 6); this summary is changed to match._
+- **Real note lengths first.** A local survey script prints aggregate token statistics of a person's notes and nothing else. The owner runs it on their notes first. Lengths do not say where the answer sits in a note; only Part R measures that.
 - **A public synthetic set (Part S).**
   - At least six collections of 500 to 800 notes, written to a frozen specification.
-  - 800 test queries and 200 development queries, written from memory cues rather than from the note text.
-  - 100 queries with no answer.
-  - Evidence spans are stratified so that at least 25% of answers start after token 128, 15% after 256 and 5% after 512. Results are reweighted to the real lengths.
-- **A small private real set (Part R).** At least 150 queries per contributor, evaluated on the contributor's machine; only aggregates are committed.
-- **Judging.** Pooled, blinded and graded by two human judges.
-- **Decision rule.** The frozen rule unchanged, plus per-stratum and exact-match guardrails.
-- **Sizing from Phase A's per-query spread.** 200 queries give ±0.01 for `bge@256`; the 128-token and MiniLM candidates need 600 to 900.
-- **Owner decisions it needs:** Part R and whose notes; who judges; whether LLM authors may write Part S's notes; and the target sizes.
+  - 800 test queries and 200 development queries, written from memory cues rather than from the note text, with an audit of how much each query's words overlap its target note.
+  - Each query belongs to one fixed stratum, set by where its target's evidence *ends* (within 128, 129 to 256, 257 to 512, or beyond 512 tokens). At least 25% end beyond token 128, 15% beyond 256 and 5% beyond 512.
+  - The no-answer queries are deferred.
+- **A small private real set (Part R), now required for a default change.**
+  - At least 150 naturally elicited queries per contributor, each with its evidence span marked.
+  - Everything is evaluated locally, with no remote service or LLM. Only an explicit allowlist of aggregates is exported, including the evidence-position histogram that reweighting needs.
+  - Without Part R, the best possible outcome is a provisional pass that does not change the default.
+- **Judging.**
+  - The pool is the top 20 of lexical search and of both the semantic and the hybrid ranking of each configuration, plus every known target.
+  - It is blinded and graded by two human judges, with a depth audit of ranks 11 to 100.
+  - Recall@100 is labelled pooled recall. No LLM pre-sorting.
+- **Decision rule.**
+  - The frozen rule is unchanged.
+  - The added guardrails (exact-match queries, each stratum beyond the input limit, and each Part R contributor) end in veto, hold or clear, with stated criteria.
+  - Reweighting uses Part R's histogram, or else three scenarios the candidate must clear.
+- **Sizing from Phase A's per-query spread:** ±0.01 needs about 325 queries for `bge@256` (SciFact), and 1,237 to 1,321 for `minilm@128`. 800 is therefore a budget choice that can leave the 128-token and MiniLM candidates INCONCLUSIVE.
+- **Owner decisions it needs:**
+  - Part R, and whose notes;
+  - who judges;
+  - whether LLM authors may write Part S's notes;
+  - the primary and guardrail sizes;
+  - whether to build the deferred no-answer set.
 
 ## Measurements added for the targets in answer 5 (November 12, cloud session)
 
-`phase-5-mobile-indexing` at `6e41d47` adds the measurements that "Not done against the protocol" lists under targets.
+`phase-5-mobile-indexing` at `6e41d47` adds the measurements that "Not done against the protocol" lists under targets. _Changed after the smoke check and Codex's review: `31f1e0c` fixes the reporting, moves the queries before the edits and adds raw samples. The bullets below are updated and marked, and the next section but one lists every changed field._
 - No default changed, and nothing was run on a device.
 - The local check's python, fixtures and jvm parts passed before the push. CI run 43125937136 is green on every job, including the iOS simulator job, which compiles and runs the shared tests (`PhaseSamplerTest` among them) and runs one tuning configuration.
 - The JVM smoke runs only check that the tests work; their times say nothing about phones.
@@ -599,20 +616,32 @@ The proposal is [notes-evaluation.md](notes-evaluation.md), for the owner and fo
   - both together (`edit_total_`), which is the edit-latency target.
 
   The edit texts are `mixed`-length notes from a separate seed. 5 warm-up edits are not counted.
-- **Query and search at 5,000 notes.** `queries=<n>` runs n queries of 2 to 6 words from the notes' vocabulary against the same store. It uses 20 results, the default, and lexical matching on any word, as in the quality study. It reports p50 and p95 of:
+- **Query and search at 5,000 notes.** `queries=<n>` runs n queries of 2 to 6 words from the notes' vocabulary against the same store.
+  - _Changed after Codex's review:_ the queries run before the edits, so they search exactly the 5,000 indexed notes; `query_store_notes` prints the live count.
+  - _Changed after Codex's review:_ the four calls of a query rotate through a 4×4 Williams square (`query_order=williams4`), so each call is in each position, and follows each other call, equally often over every four queries. They used to run in one fixed order, with hybrid always last.
+  - The queries use 20 results, the default, and lexical matching on any word, as in the quality study.
+  - They are continuous warm measurements on a synthetic vocabulary, not representative search latency.
+
+  It reports p50 and p95 of:
   - the query embedding alone (`query_embed_`);
   - lexical `find` (`query_lexical_`);
   - `findSimilar` (`query_similar_`), which is the embedding plus an exact scan of the stored vectors;
   - `findHybrid` (`query_hybrid_`).
 
   5 warm-up queries are not counted.
-- **Cooling between phases.** `pause=<s>` waits after indexing, so edits and queries need not run on a phone throttled by the 5,000-note run. `phase_start_s` gives each phase's start in seconds from just before the open, for lining up with the driver's thermal readings. Without a pause, the edits and queries describe a hot phone.
-- **Memory from before the model opens.** Both measurement tests now sample from before `open` until after `close`:
-  - `mem_peak_kb` keeps its earlier meaning, the embedding or indexing phase, so it stays comparable with Phase B;
-  - new peaks per phase: `mem_open_peak_kb`, `mem_index_peak_kb`, `mem_pause_peak_kb`, `mem_edits_peak_kb`, `mem_queries_peak_kb` and `mem_close_peak_kb`, plus `mem_embed_peak_kb` in the tuning test;
-  - `mem_lifecycle_peak_kb`.
+- **Cooling between phases.** `pause=<s>` waits after indexing, so the queries and edits need not run on a phone throttled by the 5,000-note run. Elapsed time does not prove cooling, so the thermal readings decide what a phase measured. Without a pause, the queries and edits describe a hot phone.
+- **Timing the phases.** `phase_start_s` gives each phase's start in seconds from the open. _Changed after the local agent's request:_ `open_epoch_ms` is the phone's wall-clock time at the open, so the phases line up with the thermal log exactly.
+- **Raw samples** _(added after Codex's review, which said to retain samples)_. After the result line, `[kvid-index-samples]` lines give every counted call's value. With them, the runs of a configuration can be pooled, and per-operation (put or update) percentiles computed.
+- **Memory from before the model opens.** Both measurement tests sample from before `open` until after `close`, and the tuning test until 5 s after it:
+  - `mem_peak_kb` keeps its earlier meaning, the embedding or indexing phase including the reading at its end, so it stays comparable with Phase B;
+  - peaks per phase, and `mem_lifecycle_peak_kb`.
+  - _Changed after the smoke check and Codex's review:_
+    - the explicit readings are in the same peaks;
+    - a sample during which the phase changed counts for the lifecycle only;
+    - every phase field is printed on every run;
+    - both tests use one label for the method.
 
-  They are still 100 ms samples in the test process: a lower bound, not whole-app memory.
+  They are still 100 ms samples and explicit readings in the test process: a lower bound, not whole-app memory.
 
 Commands, added to the November 8 block:
 
@@ -621,7 +650,7 @@ Commands, added to the November 8 block:
 #    keeps (maxTokens=256 or 128 selects the input limit; model=minilm-fp32 for MiniLM).
 run $ARGS.class=com.kvid.embed.IndexingMeasurementTest $ARGS.KVID_MODEL_VARIANTS_DIR=$V \
   $ARGS.KVID_INDEX_MEASURE=corpus=mixed+notes=5000+model=bge-fp32+edits=200+queries=200+pause=300
-adb logcat -d -s System.out | grep -F "[kvid-index-measure]"
+adb logcat -d -s System.out | grep -E "\[kvid-index-(measure|samples)\]"   # changed: keep the samples lines too
 ```
 
 **What these still do not measure:**
@@ -645,3 +674,82 @@ Records: [docs/measurements/2026-11-12-answer5](../measurements/2026-11-12-answe
   - **Notes-evaluation proposal, four P2:** evidence-position weights are needed for the reweighting; the guardrails are not operational and Part R cannot stay optional for a non-provisional decision; the judgment pool needs its retrieval modes named and the intended target always included; the sizing understates the spread (about 1,200 to 1,300 queries for ±0.01 with MiniLM at 128 tokens).
 - **Consequence:** the local session stopped before the timed runs. They wait for a commit that deals with the two code P2s and the missing field, a repeat of the smoke check on that APK, a fresh idle baseline on the Pixel 8 and the owner's go-ahead. The draft run plan is `plan-draft.txt` in the records.
 - **Request to the cloud session:** print a wall-clock time at the open in the result line, so the phases can be lined up with the driver's thermal readings exactly.
+
+## Reporting fixes after the smoke check and Codex's review (November 12, cloud session)
+
+`phase-5-mobile-indexing` at `31f1e0c` fixes the faults the smoke check found and Codex's code findings 1, 2 and 8, adds the local agent's wall-clock request, and makes two changes to the measurement now, before any timed run, so that every timed run uses one design.
+- **Validation.** The local check's python, fixtures and jvm parts passed (iOS and Android skipped: no macOS or adb in the cloud session). `PhaseSamplerTest` has six cases.
+- **JVM smoke.** On the JVM, with a temporary process-memory reading that was not committed, three configurations produced lines that pass `check_measure_lines.py`. The checker fails both device lines from `6e41d47`, for the two faults the smoke check found. Nothing was run on a device, and no default changed.
+
+### What changed, and why
+
+- **Memory accounting** (Codex 1 and 2, smoke faults 1 and 2).
+  - Explicit readings go into the same peaks as the 100 ms samples. They are taken before the open, after it, at the end of every phase, after close, and in the tuning test after the 5 s idle.
+  - A sample during which the phase changed counts for the lifecycle peak only: the phase is read on both sides of the memory read.
+  - Every phase field of a test is printed on every run.
+  - Both lines are built only after the sampler is cancelled and joined.
+- **Query store size** (Codex 8). The queries now run before the edits, against exactly the indexed notes.
+  - The order is pause, then queries, then edits. The alternatives were to restore the corpus after the edits, which adds work to every run, or to print 5,103.
+  - The edits follow the queries, which are short compared with the 300 s pause.
+- **Query call order** (decided now, before step 3). The four calls of each query rotate through a 4×4 Williams square instead of always ending with hybrid. `queries=200` is a multiple of 4, so each order is used 50 times.
+- **Raw samples.** The draft run plan asks for edit p95 "pooled over runs", which cannot be computed from per-run percentiles. Codex said to retain samples. `[kvid-index-samples]` lines now give every counted call's value.
+- **Wall clock** (local agent). `open_epoch_ms` on both lines.
+
+### Result-line fields added, renamed or changed in meaning
+
+| Line | Field | Change |
+|---|---|---|
+| both | `open_epoch_ms` | **added:** the phone's wall-clock time (epoch ms) at the origin of `phase_start_s`, just before the open |
+| both | `mem_peak` | **value renamed:** `sampled-100ms` (tuning) and `sampled-100ms-from-before-open` (index) are both now `sampled-100ms+readings-from-before-open` |
+| both | `mem_<phase>_peak_kb` | **meaning changed:** includes the explicit reading at the phase's end (`open` also includes the reading before the open) and excludes samples that span a phase change. Always printed: a number, `not-run` for a phase whose setting is 0, or `none` for a phase without a reading (should not occur) |
+| both | `mem_lifecycle_peak_kb` | **meaning changed:** the highest of every sample, spanning ones included, and every explicit reading |
+| both | `mem_samples`, `mem_boundary_samples` | **added:** sampled reads, and how many of them spanned a phase change |
+| both | `mem_peak_kb` | **same meaning** (the indexing or embedding phase's peak, including the reading at its end); now equal to `mem_index_peak_kb` or `mem_embed_peak_kb` by construction |
+| index | `phase_start_s` | **changed:** starts with `open:0.0`; order `open,index,pause,queries,edits,close,end` (queries before edits); lists only phases that ran |
+| index | `query_store_notes` | **added:** live notes when the queries start; equals `notes` |
+| index | `query_order` | **added:** `williams4` |
+| index | `query_*_p50_ms`, `query_*_p95_ms` | **conditions changed:** measured before the edits, on exactly `notes` notes, in rotated call order. Not poolable with `6e41d47` lines (none were timed) |
+| index | `edit_*` | **conditions changed:** measured after the queries rather than straight after the pause; fields unchanged |
+| index | `[kvid-index-samples]` | **new line**, one per series and part of up to 200 values: `open_epoch_ms`, `series`, `part=k/m`, `n`, `values`. The series are `query_embed_ms`, `query_lexical_ms`, `query_similar_ms`, `query_hybrid_ms`, `edit_total_ms`, `edit_save_ms`, `edit_write_ms`, `edit_tokens` and `edit_kind` (`put` or `update`) |
+| tuning | `phase_start_s` | **added:** `open,embed,close,idle,end` |
+| tuning | `mem_idle_peak_kb` | **added:** the 5 s after close, now sampled; `mem_after_close_kb` and `mem_idle_5s_kb` are unchanged |
+
+### Invariants the smoke check confirms
+
+`python3 -I kvid-embed-onnx/scripts/check_measure_lines.py RAW.txt` checks all of these on every result line in the file, together with that run's samples lines. It exits 0 only if all hold.
+1. `open_epoch_ms` is present and a plausible epoch time.
+2. `phase_start_s`:
+   - starts at `open:0.0`;
+   - lists the phases that ran, in run order, with non-decreasing times;
+   - ends with `end`.
+3. `mem_peak=sampled-100ms+readings-from-before-open` on both lines.
+4. Every phase field is present: a number for a phase that ran, `not-run` exactly for a phase whose setting is 0, never `none`.
+5. `mem_lifecycle_peak_kb` is at least every other `mem_*_kb` value on the line.
+6. `mem_peak_kb` equals `mem_index_peak_kb` (index line) or `mem_embed_peak_kb` (tuning line).
+7. `mem_boundary_samples` ≤ `mem_samples`.
+8. With queries: `query_store_notes` equals `notes`, and `query_order=williams4`.
+9. With queries or edits, the samples lines:
+   - every series is present with all its parts, and has as many values as the setting asks;
+   - the nearest-rank p50 and p95 recomputed from them equal the line's;
+   - `edit_kind` is half `put` and half `update`.
+
+Not checked by the script: `mem_samples` should be roughly ten per second of the run, from `phase_start_s`'s `end`.
+
+### Comments on the draft run plan (`plan-draft.txt`)
+
+- **Commit:** `31f1e0c`, once its CI run is green.
+- **Capture the samples lines.** Keep the `[kvid-index-samples]` lines with each result line (the changed `grep` in the command above), and run the checker on each run's raw file before the next run. A failing check is a harness fault: stop and report it to the cloud session, rather than excluding the run under the exclusion rules.
+- **Thermal alignment.**
+  - Use `open_epoch_ms`. It is the phone's clock. The draft records thermal readings "with host UTC times", while the owner's brief says the phone's clock.
+  - Either log the readings with the phone's clock, or record the phone-to-host offset at each gate (`adb shell date +%s%3N` beside the host time).
+  - With the new phase order, report the thermal status at the start of the index, queries and edits phases.
+- **Pooled percentiles.**
+  - Define pooled p95 as the nearest-rank p95 over all counted calls of a configuration's valid runs (600 for three runs), computed from the samples. Report it beside each run's p95.
+  - Also report edits by kind (`put`, `update`) from `edit_kind`. Codex noted that a pooled p95 over the mixture does not establish either operation's p95.
+- **Also report** `mem_boundary_samples` per run.
+- **No objection to the rest:**
+  - the cooling formula and its fresh Pixel 8 baseline;
+  - AB, BA, AB, BA blocks over at least two sessions;
+  - exclusions decided by rule only;
+  - the 10% threshold;
+  - the optional steps.

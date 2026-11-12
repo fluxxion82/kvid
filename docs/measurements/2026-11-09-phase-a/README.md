@@ -13,7 +13,7 @@ Preregistered in [docs/plans/mobile-indexing.md](../../plans/mobile-indexing.md)
 | `records/fiqa-full-queries.jsonl.gz` | The same for the full-FiQA runs (10 MB uncompressed) |
 | `records/SHA256SUMS`, `records/SHA256SUMS-uncompressed` | Their digests, compressed and after `gunzip` |
 
-**The per-query records were archived on November 12** at Codex's request in its review of Phase A. They are the files the reports above were computed from, not a rerun. With them, the paired intervals, overlaps, length buckets and the `trec_eval` cross-check can be audited without running a model; [2026-11-12-retained-quality](../2026-11-12-retained-quality/README.md) shows how. The screening file contains the FiQA-subset lexical block twice, from a repeated invocation. The two copies are identical, and the analysis keys records by dataset, run, instruction, mode and query, so the second replaces the first.
+**The per-query records were archived on November 12** at Codex's request in its review of Phase A. They are the files the reports above were computed from, not a rerun. With them, the paired intervals, overlaps, length buckets and the `trec_eval` cross-check can be audited without running a model; [2026-11-12-retained-quality](../2026-11-12-retained-quality/README.md) shows how. Both files contain their FiQA lexical block twice, because each of the two FiQA invocations wrote the lexical run (corrected after Codex's review; this said the screening file only). The copies are identical, and the analysis keys records by dataset, run, instruction, mode and query, so the second replaces the first.
 
 To regenerate everything from scratch instead, from the code branch:
 
