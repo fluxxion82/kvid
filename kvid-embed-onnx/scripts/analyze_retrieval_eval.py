@@ -17,7 +17,9 @@ DATASETS_DIR holds the datasets of prepare_retrieval_eval.py, whose qrels.tsv fi
      weighs datasets equally; 95% intervals come from resampling queries within each dataset (bootstrap);
    - PASS when the macro interval's lower bound is at least -margin, FAIL when its upper bound is below
      -margin, INCONCLUSIVE otherwise; a dataset whose point loss exceeds the margin is flagged;
-   - the per-set guardrail hybrid >= lexical is reported as a point comparison with its paired interval.
+   - the per-set guardrail hybrid >= lexical is reported as a point comparison with its paired interval;
+   - per-set intervals of each candidate against the baseline are reported beside the rule (Codex's review of
+     Phase A); they use their own random generator (seed + 1), so the macro results stay reproducible.
 3. Also reports scores by the token length of each query's longest relevant document, and for variants of
    one model the mean top-10 overlap with their reference (ranking change, a diagnostic).
 Writes a Markdown report (stdout, or --report) and the same numbers as JSON next to it. Needs only the
@@ -196,6 +198,19 @@ def main():
         results["candidates"].append(entry)
         lines.append(f"| {run} | {instruction} | {p:+.4f} ({lo:+.4f}, {hi:+.4f}) | {entry['verdict']} | "
                      f"{sp:+.4f} ({slo:+.4f}, {shi:+.4f}) | {rp:+.4f} ({rlo:+.4f}, {rhi:+.4f}) | {', '.join(flagged) or '-'} |")
+
+    lines += ["", "## Per-set delta against the baseline (reported beside the rule, not part of it)", "",
+              "| Run | Instruction | Mode | " + " | ".join(f"{d} delta (95% CI)" for d in datasets) + " |", "|---|---|---|" + "---|" * len(datasets)]
+    per_set_rng = random.Random(args.seed + 1)
+    for entry in results["candidates"]:
+        for mode in MODES:
+            cells = []
+            entry.setdefault("per_set_intervals", {})[mode] = {}
+            for d, deltas in sorted(pairs(entry["run"], entry["instruction"], mode, "ndcg10").items()):
+                p, lo, hi = interval({d: deltas}, args.bootstrap, per_set_rng)
+                entry["per_set_intervals"][mode][d] = {"delta": p, "low": lo, "high": hi}
+                cells.append(f"{p:+.4f} ({lo:+.4f}, {hi:+.4f})")
+            lines.append(f"| {entry['run']} | {entry['instruction']} | {mode} nDCG@10 | " + " | ".join(cells) + " |")
 
     lines += ["", "## Absolute scores", "", "| Dataset | Run | Instruction | Mode | nDCG@10 | Recall@10 | Recall@100 | ms/doc | Truncated |", "|---|---|---|---|---|---|---|---|---|"]
     latest = {}

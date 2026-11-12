@@ -2,13 +2,14 @@ package com.kvid.embed
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
+import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.math.exp
 import kotlin.math.ln
@@ -43,8 +44,11 @@ import kotlin.time.Duration.Companion.seconds
  * - `latency=on`: each note is embedded alone (a new or edited note), and the line adds p50 and p95 call
  *   latency, overall and by token length (up to 64, 128, 256 and above).
  *
- * Memory is also read after the embedder is closed and again after 5 s idle; the peak is the highest of
- * the 100 ms samples (`mem_peak=sampled-100ms`), a lower bound that can miss short peaks.
+ * Memory is also read after the embedder is closed and again after 5 s idle. It is sampled every 100 ms from
+ * before the model is opened until it is closed: `mem_peak_kb` is the peak while embedding, as before, and
+ * `mem_open_peak_kb` (opening and warm-up), `mem_embed_peak_kb`, `mem_close_peak_kb` and
+ * `mem_lifecycle_peak_kb` cover the phases ([PhaseSampler]). Sampled peaks are lower bounds that can miss
+ * short peaks.
  *
  * An unknown setting, a flag other than `on`/`off` or a count that is not positive fails the test, so a
  * misspelt option cannot produce a plausible default measurement. The line repeats the resolved settings
@@ -94,25 +98,22 @@ class OnnxEmbedderTuningTest {
         val warmup = settings["warmup"]?.toInt() ?: 8
         val latency = flag("latency", false)
         val memBefore = memoryKb()
-        val openStart = kotlin.time.TimeSource.Monotonic.markNow()
-        val embedder = openForTuning(fixture.modelPath, fixture.vocabPath, model, options, ep, providerThreads = threads ?: 4)
-        val openMs = openStart.elapsedNow().inWholeMicroseconds / 1000.0
-        val memAfterOpen = memoryKb()
+        val sampler = PhaseSampler(memBefore)
         val callMs = ArrayList<Double>()
-        val line = embedder.use {
-            if (warmup > 0) embedder.embed(notes.take(warmup))
-            val result = withContext(Dispatchers.Default) {
-                // The sampler is the only writer; the result is read after it has been joined.
-                val peak = AtomicLong(memAfterOpen ?: 0L)
-                val sampler = launch {
-                    while (isActive) {
-                        memoryKb()?.let { kb -> if (kb > peak.load()) peak.store(kb) }
-                        delay(100.milliseconds)
-                    }
-                }
-                var vectors: List<FloatArray> = emptyList()
-                val totalMs = try {
-                    if (latency) {
+        val line = coroutineScope {
+            // Sampling starts before the model is opened, so opening and warm-up are inside the measured lifecycle.
+            val sampling = launch { sampler.run() }
+            try {
+                sampler.phase = Phase.OPEN
+                val openStart = kotlin.time.TimeSource.Monotonic.markNow()
+                val embedder = openForTuning(fixture.modelPath, fixture.vocabPath, model, options, ep, providerThreads = threads ?: 4)
+                val openMs = openStart.elapsedNow().inWholeMicroseconds / 1000.0
+                val memAfterOpen = memoryKb()
+                embedder.use {
+                    if (warmup > 0) embedder.embed(notes.take(warmup))
+                    sampler.phase = Phase.EMBED
+                    var vectors: List<FloatArray> = emptyList()
+                    val totalMs = if (latency) {
                         val each = ArrayList<FloatArray>(notes.size)
                         for (note in notes) callMs += timedMs { each += embedder.embed(listOf(note)) }
                         vectors = each
@@ -120,59 +121,102 @@ class OnnxEmbedderTuningTest {
                     } else {
                         timedMs { vectors = embedder.embed(notes) }
                     }
-                } finally {
-                    sampler.cancelAndJoin()
+                    assertEquals(notes.size, vectors.size)
+                    val memAfter = memoryKb()
+                    sampler.phase = Phase.CLOSE
+                    val mem = if (memBefore == null) "mem=not-measured"
+                    else "mem_kind=$memoryKind mem_peak=sampled-100ms mem_before_kb=$memBefore mem_after_open_kb=$memAfterOpen " +
+                        "mem_peak_kb=${maxOf(sampler.peak(Phase.EMBED), memAfter ?: 0L)} mem_after_kb=$memAfter"
+                    val latencies = if (!latency) "" else " " + latencySummary(callMs, lengths)
+                    val resolved = "model=${model.name} variant=${variant ?: "fixture"} max_input_tokens=${model.maxInputTokens} " +
+                        "batch=${options.maxBatchSize} sort=${onOff(options.sortByLength)} arena=${onOff(options.cpuMemoryArena)} " +
+                        "pattern=${onOff(options.memoryPattern)} threads=${options.intraOpThreads ?: "default"} ep=$ep" +
+                        (if (ep == "xnnpack") " ep_threads=${threads ?: 4}" else "")
+                    "[kvid-embedding-tune] platform=$testPlatform config=$config $resolved " +
+                        "batch_invariant=${fixture.maxBatchSize.let { it == null || options.maxBatchSize <= it }} " +
+                        "model_digest=${embedder.spec.modelDigest} model_bytes=${SystemFileSystem.metadataOrNull(Path(fixture.modelPath))?.size} " +
+                        "open_ms=${fmt("%.1f", openMs)} notes=${notes.size} tokens=${lengths.sum()} " +
+                        "max_tokens=${lengths.max()} padded_tokens=$padded total_ms=${fmt("%.1f", totalMs)} " +
+                        "warmup=$warmup latency=${onOff(latency)} " +
+                        "per_note_ms=${fmt("%.1f", totalMs / notes.size)} tokens_per_s=${fmt("%.0f", lengths.sum() / (totalMs / 1000))}$latencies $mem"
                 }
-                Triple(vectors.size, totalMs, peak.load())
+            } finally {
+                sampling.cancelAndJoin()
             }
-            val (count, totalMs, peak) = result
-            assertEquals(notes.size, count)
-            val memAfter = memoryKb()
-            val mem = if (memBefore == null) "mem=not-measured"
-            else "mem_kind=$memoryKind mem_peak=sampled-100ms mem_before_kb=$memBefore mem_after_open_kb=$memAfterOpen " +
-                "mem_peak_kb=${maxOf(peak, memAfter ?: 0L)} mem_after_kb=$memAfter"
-            val latencies = if (!latency) "" else " " + latencySummary(callMs, lengths)
-            val resolved = "model=${model.name} variant=${variant ?: "fixture"} max_input_tokens=${model.maxInputTokens} " +
-                "batch=${options.maxBatchSize} sort=${onOff(options.sortByLength)} arena=${onOff(options.cpuMemoryArena)} " +
-                "pattern=${onOff(options.memoryPattern)} threads=${options.intraOpThreads ?: "default"} ep=$ep" +
-                (if (ep == "xnnpack") " ep_threads=${threads ?: 4}" else "")
-            "[kvid-embedding-tune] platform=$testPlatform config=$config $resolved " +
-                "batch_invariant=${fixture.maxBatchSize.let { it == null || options.maxBatchSize <= it }} " +
-                "model_digest=${embedder.spec.modelDigest} model_bytes=${SystemFileSystem.metadataOrNull(Path(fixture.modelPath))?.size} " +
-                "open_ms=${fmt("%.1f", openMs)} notes=${notes.size} tokens=${lengths.sum()} " +
-                "max_tokens=${lengths.max()} padded_tokens=$padded total_ms=${fmt("%.1f", totalMs)} " +
-                "warmup=$warmup latency=${onOff(latency)} " +
-                "per_note_ms=${fmt("%.1f", totalMs / notes.size)} tokens_per_s=${fmt("%.0f", lengths.sum() / (totalMs / 1000))}$latencies $mem"
         }
         // After close, and after the process has been idle for a while: what an app keeps once indexing ends.
         val memAfterClose = memoryKb()
         delay(5.seconds)
         val memIdle = memoryKb()
-        println(if (memBefore == null) line else "$line mem_after_close_kb=$memAfterClose mem_idle_5s_kb=$memIdle")
+        println(if (memBefore == null) line else "$line mem_after_close_kb=$memAfterClose mem_idle_5s_kb=$memIdle ${sampler.summary()}")
     }
 }
 
 private fun onOff(value: Boolean) = if (value) "on" else "off"
 
-/** p50 and p95 of single-note calls, overall and by token length (`p95_le128_ms` covers 65 to 128 tokens). */
-internal fun latencySummary(callMs: List<Double>, tokens: List<Int>): String {
-    fun percentile(values: List<Double>, p: Double): Double {
-        val sorted = values.sorted()
-        return sorted[minOf(sorted.size - 1, kotlin.math.ceil(p * sorted.size).toInt() - 1).coerceAtLeast(0)]
-    }
-    val parts = mutableListOf("p50_ms=${fmt("%.1f", percentile(callMs, 0.5))}", "p95_ms=${fmt("%.1f", percentile(callMs, 0.95))}")
+/** The [p] quantile of [values] by the nearest-rank method. */
+internal fun percentile(values: List<Double>, p: Double): Double {
+    val sorted = values.sorted()
+    return sorted[minOf(sorted.size - 1, kotlin.math.ceil(p * sorted.size).toInt() - 1).coerceAtLeast(0)]
+}
+
+/** `<prefix>p50_ms` and `<prefix>p95_ms` of [values]. */
+internal fun percentiles(values: List<Double>, prefix: String): String =
+    "${prefix}p50_ms=${fmt("%.1f", percentile(values, 0.5))} ${prefix}p95_ms=${fmt("%.1f", percentile(values, 0.95))}"
+
+/**
+ * p50 and p95 of single-note calls, overall and by token length (`p95_le128_ms` covers 65 to 128 tokens),
+ * each key starting with [prefix].
+ */
+internal fun latencySummary(callMs: List<Double>, tokens: List<Int>, prefix: String = ""): String {
+    val parts = mutableListOf(percentiles(callMs, prefix))
     var lower = 0
     for ((upper, name) in listOf(64 to "le64", 128 to "le128", 256 to "le256", Int.MAX_VALUE to "gt256")) {
         val bucket = callMs.indices.filter { tokens[it] in (lower + 1)..upper }.map { callMs[it] }
-        if (bucket.isNotEmpty()) parts += "n_$name=${bucket.size} p50_${name}_ms=${fmt("%.1f", percentile(bucket, 0.5))} p95_${name}_ms=${fmt("%.1f", percentile(bucket, 0.95))}"
+        if (bucket.isNotEmpty()) parts += "${prefix}n_$name=${bucket.size} " + percentiles(bucket, "${prefix}${name}_")
         lower = upper
     }
     return parts.joinToString(" ")
 }
 
+/** The phases [PhaseSampler] attributes memory samples to. */
+internal enum class Phase { OPEN, EMBED, INDEX, PAUSE, EDITS, QUERIES, CLOSE }
+
+/**
+ * Samples [read] ([memoryKb] by default) every 100 ms into the peak of the [phase] current at each sample,
+ * from when [run] starts (before the model is opened) until it is cancelled; [summary] prints a peak per
+ * phase that saw a sample, and the lifecycle peak. Does nothing where memory is not measured ([before] is
+ * null).
+ */
+internal class PhaseSampler(private val before: Long?, private val read: () -> Long? = ::memoryKb) {
+    private val current = AtomicInt(Phase.OPEN.ordinal)
+    private val peaks = Array(Phase.entries.size) { AtomicLong(0L) }
+
+    var phase: Phase
+        get() = Phase.entries[current.load()]
+        set(value) = current.store(value.ordinal)
+
+    suspend fun run() {
+        if (before == null) return
+        while (true) {
+            read()?.let { kb ->
+                val peak = peaks[current.load()]
+                if (kb > peak.load()) peak.store(kb)
+            }
+            delay(100.milliseconds)
+        }
+    }
+
+    fun peak(phase: Phase): Long = peaks[phase.ordinal].load()
+
+    fun summary(): String =
+        Phase.entries.filter { peak(it) > 0 }.joinToString(" ") { "mem_${it.name.lowercase()}_peak_kb=${peak(it)}" } +
+            " mem_lifecycle_peak_kb=${peaks.maxOf { it.load() }}"
+}
+
 private val FLAGS = setOf("sort", "arena", "pattern", "latency")
 private val COUNTS = setOf("notes", "batch", "maxTokens", "threads", "outer", "chunk")
-private val NON_NEGATIVE = setOf("warmup")
+private val NON_NEGATIVE = setOf("warmup", "edits", "queries", "pause")
 private val CHOICES = mapOf("corpus" to setOf("m3", "mixed"), "ep" to setOf("cpu", "xnnpack"))
 
 /** The settings OnnxEmbedderTuningTest accepts. */
@@ -206,14 +250,16 @@ internal fun parseSettings(config: String, variable: String, allowed: Set<String
  * unlike the Milestone 3 notes, which almost all reach the 512-token limit. Padding and length sorting
  * only matter when lengths differ, so this corpus shows their effect.
  */
-internal fun mixedLengthNotes(count: Int): List<String> {
-    val random = Random(20261024)
-    val words = ("the of and to in is that for it with as was on be at by this had not are but from or have an they which " +
-        "one you were her all she there would their we him been has when who will more no if out so said what up plan " +
-        "budget review note meeting search store document version token embedding model vector query garden recipe " +
-        "travel invoice project deadline weekend family doctor appointment library chapter summary idea draft").split(' ')
+internal fun mixedLengthNotes(count: Int, seed: Int = 20261024): List<String> {
+    val random = Random(seed)
     return List(count) {
         val n = exp(random.nextDouble(ln(5.0), ln(600.0))).toInt()
-        (1..n).joinToString(" ") { words[random.nextInt(words.size)] }
+        (1..n).joinToString(" ") { NOTE_WORDS[random.nextInt(NOTE_WORDS.size)] }
     }
 }
+
+/** The vocabulary of [mixedLengthNotes], also used for the store measurement's queries. */
+internal val NOTE_WORDS = ("the of and to in is that for it with as was on be at by this had not are but from or have an they which " +
+    "one you were her all she there would their we him been has when who will more no if out so said what up plan " +
+    "budget review note meeting search store document version token embedding model vector query garden recipe " +
+    "travel invoice project deadline weekend family doctor appointment library chapter summary idea draft").split(' ')
