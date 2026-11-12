@@ -1,0 +1,12 @@
+$ python3 -I kvid-embed-onnx/scripts/check_measure_lines.py docs/measurements/2026-11-12-answer5/smoke2-pixel4xl-index.txt   (script at 31f1e0c)
+OK   docs/measurements/2026-11-12-answer5/smoke2-pixel4xl-index.txt index
+exit=0
+$ python3 -I kvid-embed-onnx/scripts/check_measure_lines.py docs/measurements/2026-11-12-answer5/smoke2-pixel4xl-tune.txt   (script at 31f1e0c)
+OK   docs/measurements/2026-11-12-answer5/smoke2-pixel4xl-tune.txt tune
+exit=0
+
+The same script on the first smoke files (APK at 6e41d47), for comparison:
+FAIL docs/measurements/2026-11-12-answer5/smoke-pixel4xl-index.txt index: open_epoch_ms missing or implausible: None; phase_start_s lists ['index', 'pause', 'edits', 'queries', 'close', 'end'], expected ['open', 'index', 'pause', 'queries', 'edits', 'close', 'end']; phase_start_s does not start at open:0.0: index:1.0,pause:53.7,edits:58.7,queries:62.4,close:64.8,end:64.9; mem_peak is sampled-100ms-from-before-open, expected sampled-100ms+readings-from-before-open; mem_close_peak_kb missing; mem_samples= mem_boundary_samples=; query_store_notes=None differs from notes=300; query_order=None; samples query_embed_ms: missing; samples query_lexical_ms: missing; samples query_similar_ms: missing; samples query_hybrid_ms: missing; samples edit_total_ms: missing; samples edit_save_ms: missing; samples edit_write_ms: missing; samples edit_tokens: missing; samples edit_kind: missing
+exit=1
+FAIL docs/measurements/2026-11-12-answer5/smoke-pixel4xl-tune.txt tune: open_epoch_ms missing or implausible: None; phase_start_s missing; mem_peak is sampled-100ms, expected sampled-100ms+readings-from-before-open; mem_idle_peak_kb missing; mem_peak_kb=427532 exceeds mem_lifecycle_peak_kb=427516; mem_after_kb=427532 exceeds mem_lifecycle_peak_kb=427516; mem_peak_kb=427532 differs from mem_embed_peak_kb=421099; mem_samples= mem_boundary_samples=
+exit=1

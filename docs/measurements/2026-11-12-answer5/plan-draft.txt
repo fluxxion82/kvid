@@ -1,16 +1,35 @@
-DRAFT 2026-11-12T02:08:01Z: run plan for the answer-5 runs, written before any timed run. Not in force until the three
-open fields below are filled in, the file is committed as plan.txt, and the owner gives the go-ahead.
+DRAFT, revised 2026-11-12T20:40Z for commit 31f1e0c and the cloud session's comments (docs/plans/mobile-indexing.md,
+"Reporting fixes after the smoke check and Codex's review"). Written before any timed run. Not in force until the
+open fields below are filled in, the file is committed as plan.txt, and the owner gives the go-ahead. plan.txt is
+not changed after its commit.
 
 open fields
-  commit and APK: the commit the cloud session names after Codex's findings 1, 2 and 8 and the smoke faults are
-    dealt with; the APK's sha256 is recorded here. The smoke check is repeated on that APK first.
   cooling value, Pixel 8: from the baseline procedure below, at the start of the first session.
+  Codex's review of 31f1e0c: any change it leads to in this plan is made before plan.txt is committed.
   owner's go-ahead: date and words.
+
+code and APK
+  phase-5-mobile-indexing at 31f1e0c (CI run 43272663200 green), clean tree.
+  kvid-embed-onnx-androidTest.apk built with -Pkvid.deviceTestAbi=arm64-v8a,
+  sha256 e6963588ac128ca883739cdcd32b150986d6a474d782255a16e16d3b3b6748d5.
+  Smoke check on this APK: passed on the Pixel 4 XL, 2026-11-12 (smoke2-*.txt). If the code changes again, the APK
+  is rebuilt, the smoke check repeated, and this section rewritten before plan.txt is committed.
 
 every run
   KVID_INDEX_MEASURE=corpus=mixed+notes=5000+<configuration>+edits=200+queries=200+pause=300
-  fresh instrumentation process, same APK, model files as in Phase B. Screen on, launcher in front, phone at its
+  queries=200 is kept: a multiple of 4, so each of the four query call orders is used 50 times.
+  Phase order in the test: open, index, pause, queries, edits, close.
+  Fresh instrumentation process, same APK, model files as in Phase B. Screen on, launcher in front, phone at its
   charge limit and not charging (state recorded in each gate line; a run does not start while it charges).
+
+captured per run
+  adb logcat -d -s System.out | grep -E "\[kvid-(index-measure|index-samples|embedding-tune)\]"
+  kept whole in one raw file per run: the result line and all its [kvid-index-samples] lines.
+
+checker, after every run and before the next one starts
+  python3 -I kvid-embed-onnx/scripts/check_measure_lines.py <the run's raw file>     (script at 31f1e0c)
+  It must print OK. A failure is a harness fault, not an exclusion: the queue stops, nothing further is run, and
+  the raw file and the checker's output go to the cloud session.
 
 configurations
   A  model=bge-fp32                 (baseline, 512 tokens)
@@ -37,17 +56,27 @@ exclusions (decided by these rules only, never by a result)
   the phone leaving during the run (no line);
   a line whose settings differ from the queue's.
   Excluded runs keep their raw lines and are listed with the reason.
+  A checker failure is not on this list: see "checker".
 
 thermal logging
-  Battery and skin temperature and thermal status before, every 15 s during, and after each run, with host UTC
-  times. Aligned to phase_start_s by the logcat time of the result line (or by a wall-clock field if the fixed
-  commit prints one). Reported: thermal status and skin temperature at the start of the index, edits and
-  queries phases, and the number of samples at status 1 or above per phase.
+  Battery and skin temperature and thermal status before, every 15 s during, and after each run. Every reading is
+  stamped with the phone's clock (epoch ms, `date +%s%3N` in the same adb shell call as the reading) and with host
+  UTC. At each gate the phone-to-host offset is also recorded (phone epoch ms between two host readings).
+  Alignment: a phase starts at open_epoch_ms + 1000 * its phase_start_s value, on the phone's clock. The reading
+  reported for a phase start is the last one at or before that time, with its age in seconds.
+  Reported per run: thermal status and skin temperature at the start of the index, queries and edits phases, and
+  the number of readings at status 1 or above in each phase.
 
 reported per configuration (fixed now)
-  edit_total p50 and p95, per run and pooled over runs, overall and by token length, against 200 ms;
-  query_embed and query_hybrid p95 at the store size the line reports;
-  mem_lifecycle_peak_kb in KiB and decimal MB against 488,281 KiB, stated as a sampled test-process peak;
+  edit_total p50 and p95 against 200 ms, overall and by token length:
+    per run, from the result line;
+    pooled: the nearest-rank p95 over all counted calls of the configuration's valid runs (600 calls for three
+    runs), computed from the edit_total_ms samples, shown beside each run's p95;
+    by kind (put, update) from edit_kind, per run and pooled the same way.
+  query_embed and query_hybrid p95, per run and pooled the same way, at query_store_notes notes. Described as
+    warm calls on a synthetic vocabulary in rotated order, not as representative search latency.
+  mem_lifecycle_peak_kb in KiB and decimal MB against 488,281 KiB, stated as a sampled test-process peak, with
+    mem_samples and mem_boundary_samples per run.
   index_total_ms per run, against 300 s; every run listed, with range.
   Three or four runs per configuration give no useful interval; differences between A and B under 10% are
   called inconclusive. The targets are judged per run and all runs are shown.
@@ -55,7 +84,7 @@ reported per configuration (fixed now)
 optional parts
   step 4 (owner's choice; quality INCONCLUSIVE, labelled so in every table): C model=bge-fp32+maxTokens=128,
     D model=minilm-fp32+maxTokens=256, E model=minilm-fp32+maxTokens=128; blocks of three runs in the orders
-    CDE, DEC, ECD; same rule, same exclusions.
+    CDE, DEC, ECD; same rule, same exclusions, same captures and checker.
   step 5: step 3 on the Pixel 4 XL with the same baseline procedure on that phone (sensor sdm-therm-monitor);
     reported separately, never pooled.
 
