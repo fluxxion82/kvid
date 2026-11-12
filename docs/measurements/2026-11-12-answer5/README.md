@@ -26,7 +26,7 @@ For "Measurements added for the targets in answer 5" in [docs/plans/mobile-index
 | Tuning line: `mem_open_peak_kb`, `mem_embed_peak_kb`, `mem_close_peak_kb` | Present (222,459; 421,099; 427,516) |
 | Tuning line: lifecycle peak against `mem_peak_kb` | **`mem_lifecycle_peak_kb` (427,516) is below `mem_peak_kb` (427,532).** `mem_peak_kb` includes the explicit reading after embedding; the lifecycle peak is the largest sampled value only. This is Codex's second finding, seen on a device |
 
-Two more observations from the lines, for the cloud session:
+Further observations from the lines, for the cloud session:
 
 - On the tuning line the largest sample is attributed to the close phase (427,516 KiB) although the embedding phase's own peak is 421,099 KiB and the reading taken after embedding is 427,532 KiB. Memory is at its highest when embedding ends, so a sample taken around the phase change lands in "close". Codex's first finding describes how.
 - The tuning line still says `mem_peak=sampled-100ms`; the index line says `sampled-100ms-from-before-open`.
