@@ -525,3 +525,108 @@ Codex (`gpt-6.1-sol`, high effort, read-only) reviewed "Phase B results" and `do
 - **[P3] Numbers and stale lines:** the Pixel 4 XL sweep gain is 9% to 11%; peak change with two threads is −1.5% to +3.2%; XNNPACK is six crashes in six attempts; 497,164 KiB is 486 MiB; the second rule was written at 23:45 and in force from 23:55; `m3` is long notes, not every note at the limit; `m3` end temperatures are 37.9 to 38.9 °C; latency buckets are exclusive ranges; stale "not yet run" lines removed. Ratios in the tables use the printed per-note figures, so a few differ in the last digit from ratios of `total_ms`.
 
 **Still open after the review:** everything under "Not done against the protocol", and the owner's decisions above.
+
+## Quality of the retained candidates (November 12, cloud session)
+
+This is the frozen rule's full-FiQA step for the two candidates that stopped at screening (Codex's first P2 on Phase A), followed by the decision analysis for all three retained candidates.
+- **Comparison:** each candidate against `bge-fp32@512` on SciFact, NFCorpus and full FiQA, with raw queries.
+- **The rule is unchanged.** Per-set intervals against the baseline are now reported beside it (Codex's third P2).
+- **Phase A's per-query records are now archived** (its second P2), and this analysis reproduces from them.
+- Records, report and how to reproduce: [docs/measurements/2026-11-12-retained-quality](../measurements/2026-11-12-retained-quality/README.md).
+
+| Candidate | Hybrid nDCG@10 delta (95% CI) | Verdict | Semantic nDCG@10 delta (95% CI) | Hybrid recall@100 delta (95% CI) | JVM time per document, full FiQA |
+|---|---|---|---|---|---|
+| `bge-fp32@128` | −0.0141 (−0.0214, −0.0067) | INCONCLUSIVE | −0.035 (−0.045, −0.025) | −0.006 (−0.012, −0.000) | 0.53 |
+| `minilm-fp32@128` | −0.0157 (−0.0247, −0.0066) | INCONCLUSIVE | −0.046 (−0.059, −0.032) | +0.002 (−0.008, +0.011) | 0.28 |
+| `minilm-fp32@256` | −0.0122 (−0.0204, −0.0040) | INCONCLUSIVE | −0.037 (−0.050, −0.025) | +0.008 (−0.002, +0.017) | 0.41 |
+
+Per-set hybrid nDCG@10 deltas against the baseline (95% CI). These are reported beside the rule; a point loss over 0.02 is flagged (**bold**).
+
+| Candidate | SciFact | NFCorpus | full FiQA |
+|---|---|---|---|
+| `bge-fp32@128` | −0.008 (−0.026, +0.009) | −0.010 (−0.017, −0.002) | **−0.024 (−0.035, −0.014)** |
+| `minilm-fp32@128` | **−0.035 (−0.057, −0.015)** | −0.013 (−0.023, −0.003) | +0.001 (−0.013, +0.015) |
+| `minilm-fp32@256` | **−0.029 (−0.048, −0.011)** | −0.010 (−0.021, +0.000) | +0.003 (−0.009, +0.015) |
+
+### Reading
+
+- **No candidate passes and none fails.**
+  - Each macro interval straddles −0.02: lower bounds −0.0214, −0.0247 and −0.0204; upper bounds −0.007 to −0.004.
+  - INCONCLUSIVE is not a pass, and there is no speed waiver. So none of the three can replace the default on this evidence, whatever their device times.
+  - `minilm-fp32@256`'s figures are Phase A's, recomputed: its interval moves in the fourth decimal because the bootstrap stream now serves two earlier candidates (README).
+- **The two 128-token candidates lose in different places.**
+  - **`bge-fp32@128` loses where documents are long.** The loss is on full FiQA, where 46.8% of documents exceed 128 tokens.
+    - Queries whose longest relevant document has 257 to 512 tokens fall from 0.372 to 0.328 (253 queries). Those over 512 fall from 0.382 to 0.324 (108 queries).
+    - Queries with relevant documents of up to 256 tokens are unchanged (0.305 and 0.315 against 0.312 and 0.319).
+    - This is the cost of truncation.
+  - **MiniLM loses on SciFact at both limits.** The loss is −0.035 at 128 tokens and −0.029 at 256. On full FiQA it is level with the baseline at both limits, so it is a property of the model on scientific claims rather than of the limit.
+  - SciFact is the proxy least like notes. Neither pattern says how either candidate does on notes.
+- **The guardrails show a real loss in dense retrieval.**
+  - **Semantic nDCG@10.** All three lose more than the margin on semantic nDCG@10, with upper bounds below −0.02 (−0.025, −0.032, −0.025). Hybrid search hides most of it because BM25 carries part of the ranking.
+  - **Recall@100** stays within ±0.01.
+  - **Hybrid against lexical.** Hybrid beats lexical in every set, except `minilm-fp32@128` on SciFact: +0.019 (−0.007, +0.046), an interval that includes zero and so is no evidence of improvement. Phase A found the same for `minilm-int8`.
+- **What would settle them.** These proxies cannot. Their documents are longer than notes, and the 128-token question depends on where in a note the answer sits. The next evidence is the notes-style evaluation set below. Until it exists, the 512-token `bge-fp32` default stays.
+
+## Proposal: a notes-style evaluation set (November 11, cloud session)
+
+The proposal is [notes-evaluation.md](notes-evaluation.md), for the owner and for review by Codex before anything is built. Nothing is built yet.
+- **Real note lengths first.** A local survey script prints aggregate token statistics of a person's notes and nothing else. The owner runs it on their notes first.
+- **A public synthetic set (Part S).**
+  - At least six collections of 500 to 800 notes, written to a frozen specification.
+  - 800 test queries and 200 development queries, written from memory cues rather than from the note text.
+  - 100 queries with no answer.
+  - Evidence spans are stratified so that at least 25% of answers start after token 128, 15% after 256 and 5% after 512. Results are reweighted to the real lengths.
+- **A small private real set (Part R).** At least 150 queries per contributor, evaluated on the contributor's machine; only aggregates are committed.
+- **Judging.** Pooled, blinded and graded by two human judges.
+- **Decision rule.** The frozen rule unchanged, plus per-stratum and exact-match guardrails.
+- **Sizing from Phase A's per-query spread.** 200 queries give ±0.01 for `bge@256`; the 128-token and MiniLM candidates need 600 to 900.
+- **Owner decisions it needs:** Part R and whose notes; who judges; whether LLM authors may write Part S's notes; and the target sizes.
+
+## Measurements added for the targets in answer 5 (November 12, cloud session)
+
+`phase-5-mobile-indexing` at `6e41d47` adds the measurements that "Not done against the protocol" lists under targets.
+- No default changed, and nothing was run on a device.
+- The local check's python, fixtures and jvm parts passed before the push.
+- The JVM smoke runs only check that the tests work; their times say nothing about phones.
+
+- **Persisted edits.** `IndexingMeasurementTest` takes `edits=<n>`. After the store is indexed, each edit is one of two kinds, alternately:
+  - a new note (`put`);
+  - new text for an existing note (`update`, which also removes the old version's vector).
+
+  Each is followed by `indexVectors` for that one note. The line reports p50 and p95, overall and by token length, of:
+  - the write (`edit_write_`);
+  - tokenizing, embedding and saving the vector (`edit_save_`);
+  - both together (`edit_total_`), which is the edit-latency target.
+
+  The edit texts are `mixed`-length notes from a separate seed. 5 warm-up edits are not counted.
+- **Query and search at 5,000 notes.** `queries=<n>` runs n queries of 2 to 6 words from the notes' vocabulary against the same store. It uses 20 results, the default, and lexical matching on any word, as in the quality study. It reports p50 and p95 of:
+  - the query embedding alone (`query_embed_`);
+  - lexical `find` (`query_lexical_`);
+  - `findSimilar` (`query_similar_`), which is the embedding plus an exact scan of the stored vectors;
+  - `findHybrid` (`query_hybrid_`).
+
+  5 warm-up queries are not counted.
+- **Cooling between phases.** `pause=<s>` waits after indexing, so edits and queries need not run on a phone throttled by the 5,000-note run. `phase_start_s` gives each phase's start in seconds from just before the open, for lining up with the driver's thermal readings. Without a pause, the edits and queries describe a hot phone.
+- **Memory from before the model opens.** Both measurement tests now sample from before `open` until after `close`:
+  - `mem_peak_kb` keeps its earlier meaning, the embedding or indexing phase, so it stays comparable with Phase B;
+  - new peaks per phase: `mem_open_peak_kb`, `mem_index_peak_kb`, `mem_pause_peak_kb`, `mem_edits_peak_kb`, `mem_queries_peak_kb` and `mem_close_peak_kb`, plus `mem_embed_peak_kb` in the tuning test;
+  - `mem_lifecycle_peak_kb`.
+
+  They are still 100 ms samples in the test process: a lower bound, not whole-app memory.
+
+Commands, added to the November 8 block:
+
+```sh
+# 5. Edits, queries and lifecycle memory at 5,000 notes: the baseline first, then the configurations the owner
+#    keeps (maxTokens=256 or 128 selects the input limit; model=minilm-fp32 for MiniLM).
+run $ARGS.class=com.kvid.embed.IndexingMeasurementTest $ARGS.KVID_MODEL_VARIANTS_DIR=$V \
+  $ARGS.KVID_INDEX_MEASURE=corpus=mixed+notes=5000+model=bge-fp32+edits=200+queries=200+pause=300
+adb logcat -d -s System.out | grep -F "[kvid-index-measure]"
+```
+
+**What these still do not measure:**
+- whole-app memory in a representative app process;
+- screen-off and background runs;
+- energy.
+
+Those need the sample app, or a dedicated app, rather than an instrumentation test.

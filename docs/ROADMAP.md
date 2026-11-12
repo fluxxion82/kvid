@@ -426,6 +426,19 @@ At this size exact search is well within interactive latency on every target, so
 - **Retained candidates on the Pixel 4 XL (November 11, after the review):** `minilm-fp32@128` indexes 5,000 notes in 3.3 minutes, the first configuration under 5 minutes on either phone; `minilm-fp32@256` takes 5.2 and `bge-fp32@128` 6.2, none throttled, all at about half the memory limit or less. Their quality is unsettled (uncertain or INCONCLUSIVE in Phase A) and they are not timed on the Pixel 8.
 - **Codex reviewed Phase B (November 11):** two P1 findings (the edit-latency target is not validated by an embedding-only test; memory verdicts needed decimal MB and narrower claims) and nine P2, all checked against the raw files and corrected ([review](plans/mobile-indexing.md#codexs-review-of-phase-b-november-11)).
 
+**Mobile indexing study, retained candidates (November 12).** Full FiQA for the two 128-token candidates, then the frozen rule on all three retained candidates ([results](plans/mobile-indexing.md#quality-of-the-retained-candidates-november-12-cloud-session), [records](measurements/2026-11-12-retained-quality/README.md)).
+- **All three are INCONCLUSIVE** on hybrid nDCG@10 against `bge-fp32@512`, so none replaces the default on this evidence:
+  - `bge-fp32@128`: −0.014 (−0.021, −0.007);
+  - `minilm-fp32@128`: −0.016 (−0.025, −0.007);
+  - `minilm-fp32@256`: −0.012 (−0.020, −0.004).
+- **Semantic search alone** loses more than the margin for all three.
+- **Codex's P2s on Phase A are addressed:** the per-query records are archived, and per-set intervals against the baseline are reported.
+- **Next evidence:** a notes-style evaluation set ([proposal](plans/notes-evaluation.md)). It waits on the owner's decisions and Codex's review.
+- **New device measurements are ready** at `phase-5-mobile-indexing` `6e41d47`, for the local agent (commands in the plan):
+  - persisted-edit latency, including saving the vector;
+  - query and search p95 at 5,000 notes;
+  - memory sampled from before the model opens.
+
 Next steps (ADR 0002 accepted; the tokenizer and the JVM/Android embedder are done and reviewed, October 25). Merging `phase-5-onnx-embedder` waits for the local agent's sign-off on `0d85781` (owner, October 25). Then two tracks run in parallel. The [mobile indexing study](plans/mobile-indexing.md) is reviewed by Codex first, then the cloud session measures quality and JVM speed and the local agent measures devices. [iOS through cinterop](plans/ios-embedder.md) is planned and implemented by the local agent; then iOS through cinterop; then an evaluation corpus to measure semantic and hybrid retrieval and tune fusion; then semantic search in the sample.
 
 **Exit criterion:** semantic retrieval improves a representative evaluation corpus and has explicit model compatibility and resource costs.

@@ -9,8 +9,13 @@ Preregistered in [docs/plans/mobile-indexing.md](../../plans/mobile-indexing.md)
 | `screening-report.md`, `.json` | `analyze_retrieval_eval.py` on the screening records |
 | `fiqa-full-summary.jsonl` | The frontier on full FiQA (57,638 documents), raw queries |
 | `final-report.md`, `.json` | The decision analysis: SciFact, NFCorpus and full FiQA, frontier runs, raw queries |
+| `records/screening-queries.jsonl.gz` | The original per-query records of the screening runs (48 MB uncompressed): per query, each metric and the top 100 |
+| `records/fiqa-full-queries.jsonl.gz` | The same for the full-FiQA runs (10 MB uncompressed) |
+| `records/SHA256SUMS`, `records/SHA256SUMS-uncompressed` | Their digests, compressed and after `gunzip` |
 
-The per-query records (`queries.jsonl`, 50 MB) are not committed. To regenerate them, from the code branch:
+**The per-query records were archived on November 12** at Codex's request in its review of Phase A. They are the files the reports above were computed from, not a rerun. With them, the paired intervals, overlaps, length buckets and the `trec_eval` cross-check can be audited without running a model; [2026-11-12-retained-quality](../2026-11-12-retained-quality/README.md) shows how. The screening file contains the FiQA-subset lexical block twice, from a repeated invocation. The two copies are identical, and the analysis keys records by dataset, run, instruction, mode and query, so the second replaces the first.
+
+To regenerate everything from scratch instead, from the code branch:
 
 ```sh
 pip install -r kvid-embed-onnx/scripts/requirements-study.txt
