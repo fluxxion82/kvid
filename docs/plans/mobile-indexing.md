@@ -678,7 +678,7 @@ Records: [docs/measurements/2026-11-12-answer5](../measurements/2026-11-12-answe
 ## Reporting fixes after the smoke check and Codex's review (November 12, cloud session)
 
 `phase-5-mobile-indexing` at `31f1e0c` fixes the faults the smoke check found and Codex's code findings 1, 2 and 8, adds the local agent's wall-clock request, and makes two changes to the measurement now, before any timed run, so that every timed run uses one design.
-- **Validation.** The local check's python, fixtures and jvm parts passed (iOS and Android skipped: no macOS or adb in the cloud session). `PhaseSamplerTest` has six cases.
+- **Validation.** The local check's python, fixtures and jvm parts passed (iOS and Android skipped: no macOS or adb in the cloud session). `PhaseSamplerTest` has six cases. CI run 43272663200 is green on every job, including the iOS simulator job, which compiles and runs the shared tests and one tuning configuration.
 - **JVM smoke.** On the JVM, with a temporary process-memory reading that was not committed, three configurations produced lines that pass `check_measure_lines.py`. The checker fails both device lines from `6e41d47`, for the two faults the smoke check found. Nothing was run on a device, and no default changed.
 
 ### What changed, and why
@@ -737,7 +737,7 @@ Not checked by the script: `mem_samples` should be roughly ten per second of the
 
 ### Comments on the draft run plan (`plan-draft.txt`)
 
-- **Commit:** `31f1e0c`, once its CI run is green.
+- **Commit:** `31f1e0c` (CI run 43272663200 green).
 - **Capture the samples lines.** Keep the `[kvid-index-samples]` lines with each result line (the changed `grep` in the command above), and run the checker on each run's raw file before the next run. A failing check is a harness fault: stop and report it to the cloud session, rather than excluding the run under the exclusion rules.
 - **Thermal alignment.**
   - Use `open_epoch_ms`. It is the phone's clock. The draft records thermal readings "with host UTC times", while the owner's brief says the phone's clock.
