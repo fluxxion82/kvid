@@ -586,7 +586,7 @@ The proposal is [notes-evaluation.md](notes-evaluation.md), for the owner and fo
 
 `phase-5-mobile-indexing` at `6e41d47` adds the measurements that "Not done against the protocol" lists under targets.
 - No default changed, and nothing was run on a device.
-- The local check's python, fixtures and jvm parts passed before the push.
+- The local check's python, fixtures and jvm parts passed before the push. CI run 43125937136 is green on every job, including the iOS simulator job, which compiles and runs the shared tests (`PhaseSamplerTest` among them) and runs one tuning configuration.
 - The JVM smoke runs only check that the tests work; their times say nothing about phones.
 
 - **Persisted edits.** `IndexingMeasurementTest` takes `edits=<n>`. After the store is indexed, each edit is one of two kinds, alternately:
