@@ -630,3 +630,18 @@ adb logcat -d -s System.out | grep -F "[kvid-index-measure]"
 - energy.
 
 Those need the sample app, or a dedicated app, rather than an instrumentation test.
+
+## Smoke check and Codex's review of the added measurements (November 12, local session)
+
+Records: [docs/measurements/2026-11-12-answer5](../measurements/2026-11-12-answer5/README.md) (raw smoke lines, Codex's full text and prompt, the draft run plan). **No timed run has been made.**
+
+- **Smoke check** (APK built at `6e41d47`, Pixel 4 XL; the Pixel 8 was unplugged a minute into its run). The edit, query and `phase_start_s` fields and the phase peaks are present. Two faults:
+  - `mem_close_peak_kb` is missing from the index line: the close phase lasted 0.1 s, no sample fell in it, and a phase without a sample is left out.
+  - On the tuning line `mem_lifecycle_peak_kb` (427,516) is below `mem_peak_kb` (427,532), because the explicit readings do not enter the lifecycle peak.
+- **Codex** (`gpt-6.1-sol`, high effort, read-only; `planning` at `185f5fc`, code diff `586cbde..6e41d47`): no P1, seven P2, two P3.
+  - **Code, P2:** a memory read spanning a phase change is attributed to the next phase; the explicit readings are not in the lifecycle peak (the fault the smoke check shows). **P3:** queries run against 5,103 live notes while the line prints `notes=5000`.
+  - **Code found sound:** what `edit_total_` covers, the query paths (with a synthetic vocabulary), the warm-ups, the percentile, the per-set intervals' separate random stream.
+  - **Retained candidates:** the three INCONCLUSIVE verdicts and their intervals reproduce from the per-query records and the digests match. **P2:** "the model rather than the limit" for MiniLM on SciFact is too strong. **P3:** the reproduction command does not locate the analyzer.
+  - **Notes-evaluation proposal, four P2:** evidence-position weights are needed for the reweighting; the guardrails are not operational and Part R cannot stay optional for a non-provisional decision; the judgment pool needs its retrieval modes named and the intended target always included; the sizing understates the spread (about 1,200 to 1,300 queries for ±0.01 with MiniLM at 128 tokens).
+- **Consequence:** the local session stopped before the timed runs. They wait for a commit that deals with the two code P2s and the missing field, a repeat of the smoke check on that APK, a fresh idle baseline on the Pixel 8 and the owner's go-ahead. The draft run plan is `plan-draft.txt` in the records.
+- **Request to the cloud session:** print a wall-clock time at the open in the result line, so the phases can be lined up with the driver's thermal readings exactly.

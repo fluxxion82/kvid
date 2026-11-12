@@ -1,0 +1,41 @@
+Prompt given to Codex (gpt-6.1-sol, high effort, read-only sandbox), 2026-11-12. The first paragraph was added by the local session; the rest is the owner's prompt.
+
+Repository layout for this review: your working directory is a git worktree of the repository on branch `planning` (at 185f5fc), so every docs/ path below is in the working tree. The code branch is the local ref `phase-5-mobile-indexing` (at 6e41d47); read it with `git diff 586cbde..6e41d47` and `git show phase-5-mobile-indexing:<path>`. Do not modify files. Do your assigned scope yourself; don't delegate further.
+
+Review read-only, high effort. Report findings as P1/P2/P3 with file and line, and say what you
+recomputed.
+
+A. Measurement code, before device runs (this gates the local agent's long sessions).
+   On branch phase-5-mobile-indexing, the diff 586cbde..6e41d47:
+   - IndexingMeasurementTest.kt, OnnxEmbedderTuningTest.kt and PhaseSamplerTest.kt, in
+     kvid-embed-onnx/src/commonTest/kotlin/com/kvid/embed/;
+   - kvid-embed-onnx/scripts/analyze_retrieval_eval.py.
+   Check them against answer 5 in docs/plans/mobile-indexing.md on `planning`:
+   - Does edit_total_ measure "warm batch-1 p95 for a new/edited typical note, including
+     tokenization and vector persistence"?
+   - Are the query measurements (random 2-6-word queries from the notes' vocabulary, 20 results,
+     lexical any-word) a fair stand-in for "query encoding and total search p95 at 5,000 notes"?
+   - Is phase attribution of the memory samples correct, and is anything in the lifecycle missed?
+   - Do pause=, the warm-ups and the nearest-rank percentile at n=200 bias the result?
+   - Do the per-set intervals leave the macro rule unchanged?
+   Also review the command and caveats in "Measurements added for the targets in answer 5".
+
+B. Quality of the retained candidates (planning 2628b1d).
+   - Read docs/measurements/2026-11-12-retained-quality/ (README, report, combine_retained.py),
+     Phase A's newly archived records in docs/measurements/2026-11-09-phase-a/records/, and
+     "Quality of the retained candidates" in the plan.
+   - Recompute the verdicts and intervals from the archived per-query records, and check the
+     digests and the reproduction steps.
+   - Challenge the reading, in particular: that bge@128's loss is truncation on long FiQA documents,
+     and that MiniLM's SciFact loss is "the model rather than the limit".
+   - Check that every claim follows from the frozen rule (planning 13262ad) without a new rule.
+
+C. The notes-evaluation proposal, before anything is built: docs/plans/notes-evaluation.md on
+   `planning`.
+   - Can it decide the 128/256-token question and the MiniLM question?
+   - Bias from authorship, cue-based queries and pooling.
+   - The stratified-then-reweighted design.
+   - The sizing from Phase A's per-query spread.
+   - Privacy of Part R.
+   - Whether the decision rule is the frozen rule plus guardrails, and nothing looser.
+   - What you would cut to make it cheaper without losing the decision.
