@@ -111,7 +111,7 @@ class OnnxEmbedderTuningTest {
         val clock = TimeSource.Monotonic.markNow()
         val openEpochMs = Clock.System.now().toEpochMilliseconds()
         fun now() = clock.elapsedNow().inWholeMicroseconds / 1_000_000.0
-        val marks = linkedMapOf("open" to now())
+        val marks = linkedMapOf("open" to 0.0)  // the origin of the clock above, exactly
         // Reading before the open: OPEN runs from here until open and warm-up are done.
         val memBefore = sampler.reading()
         var memAfterOpen: Long? = null

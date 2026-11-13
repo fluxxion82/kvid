@@ -124,7 +124,7 @@ class IndexingMeasurementTest {
                 val clock = TimeSource.Monotonic.markNow()
                 val openEpochMs = Clock.System.now().toEpochMilliseconds()
                 fun now() = clock.elapsedNow().inWholeMicroseconds / 1_000_000.0
-                val marks = linkedMapOf("open" to now())
+                val marks = linkedMapOf("open" to 0.0)  // the origin of the clock above, exactly
                 // Reading before the open: OPEN runs from here until the model is open.
                 val memBefore = sampler.reading()
                 val calls = ArrayList<Pair<Int, Double>>()  // documents embedded and milliseconds, per indexVectors call

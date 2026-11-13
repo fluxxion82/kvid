@@ -5,7 +5,8 @@
 #
 # Parts, in order (each runs in its own `bash -euo pipefail` process; its output goes to
 # build/check-local/PART.log and to the console):
-#   python          virtual environment build/check-local/venv with kvid-embed-onnx/scripts/requirements.txt
+#   python          virtual environment build/check-local/venv with kvid-embed-onnx/scripts/requirements.txt,
+#                   then the scripts' own unit tests (kvid-embed-onnx/scripts/test_*.py)
 #   fixtures        model download and digest check (kvid-embed-onnx/scripts/download_model.py) into
 #                   ${KVID_MODEL_CACHE:-$HOME/.cache/kvid/models}, then the tokenizer fixture and the
 #                   embedding fixture, written to build/check-local/{tokenizer,embedding}-fixture
@@ -125,6 +126,7 @@ part_python() {
   "$PY" --version
   "$PY" -m pip install --quiet --disable-pip-version-check -r "$SCRIPTS/requirements.txt"
   "$PY" -I -c 'import numpy, onnxruntime, tokenizers; print("numpy", numpy.__version__, "onnxruntime", onnxruntime.__version__, "tokenizers", tokenizers.__version__)'
+  "$PY" -I -W error::ResourceWarning -m unittest discover -s "$SCRIPTS" -p 'test_*.py'
 }
 
 part_fixtures() {
