@@ -577,7 +577,7 @@ The proposal is [notes-evaluation.md](notes-evaluation.md), for the owner and fo
 - **A public synthetic set (Part S).**
   - At least six collections of 500 to 800 notes, written to a frozen specification.
   - 800 test queries and 200 development queries, written from memory cues rather than from the note text, with an audit of how much each query's words overlap its target note.
-  - Each query belongs to one fixed stratum, set by where its target's evidence *ends* (within 128, 129 to 256, 257 to 512, or beyond 512 tokens). At least 25% end beyond token 128, 15% beyond 256 and 5% beyond 512.
+  - Each query belongs to one fixed stratum, set by the smallest input limit at which its target's whole evidence survives encoding, special tokens counted (within 128, 129 to 256, 257 to 512, or beyond 512). Each stratum needs minimum support: 10%, 10%, 10% and 5% of the test queries. A stratum the decision weights but that lacks support is a hold. _Changed after Codex's second review._
   - The no-answer queries are deferred.
 - **A small private real set (Part R), now required for a default change.**
   - At least 150 naturally elicited queries per contributor, each with its evidence span marked.
@@ -585,7 +585,7 @@ The proposal is [notes-evaluation.md](notes-evaluation.md), for the owner and fo
   - Without Part R, the best possible outcome is a provisional pass that does not change the default.
 - **Judging.**
   - The pool is the top 20 of lexical search and of both the semantic and the hybrid ranking of each configuration, plus every known target.
-  - It is blinded and graded by two human judges, with a depth audit of ranks 11 to 100.
+  - It is blinded, judged completely by two human judges, and followed by a depth audit of ranks 21 to 100. Judging stops only when the relevant notes the audit says may be missing cannot change the decision. _Changed after Codex's second review._
   - Recall@100 is labelled pooled recall. No LLM pre-sorting.
 - **Decision rule.**
   - The frozen rule is unchanged.
@@ -618,7 +618,7 @@ The proposal is [notes-evaluation.md](notes-evaluation.md), for the owner and fo
   The edit texts are `mixed`-length notes from a separate seed. 5 warm-up edits are not counted.
 - **Query and search at 5,000 notes.** `queries=<n>` runs n queries of 2 to 6 words from the notes' vocabulary against the same store.
   - _Changed after Codex's review:_ the queries run before the edits, so they search exactly the 5,000 indexed notes; `query_store_notes` prints the live count.
-  - _Changed after Codex's review:_ the four calls of a query rotate through a 4×4 Williams square (`query_order=williams4`), so each call is in each position, and follows each other call, equally often over every four queries. They used to run in one fixed order, with hybrid always last.
+  - _Changed after Codex's review:_ the four calls of a query rotate through a 4×4 Williams square (`query_order=williams4`), so each call is in each position, and follows each other call within a query, equally often over every four queries. They used to run in one fixed order, with hybrid always last. _Changed after Codex's second review:_ the square balances the calls within a query, not the transitions from one query to the next.
   - The queries use 20 results, the default, and lexical matching on any word, as in the quality study.
   - They are continuous warm measurements on a synthetic vocabulary, not representative search latency.
 
@@ -690,7 +690,7 @@ Records: [docs/measurements/2026-11-12-answer5](../measurements/2026-11-12-answe
   - Both lines are built only after the sampler is cancelled and joined.
 - **Query store size** (Codex 8). The queries now run before the edits, against exactly the indexed notes.
   - The order is pause, then queries, then edits. The alternatives were to restore the corpus after the edits, which adds work to every run, or to print 5,103.
-  - The edits follow the queries, which are short compared with the 300 s pause.
+  - _Changed after Codex's second review_ (this said the queries are short compared with the 300 s pause, which is not evidence of cooling). This does not change what `edit_total_` times. The edits now follow the queries' effects on caches and heat, so the queries and the edits are both continuous warm measurements; the thermal log, not the pause, says how warm.
 - **Query call order** (decided now, before step 3). The four calls of each query rotate through a 4×4 Williams square instead of always ending with hybrid. `queries=200` is a multiple of 4, so each order is used 50 times.
 - **Raw samples.** The draft run plan asks for edit p95 "pooled over runs", which cannot be computed from per-run percentiles. Codex said to retain samples. `[kvid-index-samples]` lines now give every counted call's value.
 - **Wall clock** (local agent). `open_epoch_ms` on both lines.
@@ -701,9 +701,9 @@ Records: [docs/measurements/2026-11-12-answer5](../measurements/2026-11-12-answe
 |---|---|---|
 | both | `open_epoch_ms` | **added:** the phone's wall-clock time (epoch ms) at the origin of `phase_start_s`, just before the open |
 | both | `mem_peak` | **value renamed:** `sampled-100ms` (tuning) and `sampled-100ms-from-before-open` (index) are both now `sampled-100ms+readings-from-before-open` |
-| both | `mem_<phase>_peak_kb` | **meaning changed:** includes the explicit reading at the phase's end (`open` also includes the reading before the open) and excludes samples that span a phase change. Always printed: a number, `not-run` for a phase whose setting is 0, or `none` for a phase without a reading (should not occur) |
+| both | `mem_<phase>_peak_kb` | **meaning changed:** includes the explicit reading at the phase's end (`open` also includes the reading before the open) and excludes samples that span a phase change. Always printed: a number, `not-run` for a phase whose setting is 0, or `none` if every memory read in the phase failed (possible on iOS when `task_info` fails, not on Android). _Added after the second smoke check:_ `mem_close_peak_kb` is in practice the reading after close alone, because close is shorter than the sampling interval, and that reading comes after the memory is released. It is not the memory held while closing (on both smoke lines it equals `mem_after_close_kb`) |
 | both | `mem_lifecycle_peak_kb` | **meaning changed:** the highest of every sample, spanning ones included, and every explicit reading |
-| both | `mem_samples`, `mem_boundary_samples` | **added:** sampled reads, and how many of them spanned a phase change |
+| both | `mem_samples`, `mem_boundary_samples` | **added:** sampled reads, and how many of them spanned a phase change. _Added after the second smoke check:_ `mem_boundary_samples` was 0 on both device lines, so a device has not yet exercised that path (the unit tests do) |
 | both | `mem_peak_kb` | **same meaning** (the indexing or embedding phase's peak, including the reading at its end); now equal to `mem_index_peak_kb` or `mem_embed_peak_kb` by construction |
 | index | `phase_start_s` | **changed:** starts with `open:0.0`; order `open,index,pause,queries,edits,close,end` (queries before edits); lists only phases that ran |
 | index | `query_store_notes` | **added:** live notes when the queries start; equals `notes` |
@@ -715,6 +715,8 @@ Records: [docs/measurements/2026-11-12-answer5](../measurements/2026-11-12-answe
 | tuning | `mem_idle_peak_kb` | **added:** the 5 s after close, now sampled; `mem_after_close_kb` and `mem_idle_5s_kb` are unchanged |
 
 ### Invariants the smoke check confirms
+
+_Superseded by the list in "Checker and open-mark fixes after Codex's second review" below, which the checker at `5afdc3a` enforces._
 
 `python3 -I kvid-embed-onnx/scripts/check_measure_lines.py RAW.txt` checks all of these on every result line in the file, together with that run's samples lines. It exits 0 only if all hold.
 1. `open_epoch_ms` is present and a plausible epoch time.
@@ -733,7 +735,7 @@ Records: [docs/measurements/2026-11-12-answer5](../measurements/2026-11-12-answe
    - the nearest-rank p50 and p95 recomputed from them equal the line's;
    - `edit_kind` is half `put` and half `update`.
 
-Not checked by the script: `mem_samples` should be roughly ten per second of the run, from `phase_start_s`'s `end`.
+Not checked by the script: `mem_samples` per second of the run. _Changed after the second smoke check:_ it is about eight per second on the Pixel 4 XL (491 in 62.5 s, 292 in 36.3 s), not ten. 100 ms is the delay between reads, and each read adds about 25 ms.
 
 ### Comments on the draft run plan (`plan-draft.txt`)
 
@@ -770,3 +772,83 @@ Records: [docs/measurements/2026-11-12-answer5](../measurements/2026-11-12-answe
 - **Run plan.** Still a draft: revised for `31f1e0c`, the cloud session's comments, and two points of practice (at most two valid blocks per session; what counts as a baseline reading). The driver for the runs is written and was tried on the Pixel 4 XL with a small setting.
 - **Open before step 3:** the cloud session's decision on Codex's checker findings and finding 7 (a test change means a new APK and a third smoke check); the Pixel 8 idle baseline; `plan.txt`; the owner's go-ahead.
 
+
+## Checker and open-mark fixes after Codex's second review (November 13, cloud session)
+
+`phase-5-mobile-indexing` at `5afdc3a` fixes the checker findings (1, 4, 5 and 6) and the open mark (7) of [Codex's second review](../measurements/2026-11-12-answer5/codex-review-2-2026-11-12.md), which the owner decided to have fixed before any timed run.
+- **Validation.** The local check's python (now with the checker's 19 unit tests), fixtures and jvm parts passed; iOS and Android were skipped, as there is no macOS or adb in the cloud session.
+- **Checker runs:**
+  - It passes the second smoke check's device lines, and JVM smoke lines from `5afdc3a` (both tests, with an odd edit count of 21, using a temporary process-memory reading that was not committed).
+  - It fails each of Codex's counterexamples.
+- No default changed, and nothing was run on a device.
+
+**Test code changed (finding 7), so the APK must be rebuilt and the smoke check repeated.**
+- Both tests now store the `open` mark as exactly 0.0, the origin of `phase_start_s`, instead of reading the clock a moment after that origin.
+- No result-line field is added or renamed. One is **changed in meaning**: `phase_start_s`'s `open:0.0` is now exact by construction. Its origin is unchanged: the monotonic mark taken together with `open_epoch_ms`, just before the open.
+
+**Checker changes** (`kvid-embed-onnx/scripts/check_measure_lines.py`):
+- **Finding 1:** it recomputes every by-length count and percentile of `edit_total_` and `edit_save_` from `edit_tokens` and the series, and checks the token values.
+- **Finding 4:** every part of a samples series must carry the same part count and `n`, part numbers must be unique, and every part but the last must be full.
+- **Finding 5:** phase times must be finite and non-negative.
+- **Finding 6:** edit kinds must alternate from `update`, which is what the harness's five warm-up edits produce, so an odd count passes.
+- **Also:**
+  - it fails samples lines that belong to no result line, two result lines of one run, and unexpected or malformed series;
+  - malformed input is reported, not a crash;
+  - `test_check_measure_lines.py` keeps every counterexample failing, and the local check's python part runs it. CI does not run it.
+
+### Invariants the smoke check confirms (complete list, replacing the one above)
+
+`python3 -I kvid-embed-onnx/scripts/check_measure_lines.py RAW.txt` (at `5afdc3a`) exits 0 only if all of these hold for every result line in the file, with that run's samples lines.
+1. `open_epoch_ms` is present and a plausible epoch time.
+2. `phase_start_s`:
+   - starts with exactly `open:0.0`;
+   - every time is finite and non-negative;
+   - lists the phases that ran, in run order, with non-decreasing times;
+   - ends with `end`.
+3. `mem_peak=sampled-100ms+readings-from-before-open` on both lines.
+4. Every phase field is present:
+   - a number for a phase that ran;
+   - `not-run` exactly for a phase whose setting is 0;
+   - `none` is a failure. It appears only if every memory read in a phase failed, which is possible on iOS if `task_info` fails, not on Android.
+5. `mem_lifecycle_peak_kb` is at least every other `mem_*_kb` value on the line.
+6. `mem_peak_kb` equals `mem_index_peak_kb` (index line) or `mem_embed_peak_kb` (tuning line).
+7. `mem_boundary_samples` ≤ `mem_samples`.
+8. With queries: `query_store_notes` equals `notes`, and `query_order=williams4`.
+9. With queries or edits, the samples lines:
+   - **The right series:** exactly the series the settings call for. No samples lines of another run, and no second result line of the same run.
+   - **Each series complete:** every part has the same part count and `n`; part numbers are unique and run from 1 to the count; every part but the last holds 200 values; there are `n` values in all, and `n` equals the setting.
+   - **Values well formed:** milliseconds with one decimal; `edit_tokens` from 1 to `max_input_tokens`; `edit_kind` alternating from `update`.
+   - **Percentiles:** the overall p50 and p95 of every timed series equal those recomputed from the samples. For `edit_total_` and `edit_save_`, so do every by-length bucket's count, p50 and p95. A bucket with no edits prints no fields.
+
+Not checked:
+- the tuning line's by-length latency fields (`latency=on`), which have no samples and are not used in the plan;
+- `mem_samples` per second, about eight on the Pixel 4 XL.
+
+### Wording changed after the second smoke check and Codex's second review
+
+These are corrected in the earlier sections and marked there:
+- `mem_samples` is about eight per second, not ten.
+- `mem_close_peak_kb` is in practice the reading after close, taken after the memory is released.
+- `mem_boundary_samples` has not been exercised on a device.
+- `none` is possible when memory reads fail (iOS).
+- The queries and the edits are both continuous warm measurements: the edits follow the queries' cache and heat effects, the pause's length is not evidence of cooling, and the Williams square balances calls within a query, not the transitions between queries.
+- In [notes-evaluation.md](notes-evaluation.md):
+  - **Judging (finding 2):** the declared pool is judged completely, with a stopping rule against missing relevant notes.
+  - **Strata (findings 3 and 8):** they now need minimum support, missing support is a hold, and membership is defined by what survives encoding.
+  - **Allowlist (finding 9):** it now includes the overlap histogram.
+
+### Comments on the revised draft run plan (`plan-draft.txt`)
+
+- **Code and checker:** `5afdc3a`, with the new APK's hash and the third smoke check.
+  - Remove the interim line "Unless a later checker does, the analysis recomputes them…": the checker now recomputes the by-length percentiles, and its tests keep that from regressing.
+- **The local agent's additions:** agreed, each as written:
+  - at most two valid blocks per attachment;
+  - what counts as a baseline reading, and 21 in a row within 2 hours;
+  - the screen on at the start of a run;
+  - an excluded block repeated whole, at most three attempts;
+  - an instrumentation run that does not end "OK (1 test)" stops the queue.
+- **Display state, one addition.** The driver does not hold the screen on, so after the phone's screen timeout the queries and edits (from about five minutes into a run) likely run with the display asleep.
+  - The 200 ms target describes a foreground edit, with the display on. Whether a phone's CPU behaves differently with the display asleep is not established either way.
+  - `therm5.sh` already records `wake=` in every reading. Report it at the start of each phase beside the thermal status, and state beside the edit latency if the edits ran with the display asleep.
+  - Keeping Phase B's practice is the owner's call. Holding the display on (for example `svc power stayon usb`) would add heat, and must be decided before `plan.txt` is committed, not after.
+- **Thermal alignment:** the phone's clock in the same adb call as each reading, and the offset at every run, is what the comments asked for. No other objection.
