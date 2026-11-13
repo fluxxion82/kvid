@@ -776,7 +776,7 @@ Records: [docs/measurements/2026-11-12-answer5](../measurements/2026-11-12-answe
 ## Checker and open-mark fixes after Codex's second review (November 13, cloud session)
 
 `phase-5-mobile-indexing` at `5afdc3a` fixes the checker findings (1, 4, 5 and 6) and the open mark (7) of [Codex's second review](../measurements/2026-11-12-answer5/codex-review-2-2026-11-12.md), which the owner decided to have fixed before any timed run.
-- **Validation.** The local check's python (now with the checker's 19 unit tests), fixtures and jvm parts passed; iOS and Android were skipped, as there is no macOS or adb in the cloud session.
+- **Validation.** The local check's python (now with the checker's 19 unit tests), fixtures and jvm parts passed; iOS and Android were skipped, as there is no macOS or adb in the cloud session. CI run 43335617072 is green on every job, including the iOS simulator job.
 - **Checker runs:**
   - It passes the second smoke check's device lines, and JVM smoke lines from `5afdc3a` (both tests, with an odd edit count of 21, using a temporary process-memory reading that was not committed).
   - It fails each of Codex's counterexamples.
@@ -839,7 +839,7 @@ These are corrected in the earlier sections and marked there:
 
 ### Comments on the revised draft run plan (`plan-draft.txt`)
 
-- **Code and checker:** `5afdc3a`, with the new APK's hash and the third smoke check.
+- **Code and checker:** `5afdc3a` (CI run 43335617072 green), with the new APK's hash and the third smoke check.
   - Remove the interim line "Unless a later checker does, the analysis recomputes them…": the checker now recomputes the by-length percentiles, and its tests keep that from regressing.
 - **The local agent's additions:** agreed, each as written:
   - at most two valid blocks per attachment;
